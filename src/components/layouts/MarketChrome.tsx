@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Btn, Icon, Annot } from "@/components/wf/primitives";
+import { Btn } from "@/components/wf/primitives";
+import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombobox";
 
 export function MarketChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
@@ -118,24 +119,7 @@ export function MarketChrome({ children }: { children: React.ReactNode }) {
             Teach
           </Link>
         </nav>
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            gap: 10,
-            padding: "8px 12px",
-            border: "1px solid var(--wf-hairline)",
-            borderRadius: 4,
-            maxWidth: 480,
-            color: "var(--wf-mute)",
-            fontSize: 12,
-            alignItems: "center",
-          }}
-        >
-          <Icon name="search" size={14} color="var(--wf-mute)" />
-          <span>Search 12,400+ courses, skills, or grades…</span>
-          <Annot ai>Semantic search</Annot>
-        </div>
+        <HeaderSearchCombobox />
         <Link href="/student" style={{ textDecoration: "none" }}>
           <Btn variant="ghost" sm>
             Sign in
