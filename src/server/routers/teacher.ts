@@ -119,6 +119,10 @@ export const teacherRouter = router({
                   slug: true,
                   title: true,
                   durationMin: true,
+                  // Block count badge in the builder. Cheap to add via
+                  // _count and removes the need for a follow-up roundtrip
+                  // when the AddBlockPopover renders.
+                  _count: { select: { blocks: true } },
                 },
               },
             },
@@ -518,6 +522,69 @@ export const teacherRouter = router({
         )
       );
       return { ok: true as const, count: input.unitIds.length };
+    }),
+
+  /**
+   * Append a new block to a lesson. Used by the course builder's
+   * "+ block" popover. Block.order is set to (max existing order + 1)
+   * so the new block always lands at the end — within-lesson reorder
+   * is a future feature.
+   *
+   * `settings` defaults to an empty JSON object; type-specific defaults
+   * (e.g. quiz prompts, video URLs) belong in the inspector flow which
+   * lands after this. Keeping the mutation skinny avoids baking
+   * assumptions about block configuration shapes too early.
+   */
+  addBlock: teacherProcedure
+    .input(
+      z.object({
+        lessonId: z.string(),
+        type: z.enum([
+          "VIDEO",
+          "READING",
+          "SLIDES",
+          "PDF",
+          "QUIZ",
+          "MCQ",
+          "SPEAK",
+          "AI_QUIZ",
+          "SIMULATION",
+          "BRANCHING",
+          "DRAG_MATCH",
+          "POLL",
+          "SECTION",
+          "DISCUSSION",
+          "LIVE",
+        ]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const lesson = await ctx.db.lesson.findUnique({
+        where: { id: input.lessonId },
+        select: {
+          id: true,
+          unit: { select: { course: { select: { authorId: true } } } },
+          blocks: { orderBy: { order: "desc" }, take: 1, select: { order: true } },
+        },
+      });
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const nextOrder = (lesson.blocks[0]?.order ?? 0) + 1;
+      const block = await ctx.db.block.create({
+        data: {
+          lessonId: input.lessonId,
+          type: input.type,
+          order: nextOrder,
+          settings: {},
+        },
+        select: { id: true, type: true, order: true },
+      });
+      return { ok: true as const, block };
     }),
 
   /**

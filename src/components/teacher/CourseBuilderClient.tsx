@@ -27,12 +27,14 @@ import {
   Toggle,
 } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
+import { AddBlockPopover } from "@/components/teacher/AddBlockPopover";
 
 type Lesson = {
   id: string;
   slug: string | null;
   title: string;
   durationMin: number | null;
+  blockCount: number;
 };
 
 type Unit = {
@@ -134,6 +136,21 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       setUnits(course.units);
     },
   });
+
+  // Bump the local blockCount on a lesson when its AddBlockPopover
+  // fires successfully. Avoids a full course refetch for a counter
+  // update — the underlying Block row is already persisted by the
+  // mutation, and the count badge is purely visual.
+  const handleBlockAdded = (lessonId: string) => {
+    setUnits((prev) =>
+      prev.map((u) => ({
+        ...u,
+        lessons: u.lessons.map((l) =>
+          l.id === lessonId ? { ...l, blockCount: l.blockCount + 1 } : l
+        ),
+      }))
+    );
+  };
 
   const handleUnitDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -422,6 +439,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
                     isOpen={openUnit === i}
                     onToggle={() => setOpenUnit(openUnit === i ? -1 : i)}
                     onLessonDragEnd={handleLessonDragEnd(u.id)}
+                    onBlockAdded={handleBlockAdded}
                     sensors={sensors}
                   />
                 ))}
@@ -732,6 +750,7 @@ function SortableUnit({
   isOpen,
   onToggle,
   onLessonDragEnd,
+  onBlockAdded,
   sensors,
 }: {
   unit: Unit;
@@ -739,6 +758,7 @@ function SortableUnit({
   isOpen: boolean;
   onToggle: () => void;
   onLessonDragEnd: (e: DragEndEvent) => void;
+  onBlockAdded: (lessonId: string) => void;
   sensors: ReturnType<typeof useSensors>;
 }) {
   const {
@@ -848,7 +868,11 @@ function SortableUnit({
                 strategy={verticalListSortingStrategy}
               >
                 {unit.lessons.map((l) => (
-                  <SortableLesson key={l.id} lesson={l} />
+                  <SortableLesson
+                    key={l.id}
+                    lesson={l}
+                    onBlockAdded={() => onBlockAdded(l.id)}
+                  />
                 ))}
               </SortableContext>
             </DndContext>
@@ -865,7 +889,7 @@ function SortableUnit({
               letterSpacing: "0.04em",
             }}
           >
-            + DROP A BLOCK HERE · OR ASK AI TO ADD A LESSON
+            + USE THE BLOCK BUTTON ON ANY LESSON · OR ASK AI TO ADD A LESSON
           </Hatch>
         </div>
       )}
@@ -873,7 +897,13 @@ function SortableUnit({
   );
 }
 
-function SortableLesson({ lesson }: { lesson: Lesson }) {
+function SortableLesson({
+  lesson,
+  onBlockAdded,
+}: {
+  lesson: Lesson;
+  onBlockAdded: () => void;
+}) {
   const {
     attributes,
     listeners,
@@ -917,9 +947,17 @@ function SortableLesson({ lesson }: { lesson: Lesson }) {
       <span
         className="wf-mono"
         style={{ fontSize: 10, color: "var(--wf-mute)" }}
+        title={`${lesson.blockCount} block${lesson.blockCount === 1 ? "" : "s"}`}
+      >
+        {lesson.blockCount} ▦
+      </span>
+      <span
+        className="wf-mono"
+        style={{ fontSize: 10, color: "var(--wf-mute)" }}
       >
         {lesson.durationMin ? `${lesson.durationMin} min` : ""}
       </span>
+      <AddBlockPopover lessonId={lesson.id} onAdded={onBlockAdded} />
     </div>
   );
 }

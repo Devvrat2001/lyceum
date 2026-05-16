@@ -47,6 +47,7 @@ export default async function CourseBuilderPage({
               slug: l.slug,
               title: l.title,
               durationMin: l.durationMin,
+              blockCount: l._count.blocks,
             })),
           })),
         }}
