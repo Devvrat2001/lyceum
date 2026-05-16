@@ -25,12 +25,18 @@ export async function findCitation(args: {
   query: string;
   lessonId: string;
 }): Promise<CitationHit | null> {
-  const q = args.query.trim();
-  if (!q) return null;
+  // Tokenize the query into alpha words ≥3 chars, then OR them into a
+  // tsquery so the rank rewards chunks containing more of the terms.
+  // `plainto_tsquery` ANDs the terms which is too strict for natural-
+  // language questions — we want "pizza model work" to match a chunk
+  // about pizzas even if "work" isn't in it.
+  const tokens = args.query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3);
+  if (tokens.length === 0) return null;
+  const tsq = tokens.join(" | ");
 
-  // plainto_tsquery handles arbitrary user text safely (no need to
-  // sanitize for tsquery syntax). It returns no rows when the query
-  // produces no lexemes.
   const rows = await db.$queryRaw<
     Array<{ page: number; section: string | null; content: string; score: number }>
   >(Prisma.sql`
@@ -38,10 +44,10 @@ export async function findCitation(args: {
       "page",
       "section",
       "content",
-      ts_rank("searchable", plainto_tsquery('english', ${q})) AS score
+      ts_rank("searchable", to_tsquery('english', ${tsq})) AS score
     FROM "LessonChunk"
     WHERE "lessonId" = ${args.lessonId}
-      AND "searchable" @@ plainto_tsquery('english', ${q})
+      AND "searchable" @@ to_tsquery('english', ${tsq})
     ORDER BY score DESC
     LIMIT 1
   `);
