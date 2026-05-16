@@ -903,9 +903,168 @@ async function main() {
     ],
   });
 
+  // ── Phase 3: paid Orders + Stripe Connect state ──
+  // Seeds a populated earnings page for the marketplace teachers.
+  // Idempotent: every Order has a deterministic externalId so re-running
+  // the seed upserts cleanly. Fee = 15% (matches STRIPE_PLATFORM_FEE_BPS
+  // default in env.ts).
+  const platformFeeBps = 1500;
+  const computeFee = (gross: number) =>
+    Math.round((gross * platformFeeBps) / 10_000);
+
+  const buyerIds = [
+    jordan.id,
+    ...classmateUsers.map((c) => c.user.id),
+  ];
+  const buyer = (i: number) => buyerIds[i % buyerIds.length];
+
+  type OrderSeed = {
+    key: string; // stable suffix → externalId
+    teacherName: string;
+    courseSlug: string;
+    buyerIdx: number;
+    grossCents: number;
+    status: "PAID" | "REFUNDED" | "PENDING";
+    /** Days before "now" the order was paid (only matters when status=PAID/REFUNDED). */
+    paidDaysAgo?: number;
+    /** Days before "now" the refund landed. */
+    refundedDaysAgo?: number;
+  };
+
+  // Three marketplace teachers, three paid courses, mix of buyers + statuses.
+  // Most orders fall inside the current calendar month so the MTD KPI on
+  // /teacher/earnings has a meaningful number.
+  const orderSeeds: OrderSeed[] = [
+    // Mr. Adeyemi · Algebra Foundations ($19) — payouts-enabled, 4 orders
+    { key: "adeyemi-1", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 0, grossCents: 1900, status: "PAID", paidDaysAgo: 1 },
+    { key: "adeyemi-2", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 1, grossCents: 1900, status: "PAID", paidDaysAgo: 4 },
+    { key: "adeyemi-3", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 2, grossCents: 1900, status: "PAID", paidDaysAgo: 9 },
+    { key: "adeyemi-4", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 3, grossCents: 1900, status: "REFUNDED", paidDaysAgo: 18, refundedDaysAgo: 16 },
+
+    // Studio Pi · Geometry Origami ($29) — no Stripe account yet, 3 orders
+    { key: "studiopi-1", teacherName: "Studio Pi", courseSlug: "geometry-origami", buyerIdx: 4, grossCents: 2900, status: "PAID", paidDaysAgo: 2 },
+    { key: "studiopi-2", teacherName: "Studio Pi", courseSlug: "geometry-origami", buyerIdx: 0, grossCents: 2900, status: "PAID", paidDaysAgo: 12 },
+    { key: "studiopi-3", teacherName: "Studio Pi", courseSlug: "geometry-origami", buyerIdx: 2, grossCents: 2900, status: "PENDING" },
+
+    // Lyceum School · Math Olympiad ($49) — account onboarded but payouts pending, 2 orders
+    { key: "lyceum-1", teacherName: "Lyceum School", courseSlug: "math-olympiad-prep", buyerIdx: 1, grossCents: 4900, status: "PAID", paidDaysAgo: 5 },
+    { key: "lyceum-2", teacherName: "Lyceum School", courseSlug: "math-olympiad-prep", buyerIdx: 3, grossCents: 4900, status: "PAID", paidDaysAgo: 22 },
+  ];
+
+  const nowMs = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  for (const o of orderSeeds) {
+    const teacher = teachers.get(o.teacherName);
+    if (!teacher) continue;
+    const course = await db.course.findUnique({ where: { slug: o.courseSlug } });
+    if (!course) continue;
+    const userId = buyer(o.buyerIdx);
+    const feeCents = computeFee(o.grossCents);
+    const netCents = o.grossCents - feeCents;
+    const paidAt =
+      o.status === "PAID" || o.status === "REFUNDED"
+        ? new Date(nowMs - (o.paidDaysAgo ?? 0) * dayMs)
+        : null;
+    const refundedAt =
+      o.status === "REFUNDED"
+        ? new Date(nowMs - (o.refundedDaysAgo ?? 0) * dayMs)
+        : null;
+    const externalId = `demo_seed_${o.key}`;
+    await db.order.upsert({
+      where: { externalId },
+      update: {
+        status: o.status,
+        paidAt,
+        refundedAt,
+        grossCents: o.grossCents,
+        feeCents,
+        netCents,
+      },
+      create: {
+        userId,
+        courseId: course.id,
+        teacherId: teacher.id,
+        grossCents: o.grossCents,
+        feeCents,
+        netCents,
+        currency: "usd",
+        status: o.status,
+        provider: "demo",
+        externalId,
+        paidAt,
+        refundedAt,
+      },
+    });
+    // PAID orders should produce an Enrollment so the buyer's library
+    // reflects the purchase. REFUNDED orders we leave alone — refund
+    // handler cancels the enrollment when it lands (see webhook).
+    if (o.status === "PAID") {
+      await db.enrollment.upsert({
+        where: { userId_courseId: { userId, courseId: course.id } },
+        update: {},
+        create: {
+          userId,
+          courseId: course.id,
+          lastActivityAt: paidAt ?? new Date(),
+        },
+      });
+    }
+  }
+
+  // Stripe Connect account states — one fully onboarded, one partial,
+  // one absent. Lets us screenshot every state of the EarningsClient
+  // status card by signing in as different teachers.
+  const stripeAccountSeeds: Array<{
+    teacherName: string;
+    externalId: string;
+    payoutsEnabled: boolean;
+    chargesEnabled: boolean;
+  }> = [
+    {
+      teacherName: "Mr. Adeyemi",
+      externalId: "demo_acct_adeyemi_ready",
+      payoutsEnabled: true,
+      chargesEnabled: true,
+    },
+    {
+      teacherName: "Lyceum School",
+      externalId: "demo_acct_lyceum_partial",
+      payoutsEnabled: false,
+      chargesEnabled: true,
+    },
+    // Studio Pi: intentionally no account → "Not connected" CTA state.
+  ];
+  for (const s of stripeAccountSeeds) {
+    const teacher = teachers.get(s.teacherName);
+    if (!teacher) continue;
+    await db.stripeAccount.upsert({
+      where: { teacherId: teacher.id },
+      update: {
+        externalId: s.externalId,
+        payoutsEnabled: s.payoutsEnabled,
+        chargesEnabled: s.chargesEnabled,
+        provider: "demo",
+      },
+      create: {
+        teacherId: teacher.id,
+        externalId: s.externalId,
+        provider: "demo",
+        payoutsEnabled: s.payoutsEnabled,
+        chargesEnabled: s.chargesEnabled,
+      },
+    });
+  }
+
+  const paidCount = orderSeeds.filter((o) => o.status === "PAID").length;
+  const refundedCount = orderSeeds.filter((o) => o.status === "REFUNDED").length;
+  const pendingCount = orderSeeds.filter((o) => o.status === "PENDING").length;
+
   console.log("✅ seed complete");
   console.log(
     `   ${COURSE_SEEDS.length} courses, ${pathSeeds.length} paths, 1 institution, 1 student, ${classmates.length} classmates`
+  );
+  console.log(
+    `   ${orderSeeds.length} orders (${paidCount} paid, ${refundedCount} refunded, ${pendingCount} pending) across ${stripeAccountSeeds.length} Stripe accounts`
   );
 
   await db.$disconnect();

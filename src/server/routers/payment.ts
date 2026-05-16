@@ -138,16 +138,25 @@ export const paymentRouter = router({
             },
           ],
           // Route the teacher's net to their Connect account if onboarded.
-          ...(course.author.stripeAccount?.payoutsEnabled
-            ? {
-                payment_intent_data: {
+          // Also stamp orderId on the PaymentIntent's metadata so the
+          // refund webhook (charge.refunded) can resolve back to our
+          // Order — Charges inherit metadata from their PaymentIntent,
+          // NOT from the Checkout Session.
+          payment_intent_data: {
+            metadata: {
+              orderId: order.id,
+              courseId: course.id,
+              teacherId: course.authorId,
+            },
+            ...(course.author.stripeAccount?.payoutsEnabled
+              ? {
                   application_fee_amount: feeCents,
                   transfer_data: {
                     destination: course.author.stripeAccount.externalId,
                   },
-                },
-              }
-            : {}),
+                }
+              : {}),
+          },
           metadata: {
             orderId: order.id,
             courseId: course.id,

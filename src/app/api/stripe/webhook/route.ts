@@ -10,7 +10,7 @@ import { audit } from "@/lib/audit";
  * Expected events:
  *   checkout.session.completed → mark Order PAID + create Enrollment
  *   account.updated            → sync StripeAccount.payoutsEnabled
- *   charge.refunded            → mark Order REFUNDED (cancels enrollment? — TBD)
+ *   charge.refunded            → mark Order REFUNDED + delete Enrollment
  */
 export const runtime = "nodejs";
 
@@ -145,6 +145,54 @@ export async function POST(req: Request) {
         .catch(() => {
           /* race with first onboarding click — ok */
         });
+    } else if (event.type === "charge.refunded") {
+      // Charges inherit metadata from their PaymentIntent, and we stamp
+      // `orderId` on the PI at checkout-session creation
+      // (see payment.createCheckoutSession). So the refund event
+      // arrives with our orderId directly — no need to do extra
+      // round-trips to resolve Charge → PI → Session → Order.
+      const charge = event.data.object as {
+        payment_intent?: string;
+        metadata?: Record<string, string>;
+      };
+      const orderId = charge.metadata?.orderId ?? null;
+      const order = orderId
+        ? await db.order.findUnique({ where: { id: orderId } })
+        : null;
+      if (!order) {
+        console.warn(
+          "[stripe.webhook] charge.refunded: no order matched",
+          { metadata: charge.metadata, pi: charge.payment_intent }
+        );
+      }
+      if (order && order.status === "PAID") {
+        // Flip the Order and cancel the Enrollment in one tx. We delete
+        // (not soft-delete) the Enrollment so the student loses access
+        // immediately — re-enrolling later just creates a fresh row.
+        await db.$transaction([
+          db.order.update({
+            where: { id: order.id },
+            data: { status: "REFUNDED", refundedAt: new Date() },
+          }),
+          db.enrollment.deleteMany({
+            where: {
+              userId: order.userId,
+              courseId: order.courseId,
+            },
+          }),
+        ]);
+        await audit({
+          actorId: order.userId,
+          kind: "course.publish",
+          payload: {
+            variant: "checkout_refunded",
+            orderId: order.id,
+            grossCents: order.grossCents,
+            netCents: order.netCents,
+          },
+          courseId: order.courseId,
+        });
+      }
     }
     return new Response("ok", { status: 200 });
   } catch (err) {
