@@ -13,18 +13,8 @@ import { getServerCaller } from "@/lib/trpc/server";
 import { MarketplaceHeroSearch } from "@/components/marketplace/MarketplaceHeroSearch";
 import { PathEnrollButton } from "@/components/marketplace/PathEnrollButton";
 import { FollowButton } from "@/components/marketplace/FollowButton";
+import { MARKETPLACE_TOPICS, findTopic } from "@/lib/marketplace";
 import { Suspense } from "react";
-
-const TOPICS = [
-  "STEM",
-  "Reading",
-  "Coding for kids",
-  "Science fair",
-  "Test prep",
-  "Spanish",
-  "Art",
-  "Music",
-];
 
 const FILTER_LABELS = [
   "Grade 6 ▾",
@@ -44,14 +34,34 @@ function fmtCount(n: number): string {
   return n.toString();
 }
 
-export default async function MarketplacePage() {
+export default async function MarketplacePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ topic?: string }>;
+}) {
+  const sp = await searchParams;
+  const activeTopic = findTopic(sp.topic);
+
   const trpc = await getServerCaller();
   const [featured, paths, teachers, recommended] = await Promise.all([
-    trpc.marketplace.featured({ subject: "math", grade: "6", limit: 4 }),
+    // When a topic chip is active, drop the default subject hint so
+    // the topic's filter wins (the router does the same on the server
+    // side — this keeps "See all" counts consistent).
+    trpc.marketplace.featured({
+      ...(activeTopic
+        ? { topic: activeTopic.slug }
+        : { subject: "math" }),
+      grade: "6",
+      limit: 4,
+    }),
     trpc.marketplace.paths(),
     trpc.marketplace.teachers({ limit: 4 }),
     trpc.marketplace.recommendedFor(),
   ]);
+
+  const featuredHeader = activeTopic
+    ? `Top picks for Grade 6 · ${activeTopic.label}`
+    : "Top picks for Grade 6 · Math";
 
   return (
     <MarketChrome>
@@ -103,16 +113,21 @@ export default async function MarketplacePage() {
                 flexWrap: "wrap",
               }}
             >
-              {TOPICS.map((t) => (
-                <Link
-                  key={t}
-                  href={`/?topic=${encodeURIComponent(t.toLowerCase())}`}
-                  className="wf-chip"
-                  style={{ textDecoration: "none" }}
-                >
-                  {t}
-                </Link>
-              ))}
+              {MARKETPLACE_TOPICS.map((t) => {
+                const isActive = activeTopic?.slug === t.slug;
+                return (
+                  <Link
+                    key={t.slug}
+                    // Clicking the active chip again clears the filter
+                    // (toggle UX matches what users expect from chip groups).
+                    href={isActive ? "/" : `/?topic=${t.slug}`}
+                    className={`wf-chip${isActive ? " wf-chip--accent" : ""}`}
+                    style={{ textDecoration: "none" }}
+                  >
+                    {t.label}
+                  </Link>
+                );
+              })}
             </div>
           </div>
           <Card p={18}>
@@ -219,6 +234,43 @@ export default async function MarketplacePage() {
 
         {/* Featured */}
         <section style={{ marginBottom: 32 }}>
+          {activeTopic && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 12,
+              }}
+            >
+              <span
+                className="wf-mono"
+                style={{
+                  fontSize: 9,
+                  color: "var(--wf-mute)",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                FILTER:
+              </span>
+              <Link
+                href="/"
+                className="wf-chip wf-chip--accent"
+                style={{
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+                aria-label={`Clear ${activeTopic.label} filter`}
+              >
+                {activeTopic.label}
+                <span aria-hidden style={{ marginLeft: 2 }}>
+                  ×
+                </span>
+              </Link>
+            </div>
+          )}
           <div
             style={{
               display: "flex",
@@ -228,7 +280,7 @@ export default async function MarketplacePage() {
             }}
           >
             <h2 className="wf-h2" style={{ fontSize: 18 }}>
-              Top picks for Grade 6 · Math
+              {featuredHeader}
             </h2>
             <span style={{ fontSize: 12, color: "var(--wf-mute)" }}>
               See all {featured.total} →
@@ -244,7 +296,21 @@ export default async function MarketplacePage() {
                   color: "var(--wf-body)",
                 }}
               >
-                Try clearing the filters or seeding the database.
+                {activeTopic ? (
+                  <>
+                    No published courses match{" "}
+                    <b>{activeTopic.label}</b> yet.{" "}
+                    <Link
+                      href="/"
+                      style={{ color: "var(--wf-accent)", fontWeight: 600 }}
+                    >
+                      Clear filter
+                    </Link>{" "}
+                    to see everything.
+                  </>
+                ) : (
+                  "Try clearing the filters or seeding the database."
+                )}
               </div>
             </Card>
           ) : (

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import {
@@ -15,6 +16,48 @@ import {
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
 
+/**
+ * Translate a topic chip slug into a Prisma `where` fragment that
+ * intersects with the caller's existing course filter. Returns `null`
+ * for an unknown slug (caller treats this as "no extra filter" rather
+ * than zero results, so a stale URL doesn't yield an empty page).
+ *
+ * Slugs come from `MARKETPLACE_TOPICS` in src/lib/marketplace.ts.
+ * Most match a subject; a couple match by title keyword.
+ *
+ * Title-keyword matches use `contains` + `mode: "insensitive"` which
+ * is fine at our scale; if the catalog grows to >10k courses, swap
+ * for the existing tsvector search infrastructure.
+ */
+function topicWhere(slug: string | undefined): Prisma.CourseWhereInput | null {
+  if (!slug) return null;
+  switch (slug.toLowerCase()) {
+    case "stem":
+      return { subject: { in: ["math", "science"] } };
+    case "reading":
+      return { subject: "ela" };
+    case "coding":
+      return { subject: "coding" };
+    case "science-fair":
+      return { subject: "science" };
+    case "test-prep":
+      return {
+        OR: [
+          { title: { contains: "olympiad", mode: "insensitive" } },
+          { title: { contains: "prep", mode: "insensitive" } },
+        ],
+      };
+    case "spanish":
+      return { subject: "spanish" };
+    case "art":
+      return { subject: "art" };
+    case "music":
+      return { subject: "music" };
+    default:
+      return null;
+  }
+}
+
 export const marketplaceRouter = router({
   /** Featured course cards (top picks). */
   featured: publicProcedure
@@ -29,9 +72,17 @@ export const marketplaceRouter = router({
         .optional()
     )
     .query(async ({ ctx, input }) => {
-      const where = {
-        status: "PUBLISHED" as const,
-        ...(input?.subject ? { subject: input.subject } : {}),
+      const topicFragment = topicWhere(input?.topic);
+      // Topic chips override the subject hint — if you've picked
+      // "Reading" you want ELA courses regardless of what the page's
+      // default subject was. The `grade` hint stays as a soft filter.
+      const where: Prisma.CourseWhereInput = {
+        status: "PUBLISHED",
+        ...(topicFragment
+          ? topicFragment
+          : input?.subject
+            ? { subject: input.subject }
+            : {}),
         ...(input?.grade ? { grade: input.grade } : {}),
       };
       const courses = await ctx.db.course.findMany({
