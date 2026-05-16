@@ -1,0 +1,877 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import {
+  Annot,
+  Btn,
+  Card,
+  Eyebrow,
+  Icon,
+  XPChip,
+} from "@/components/wf/primitives";
+import { trpc } from "@/lib/trpc/react";
+
+type Step = {
+  id: string;
+  order: number;
+  title: string;
+  durationLabel: string | null;
+  isAi: boolean;
+};
+
+type Question = {
+  id: string;
+  stem: string;
+  answers: { key: string; text: string; correct: boolean }[];
+};
+
+type LessonProps = {
+  id: string;
+  slug: string;
+  title: string;
+  intro: string | null;
+  courseSlug: string;
+  courseLabel: string;
+  steps: Step[];
+  questions: Question[];
+};
+
+type Msg = {
+  from: "you" | "ai";
+  text: string;
+  cite?: string;
+  step?: string;
+  streaming?: boolean;
+};
+
+export function LessonClient({ lesson }: { lesson: LessonProps }) {
+  const [qIdx, setQIdx] = useState(0);
+  const question = lesson.questions[qIdx];
+
+  const [selected, setSelected] = useState<number | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    correct: boolean;
+    points: number;
+    correctKey: string | null;
+  } | null>(null);
+
+  const attempt = trpc.lesson.attempt.useMutation({
+    onSuccess: (res) => setFeedback(res),
+  });
+
+  const initialAi = lesson.intro ?? "Let's break this down step by step.";
+  const [messages, setMessages] = useState<Msg[]>([
+    {
+      from: "ai",
+      step: "WELCOME",
+      text: initialAi,
+      cite: `Cited: ${lesson.courseLabel}, p. 142`,
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const tutorSessionIdRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages]);
+
+  // Cancel any in-flight stream on unmount.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const send = async (text?: string) => {
+    const value = (text ?? input).trim();
+    if (!value || streaming) return;
+    setInput("");
+
+    // Build history snapshot for the request *before* we append the new user
+    // message — the server adds the new user turn itself.
+    const history = messages
+      .filter((m): m is Msg & { from: "you" | "ai" } => !!m.text)
+      .map((m) => ({
+        role: m.from === "you" ? ("user" as const) : ("assistant" as const),
+        content: m.text,
+      }));
+
+    // Optimistic UI: append user turn + an empty streaming assistant turn.
+    setMessages((m) => [
+      ...m,
+      { from: "you", text: value },
+      { from: "ai", text: "", streaming: true },
+    ]);
+    setStreaming(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const res = await fetch("/api/tutor/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          lessonId: lesson.id,
+          sessionId: tutorSessionIdRef.current,
+          message: value,
+          history,
+        }),
+      });
+
+      if (!res.ok || !res.body) {
+        const errText = await res.text().catch(() => res.statusText);
+        throw new Error(errText || `HTTP ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      // Stream loop. Each line of the body is one NDJSON event.
+      while (true) {
+        const { value: chunk, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(chunk, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          let ev: {
+            type: string;
+            text?: string;
+            sessionId?: string;
+            citation?: string;
+            message?: string;
+          };
+          try {
+            ev = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (ev.type === "start" && ev.sessionId) {
+            tutorSessionIdRef.current = ev.sessionId;
+          } else if (ev.type === "delta" && ev.text) {
+            setMessages((m) => {
+              const next = [...m];
+              const last = next[next.length - 1];
+              if (last && last.from === "ai" && last.streaming) {
+                next[next.length - 1] = {
+                  ...last,
+                  text: last.text + ev.text,
+                };
+              }
+              return next;
+            });
+          } else if (ev.type === "cite" && ev.citation) {
+            setMessages((m) => {
+              const next = [...m];
+              const last = next[next.length - 1];
+              if (last && last.from === "ai") {
+                next[next.length - 1] = { ...last, cite: ev.citation };
+              }
+              return next;
+            });
+          } else if (ev.type === "error") {
+            throw new Error(ev.message ?? "stream error");
+          }
+        }
+      }
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setMessages((m) => {
+        const next = [...m];
+        const last = next[next.length - 1];
+        if (last && last.from === "ai" && last.streaming) {
+          next[next.length - 1] = {
+            ...last,
+            text: `(Couldn't reach the tutor: ${msg})`,
+            streaming: false,
+          };
+        }
+        return next;
+      });
+    } finally {
+      // Clear streaming flag on the final assistant message.
+      setMessages((m) => {
+        const next = [...m];
+        const last = next[next.length - 1];
+        if (last && last.streaming) {
+          next[next.length - 1] = { ...last, streaming: false };
+        }
+        return next;
+      });
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  };
+
+  const handleCheck = () => {
+    if (selected === null || !question) return;
+    const chosenKey = question.answers[selected].key;
+    setChecked(true);
+    attempt.mutate({
+      questionId: question.id,
+      chosenKey,
+      hintsUsed: 0,
+      timeMs: 0,
+    });
+  };
+
+  const next = () => {
+    setChecked(false);
+    setSelected(null);
+    setFeedback(null);
+    setQIdx((i) => Math.min(lesson.questions.length - 1, i + 1));
+  };
+
+  const isLastQuestion = qIdx >= lesson.questions.length - 1;
+  const isCorrect = feedback?.correct === true;
+  const isWrong = feedback?.correct === false;
+
+  const stepStateFor = (i: number): "done" | "current" | "locked" => {
+    // Until real progress tracking lands, mark first 3 done, 4 current, rest locked.
+    if (i < 3) return "done";
+    if (i === 3) return "current";
+    return "locked";
+  };
+
+  return (
+    <>
+      <div
+        style={{
+          padding: "14px 28px",
+          borderBottom: "1px solid var(--wf-hairline)",
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          flexShrink: 0,
+        }}
+      >
+        <Link
+          href={`/course/${lesson.courseSlug}`}
+          aria-label="Back"
+          style={{ color: "inherit" }}
+        >
+          <Icon
+            name="arrow"
+            size={16}
+            color="var(--wf-body)"
+            style={{ transform: "rotate(180deg)" }}
+          />
+        </Link>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            className="wf-mono"
+            style={{
+              fontSize: 11,
+              color: "var(--wf-mute)",
+              letterSpacing: ".04em",
+            }}
+          >
+            {lesson.courseLabel}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>{lesson.title}</div>
+        </div>
+        <XPChip value={120} sm />
+        <Btn sm variant="ghost" icon={<Icon name="bell" size={12} />}>
+          Pin
+        </Btn>
+        <Btn sm variant="ghost" icon={<Icon name="download" size={12} />}>
+          Offline
+        </Btn>
+        <Btn sm variant="ghost">
+          Notes
+        </Btn>
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          display: "grid",
+          gridTemplateColumns: "220px minmax(0,1fr) 320px",
+          overflow: "hidden",
+        }}
+      >
+        {/* TOC */}
+        <aside
+          style={{
+            borderRight: "1px solid var(--wf-hairline)",
+            padding: "18px 16px",
+            overflow: "auto",
+          }}
+        >
+          <Eyebrow style={{ marginBottom: 10 }}>In this lesson</Eyebrow>
+          {lesson.steps.length === 0 ? (
+            <div
+              style={{ fontSize: 12, color: "var(--wf-mute)" }}
+            >
+              No steps defined for this lesson yet.
+            </div>
+          ) : (
+            lesson.steps.map((s, i) => {
+              const state = stepStateFor(i);
+              return (
+                <div
+                  key={s.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    padding: "10px 0",
+                    borderBottom: "1px solid var(--wf-hairline)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: `1px solid ${
+                        state === "current"
+                          ? "var(--wf-ink)"
+                          : "var(--wf-hairline)"
+                      }`,
+                      background:
+                        state === "done"
+                          ? "var(--wf-ink)"
+                          : state === "current"
+                          ? "white"
+                          : "var(--wf-fill)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {state === "done" && (
+                      <Icon name="check" size={12} color="white" />
+                    )}
+                    {state === "locked" && (
+                      <Icon name="lock" size={10} color="var(--wf-mute)" />
+                    )}
+                    {state === "current" && (
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "var(--wf-ink)",
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: state === "current" ? 600 : 500,
+                        color:
+                          state === "locked"
+                            ? "var(--wf-mute)"
+                            : "var(--wf-ink)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {s.title}{" "}
+                      {s.isAi && (
+                        <Icon
+                          name="sparkles"
+                          size={10}
+                          color="var(--wf-ai)"
+                        />
+                      )}
+                    </div>
+                    <div
+                      className="wf-mono"
+                      style={{
+                        fontSize: 10,
+                        color: "var(--wf-mute)",
+                        marginTop: 2,
+                      }}
+                    >
+                      {s.durationLabel ?? ""}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </aside>
+
+        {/* Content */}
+        <main style={{ overflow: "auto", padding: "32px 48px" }}>
+          {!question ? (
+            <Card p={32} style={{ textAlign: "center" }}>
+              <Eyebrow>No questions yet</Eyebrow>
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 13,
+                  color: "var(--wf-body)",
+                }}
+              >
+                This lesson is content-only for now.
+              </div>
+            </Card>
+          ) : (
+            <>
+              <Annot style={{ marginBottom: 12 }}>
+                Practice question {qIdx + 1} of {lesson.questions.length}
+              </Annot>
+              <h1 className="wf-h1" style={{ fontSize: 24, marginBottom: 8 }}>
+                Try it yourself
+              </h1>
+              <div
+                style={{
+                  fontSize: 14,
+                  marginBottom: 24,
+                  maxWidth: 540,
+                  color: "var(--wf-body)",
+                }}
+              >
+                {question.stem}
+              </div>
+
+              {/* Pizza pie visual aid for the fractions question */}
+              {lesson.slug === "multiplying-fractions" && (
+                <Card p={20} style={{ marginBottom: 20 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Eyebrow>Drag slices to model the problem</Eyebrow>
+                    <Annot>Interactive widget</Annot>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 16,
+                      justifyContent: "center",
+                      padding: "20px 0",
+                    }}
+                  >
+                    {[0, 1, 2, 3].map((p) => (
+                      <PizzaPie key={p} eaten={3} total={8} />
+                    ))}
+                  </div>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      fontSize: 12,
+                      color: "var(--wf-mute)",
+                    }}
+                  >
+                    3 + 3 + 3 + 3 ={" "}
+                    <b style={{ color: "var(--wf-ink)" }}>?</b> slices
+                  </div>
+                </Card>
+              )}
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                  marginBottom: 20,
+                }}
+              >
+                {question.answers.map((a, i) => {
+                  const isSelected = selected === i;
+                  const correct = checked && a.key === feedback?.correctKey;
+                  const incorrect =
+                    checked && isSelected && a.key !== feedback?.correctKey;
+                  return (
+                    <button
+                      key={a.key}
+                      className="wf-answer"
+                      data-selected={isSelected && !checked}
+                      data-correct={correct}
+                      data-incorrect={incorrect}
+                      disabled={checked}
+                      onClick={() => {
+                        if (!checked) setSelected(i);
+                      }}
+                    >
+                      <span
+                        className="wf-mono"
+                        style={{ marginRight: 10, opacity: 0.7 }}
+                      >
+                        {a.key}
+                      </span>
+                      · {a.text}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {checked && feedback && (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    padding: 14,
+                    borderRadius: 4,
+                    background: isCorrect
+                      ? "#e7f4ee"
+                      : "var(--wf-accent-soft)",
+                    border: `1px solid ${
+                      isCorrect ? "var(--wf-good)" : "var(--wf-accent)"
+                    }`,
+                    fontSize: 13,
+                    color: "var(--wf-body)",
+                  }}
+                >
+                  <b
+                    style={{
+                      color: isCorrect
+                        ? "var(--wf-good)"
+                        : "var(--wf-accent)",
+                      marginRight: 6,
+                    }}
+                  >
+                    {isCorrect ? "Correct!" : "Not quite."}
+                  </b>
+                  {isCorrect
+                    ? `+${feedback.points} XP awarded.`
+                    : `The right answer was ${feedback.correctKey}. Open the AI tutor for help.`}
+                </div>
+              )}
+
+              {attempt.isError && (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    padding: 14,
+                    border: "1px solid var(--wf-accent)",
+                    background: "var(--wf-accent-soft)",
+                    fontSize: 12,
+                    color: "var(--wf-accent)",
+                    borderRadius: 4,
+                  }}
+                >
+                  Couldn&apos;t record attempt: {attempt.error.message}
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  borderTop: "1px solid var(--wf-hairline)",
+                  paddingTop: 16,
+                }}
+              >
+                <Btn variant="ghost" disabled>
+                  ← Back
+                </Btn>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Btn
+                    variant="ai"
+                    icon={
+                      <Icon
+                        name="sparkles"
+                        size={12}
+                        color="var(--wf-ai)"
+                      />
+                    }
+                    onClick={() => send("Give me a hint without the answer")}
+                  >
+                    Hint from AI
+                  </Btn>
+                  {!checked ? (
+                    <Btn
+                      variant="primary"
+                      disabled={selected === null || attempt.isPending}
+                      onClick={handleCheck}
+                    >
+                      {attempt.isPending ? "Checking…" : "Check answer →"}
+                    </Btn>
+                  ) : (
+                    <Btn
+                      variant="primary"
+                      onClick={next}
+                      disabled={isLastQuestion && isWrong}
+                    >
+                      {isLastQuestion ? "Lesson complete →" : "Next question →"}
+                    </Btn>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </main>
+
+        {/* AI Tutor */}
+        <aside
+          style={{
+            borderLeft: "1px solid var(--wf-hairline)",
+            display: "flex",
+            flexDirection: "column",
+            background: "var(--wf-fillsoft)",
+          }}
+        >
+          <div
+            style={{
+              padding: "14px 16px",
+              borderBottom: "1px solid var(--wf-hairline)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: "white",
+            }}
+          >
+            <Icon name="sparkles" size={16} color="var(--wf-ai)" />
+            <div style={{ flex: 1 }}>
+              <div
+                className="wf-mono"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  color: "var(--wf-ai)",
+                }}
+              >
+                AI TUTOR
+              </div>
+              <div style={{ fontSize: 10, color: "var(--wf-mute)" }}>
+                Knows this lesson · cites the textbook
+              </div>
+            </div>
+            <Annot ai>Always available</Annot>
+          </div>
+          <div
+            ref={scrollRef}
+            style={{
+              flex: 1,
+              padding: 16,
+              overflow: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            {messages.map((m, i) =>
+              m.from === "you" ? (
+                <div
+                  key={i}
+                  style={{
+                    alignSelf: "flex-end",
+                    maxWidth: "85%",
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    background: "var(--wf-ink)",
+                    color: "white",
+                    fontSize: 12,
+                  }}
+                >
+                  {m.text}
+                </div>
+              ) : (
+                <div key={i}>
+                  <div
+                    style={{
+                      alignSelf: "flex-start",
+                      maxWidth: "90%",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      background: "white",
+                      border: "1px solid var(--wf-hairline)",
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {m.step && (
+                      <div
+                        className="wf-mono"
+                        style={{
+                          fontWeight: 600,
+                          marginBottom: 4,
+                          color: "var(--wf-ai)",
+                          fontSize: 10,
+                          letterSpacing: ".04em",
+                        }}
+                      >
+                        {m.step}
+                      </div>
+                    )}
+                    {m.text || (m.streaming ? "…" : "")}
+                    {m.streaming && (
+                      <span
+                        aria-hidden
+                        className="wf-pulse"
+                        style={{
+                          display: "inline-block",
+                          width: 7,
+                          height: 12,
+                          marginLeft: 2,
+                          background: "var(--wf-ai)",
+                          verticalAlign: "text-bottom",
+                          borderRadius: 1,
+                        }}
+                      />
+                    )}
+                  </div>
+                  {m.cite && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "var(--wf-mute)",
+                        fontStyle: "italic",
+                        paddingLeft: 4,
+                        marginTop: 4,
+                      }}
+                    >
+                      ↳ {m.cite}
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+          </div>
+          <div
+            style={{
+              padding: 12,
+              borderTop: "1px solid var(--wf-hairline)",
+              background: "white",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                marginBottom: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              {["Why × not +?", "Show step 2", "Quiz me"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  style={{
+                    fontSize: 10,
+                    padding: "3px 8px",
+                    border: "1px solid var(--wf-hairline)",
+                    borderRadius: 999,
+                    color: "var(--wf-body)",
+                    cursor: "pointer",
+                    background: "white",
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                send();
+              }}
+              style={{
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+                border: "1px solid var(--wf-hairline)",
+                borderRadius: 4,
+                padding: "8px 10px",
+                background: "white",
+              }}
+            >
+              <Icon name="mic" size={14} color="var(--wf-body)" />
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                disabled={streaming}
+                placeholder={streaming ? "Tutor is thinking…" : "Ask anything…"}
+                style={{
+                  flex: 1,
+                  fontSize: 11,
+                  border: "none",
+                  outline: "none",
+                  background: "transparent",
+                  opacity: streaming ? 0.6 : 1,
+                }}
+              />
+              <button
+                type="submit"
+                disabled={streaming || !input.trim()}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  cursor: streaming ? "not-allowed" : "pointer",
+                  opacity: streaming ? 0.4 : 1,
+                }}
+              >
+                <Icon name="arrow" size={14} color="var(--wf-body)" />
+              </button>
+            </form>
+          </div>
+        </aside>
+      </div>
+    </>
+  );
+}
+
+function PizzaPie({ eaten, total }: { eaten: number; total: number }) {
+  const sliceAngle = 360 / total;
+  return (
+    <div
+      style={{
+        width: 100,
+        height: 100,
+        border: "1.5px solid var(--wf-line)",
+        borderRadius: "50%",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {Array.from({ length: total }).map((_, i) => {
+        const a1 = (i * sliceAngle - 90) * (Math.PI / 180);
+        const a2 = ((i + 1) * sliceAngle - 90) * (Math.PI / 180);
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: i < eaten ? "var(--wf-accent-soft)" : "transparent",
+              clipPath: `polygon(50% 50%, ${
+                50 + 50 * Math.cos(a1)
+              }% ${50 + 50 * Math.sin(a1)}%, ${
+                50 + 50 * Math.cos(a2)
+              }% ${50 + 50 * Math.sin(a2)}%)`,
+              border: "0.5px solid var(--wf-hairline)",
+            }}
+          />
+        );
+      })}
+      {Array.from({ length: total - 1 }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            width: 50,
+            height: 1,
+            background: "var(--wf-hairline)",
+            transformOrigin: "0 50%",
+            transform: `rotate(${(i + 1) * sliceAngle - 90}deg)`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
