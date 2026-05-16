@@ -1,0 +1,154 @@
+import { db } from "@/lib/db";
+import { env } from "@/lib/env";
+import { getStripe } from "@/lib/payments/stripe";
+import { audit } from "@/lib/audit";
+
+/**
+ * Stripe webhook. Only runs in real-Stripe mode — demo orders never
+ * hit this; they go through payment.demoConfirm instead.
+ *
+ * Expected events:
+ *   checkout.session.completed → mark Order PAID + create Enrollment
+ *   account.updated            → sync StripeAccount.payoutsEnabled
+ *   charge.refunded            → mark Order REFUNDED (cancels enrollment? — TBD)
+ */
+export const runtime = "nodejs";
+
+type StripeLike = {
+  webhooks: {
+    constructEvent: (
+      body: string,
+      sig: string,
+      secret: string
+    ) => StripeEvent;
+  };
+};
+
+type StripeEvent =
+  | {
+      type: "checkout.session.completed";
+      data: {
+        object: {
+          id: string;
+          client_reference_id: string | null;
+          metadata?: Record<string, string>;
+        };
+      };
+    }
+  | {
+      type: "account.updated";
+      data: {
+        object: {
+          id: string;
+          payouts_enabled?: boolean;
+          charges_enabled?: boolean;
+        };
+      };
+    }
+  | {
+      type: "charge.refunded";
+      data: {
+        object: {
+          payment_intent: string;
+          metadata?: Record<string, string>;
+        };
+      };
+    }
+  | { type: string; data: { object: Record<string, unknown> } };
+
+export async function POST(req: Request) {
+  const secret = env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) {
+    return new Response(
+      "Webhook secret not configured (running in demo mode).",
+      { status: 503 }
+    );
+  }
+  const stripe = (await getStripe()) as StripeLike | null;
+  if (!stripe) {
+    return new Response("Stripe SDK not installed.", { status: 503 });
+  }
+
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) return new Response("Missing stripe-signature", { status: 400 });
+
+  const body = await req.text();
+  let event: StripeEvent;
+  try {
+    event = stripe.webhooks.constructEvent(body, sig, secret);
+  } catch (err) {
+    return new Response(
+      `Webhook signature verify failed: ${err instanceof Error ? err.message : err}`,
+      { status: 400 }
+    );
+  }
+
+  try {
+    if (event.type === "checkout.session.completed") {
+      const sess = event.data.object as {
+        id: string;
+        client_reference_id: string | null;
+        metadata?: Record<string, string>;
+      };
+      const orderId =
+        sess.client_reference_id ?? sess.metadata?.orderId ?? null;
+      if (orderId) {
+        const order = await db.order.findUnique({ where: { id: orderId } });
+        if (order && order.status === "PENDING") {
+          await db.$transaction([
+            db.order.update({
+              where: { id: orderId },
+              data: { status: "PAID", paidAt: new Date() },
+            }),
+            db.enrollment.upsert({
+              where: {
+                userId_courseId: {
+                  userId: order.userId,
+                  courseId: order.courseId,
+                },
+              },
+              create: {
+                userId: order.userId,
+                courseId: order.courseId,
+                lastActivityAt: new Date(),
+              },
+              update: {},
+            }),
+          ]);
+          await audit({
+            actorId: order.userId,
+            kind: "course.publish",
+            payload: {
+              variant: "checkout_completed",
+              orderId,
+              grossCents: order.grossCents,
+              netCents: order.netCents,
+            },
+            courseId: order.courseId,
+          });
+        }
+      }
+    } else if (event.type === "account.updated") {
+      const acc = event.data.object as {
+        id: string;
+        payouts_enabled?: boolean;
+        charges_enabled?: boolean;
+      };
+      await db.stripeAccount
+        .update({
+          where: { externalId: acc.id },
+          data: {
+            payoutsEnabled: !!acc.payouts_enabled,
+            chargesEnabled: !!acc.charges_enabled,
+          },
+        })
+        .catch(() => {
+          /* race with first onboarding click — ok */
+        });
+    }
+    return new Response("ok", { status: 200 });
+  } catch (err) {
+    console.error("[stripe.webhook]", err);
+    return new Response("internal error", { status: 500 });
+  }
+}

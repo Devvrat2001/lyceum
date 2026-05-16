@@ -1,12 +1,15 @@
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
-import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
-import { ComingSoon } from "@/components/ui/ComingSoon";
+import { Card, Eyebrow } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
+import { EarningsClient } from "@/components/teacher/EarningsClient";
+
+function fmtPrice(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
 
 export default async function TeacherEarningsPage() {
   const trpc = await getServerCaller();
-  const analytics = await trpc.teacher.analytics({ rangeDays: 30 });
-  const earningsKpi = analytics.kpis.find((k) => k.l.startsWith("Earnings"));
+  const data = await trpc.payment.teacherEarnings({ limit: 30 });
 
   return (
     <TeacherChrome active="earnings">
@@ -25,55 +28,101 @@ export default async function TeacherEarningsPage() {
             maxWidth: 1200,
           }}
         >
-          {[
-            { l: "MTD", v: earningsKpi?.v ?? "$0", color: "var(--wf-ink)" },
-            { l: "PENDING", v: "$0", color: "var(--wf-body)" },
-            { l: "LIFETIME", v: "—", color: "var(--wf-body)" },
-            { l: "REV-SHARE", v: "85%", color: "var(--wf-good)" },
-          ].map((s) => (
-            <Card key={s.l} p={16}>
-              <div
-                className="wf-mono"
-                style={{
-                  fontSize: 10,
-                  color: "var(--wf-mute)",
-                  marginBottom: 6,
-                }}
-              >
-                {s.l}
-              </div>
-              <div
-                className="wf-serif"
-                style={{
-                  fontSize: 28,
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  color: s.color,
-                }}
-              >
-                {s.v}
-              </div>
-            </Card>
-          ))}
+          <KpiCard label="MTD NET" value={fmtPrice(data.mtdNetCents)} highlight />
+          <KpiCard
+            label="LIFETIME NET"
+            value={fmtPrice(data.lifetime.netCents)}
+          />
+          <KpiCard
+            label="ORDERS"
+            value={data.lifetime.count.toString()}
+            sub={`${fmtPrice(data.lifetime.grossCents)} gross`}
+          />
+          <KpiCard
+            label="REV-SHARE"
+            value="85%"
+            sub={`Lyceum fee ${fmtPrice(data.lifetime.feeCents)}`}
+          />
         </div>
 
-        <ComingSoon
-          eyebrow="Payouts via Stripe Connect"
-          title="Get paid for your courses"
-          description="Connect your bank in 60 seconds via Stripe Connect Express. Once connected, you get monthly automatic payouts of your 85% revenue share with full earnings history and 1099 docs come tax season."
-          icon="bolt"
-          phase="Phase 3"
-          bullets={[
-            "Stripe Connect Express onboarding (60 sec)",
-            "Monthly automatic payouts to your bank",
-            "85% revenue share — Lyceum keeps 15%",
-            "Detailed transaction history + 1099 export",
-            "Real-time earnings dashboard with refund handling",
-          ]}
-          backHref="/teacher/analytics"
-          backLabel="Back to analytics"
+        <EarningsClient
+          initialAccount={data.stripeAccount}
+          orders={data.orders}
         />
+
+        <Card
+          p={20}
+          style={{
+            marginTop: 18,
+            maxWidth: 1200,
+            background: "var(--wf-fillsoft)",
+          }}
+        >
+          <Eyebrow>What ships next</Eyebrow>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--wf-body)",
+              lineHeight: 1.55,
+              marginTop: 8,
+            }}
+          >
+            Stripe Connect is wired end-to-end above. Coming soon: monthly
+            automatic payouts to your bank, 1099 export, and the buyer-side
+            invoice email. Refunds + dispute handling = Phase 4.
+          </div>
+        </Card>
       </div>
     </TeacherChrome>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <Card p={16}>
+      <div
+        className="wf-mono"
+        style={{
+          fontSize: 10,
+          color: "var(--wf-mute)",
+          marginBottom: 6,
+          letterSpacing: "0.06em",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="wf-serif"
+        style={{
+          fontSize: 28,
+          fontWeight: 700,
+          lineHeight: 1,
+          color: highlight ? "var(--wf-accent)" : "var(--wf-ink)",
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--wf-mute)",
+            marginTop: 4,
+          }}
+        >
+          {sub}
+        </div>
+      )}
+    </Card>
   );
 }

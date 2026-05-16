@@ -17,6 +17,13 @@ const Schema = z.object({
   // Optional override; defaults to claude-opus-4-7 per Claude API skill guidance.
   ANTHROPIC_MODEL: z.string().default("claude-opus-4-7"),
 
+  // Phase 3 — Stripe. All optional; absence flips checkout into demo mode.
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  /// Lyceum's cut of paid course revenue (basis points, 1500 = 15%).
+  STRIPE_PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10_000).default(1500),
+  PUBLIC_BASE_URL: z.string().url().default("http://localhost:3000"),
+
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),

@@ -77,6 +77,10 @@ model User {
   authoredCourses Course[]   @relation("CourseAuthor")
   taughtClasses  Class[]     @relation("ClassTeacher")
   mastery        Mastery[]
+  // Phase 3 — payments
+  ordersBought   Order[]     @relation("OrderBuyer")
+  ordersSold     Order[]     @relation("OrderTeacher")
+  stripeAccount  StripeAccount?
 
   @@index([role])
 }
@@ -164,6 +168,7 @@ model Course {
   reviews      Review[]
   enrollments  Enrollment[]
   pathLinks    PathCourse[]
+  orders       Order[]      @relation("OrderCourse")
   publishedAt  DateTime?
   updatedAt    DateTime     @updatedAt
   createdAt    DateTime     @default(now())
@@ -445,6 +450,64 @@ model TutorMessage {
   citations  Json?
   createdAt  DateTime     @default(now())
   @@index([sessionId, createdAt])
+}
+
+/// One purchase. Created at checkout-session-start with status=PENDING,
+/// flipped to PAID once Stripe (or demo flow) confirms payment, at which
+/// point an Enrollment row is created. Stores both gross + net so the
+/// teacher's earnings page can sum payouts correctly.
+model Order {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation("OrderBuyer", fields: [userId], references: [id], onDelete: Cascade)
+  courseId     String
+  course       Course      @relation("OrderCourse", fields: [courseId], references: [id], onDelete: Cascade)
+  /// Teacher who authored the course; denormalized so the earnings query stays simple.
+  teacherId    String
+  teacher      User        @relation("OrderTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  /// Gross amount the student paid (cents).
+  grossCents   Int
+  /// Lyceum take (15% default). Subtract from gross to get net.
+  feeCents     Int
+  /// Teacher's net (cents). grossCents - feeCents.
+  netCents     Int
+  currency     String      @default("usd")
+  status       OrderStatus @default(PENDING)
+  /// "stripe" or "demo".
+  provider     String
+  /// Stripe Checkout Session id, or "demo_<cuid>" in demo mode.
+  externalId   String      @unique
+  createdAt    DateTime    @default(now())
+  paidAt       DateTime?
+  refundedAt   DateTime?
+  @@index([userId, createdAt])
+  @@index([teacherId, status, createdAt])
+  @@index([courseId, status])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+/// Per-teacher Stripe Connect Express account. Created when a teacher
+/// starts onboarding. The actual KYC dance happens on Stripe's hosted
+/// pages; we just store the account id + whether it's payouts-enabled.
+model StripeAccount {
+  id          String   @id @default(cuid())
+  teacherId   String   @unique
+  teacher     User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  /// Stripe Connect account id (acct_…). For demo accounts: "demo_<cuid>".
+  externalId  String   @unique
+  provider    String   @default("stripe")
+  /// Stripe says we can pay this account out. Defaults true in demo mode.
+  payoutsEnabled Boolean @default(false)
+  /// Stripe says we can charge through this account. Defaults true in demo mode.
+  chargesEnabled Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 /// Generated AI insight for a teacher (per-course) or admin (per-institution).

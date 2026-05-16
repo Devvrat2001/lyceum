@@ -47,6 +47,22 @@ export function EnrollPanel({
     },
   });
 
+  const checkout = trpc.payment.createCheckoutSession.useMutation({
+    onSuccess: ({ url, alreadyEnrolled }) => {
+      if (alreadyEnrolled) {
+        router.push("/student/library");
+        return;
+      }
+      // External URL (Stripe-hosted) or local /demo-checkout/[orderId]
+      if (url.startsWith("http")) {
+        window.location.href = url;
+      } else {
+        router.push(url);
+      }
+    },
+    onError: (e) => setError(e.message),
+  });
+
   const addToLibrary = trpc.course.addToLibrary.useMutation({
     onSuccess: () => {
       setSavedFlash(true);
@@ -54,6 +70,8 @@ export function EnrollPanel({
     },
     onError: (e) => setError(e.message),
   });
+
+  const isPaid = priceCents > 0;
 
   const handleEnroll = () => {
     if (status !== "authenticated") {
@@ -63,7 +81,11 @@ export function EnrollPanel({
       return;
     }
     setError(null);
-    enroll.mutate({ courseId });
+    if (isPaid) {
+      checkout.mutate({ courseId });
+    } else {
+      enroll.mutate({ courseId });
+    }
   };
 
   const handleAddToLibrary = () => {
@@ -77,8 +99,8 @@ export function EnrollPanel({
     addToLibrary.mutate({ courseId });
   };
 
-  const isPaid = priceCents > 0;
   const cta = isPaid ? "Buy & start" : "Enroll & start";
+  const isPending = isPaid ? checkout.isPending : enroll.isPending;
 
   return (
     <div>
@@ -102,23 +124,10 @@ export function EnrollPanel({
         variant="primary"
         full
         onClick={handleEnroll}
-        disabled={enroll.isPending || (isPaid && status === "authenticated")}
+        disabled={isPending}
       >
-        {enroll.isPending ? "Enrolling…" : cta}
+        {isPending ? (isPaid ? "Starting checkout…" : "Enrolling…") : cta}
       </Btn>
-
-      {isPaid && status === "authenticated" && (
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--wf-mute)",
-            marginTop: 8,
-            lineHeight: 1.4,
-          }}
-        >
-          Paid checkout (Stripe) lands in Phase 3.
-        </div>
-      )}
 
       {error && (
         <div
