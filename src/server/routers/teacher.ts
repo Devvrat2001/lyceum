@@ -473,4 +473,100 @@ export const teacherRouter = router({
         elapsedMs: Date.now() - t0,
       };
     }),
+
+  /**
+   * Persist a new unit ordering for a course. `unitIds` is the desired
+   * order; we rewrite `Unit.order` to 1..N to match. Validates that
+   * every supplied id belongs to the course AND that the caller owns
+   * the course (admin bypasses). Idempotent — sending the existing
+   * order is a no-op write.
+   */
+  reorderUnits: teacherProcedure
+    .input(
+      z.object({
+        courseId: z.string(),
+        unitIds: z.array(z.string()).min(1).max(200),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const course = await ctx.db.course.findUnique({
+        where: { id: input.courseId },
+        select: { id: true, authorId: true, units: { select: { id: true } } },
+      });
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "ADMIN" && course.authorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const existing = new Set(course.units.map((u) => u.id));
+      if (
+        input.unitIds.length !== existing.size ||
+        input.unitIds.some((id) => !existing.has(id))
+      ) {
+        // Reject partial reorders — keeps the invariant simple
+        // (every Unit always has a unique 1..N order within its course).
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "unitIds must list every unit in the course exactly once.",
+        });
+      }
+      await ctx.db.$transaction(
+        input.unitIds.map((id, i) =>
+          ctx.db.unit.update({
+            where: { id },
+            data: { order: i + 1 },
+          })
+        )
+      );
+      return { ok: true as const, count: input.unitIds.length };
+    }),
+
+  /**
+   * Persist a new lesson ordering within a single unit. Same shape as
+   * reorderUnits — rewrites Lesson.order to 1..N. Ownership check
+   * resolves the unit → course → authorId chain in one query.
+   */
+  reorderLessons: teacherProcedure
+    .input(
+      z.object({
+        unitId: z.string(),
+        lessonIds: z.array(z.string()).min(1).max(500),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const unit = await ctx.db.unit.findUnique({
+        where: { id: input.unitId },
+        select: {
+          id: true,
+          course: { select: { authorId: true } },
+          lessons: { select: { id: true } },
+        },
+      });
+      if (!unit) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const existing = new Set(unit.lessons.map((l) => l.id));
+      if (
+        input.lessonIds.length !== existing.size ||
+        input.lessonIds.some((id) => !existing.has(id))
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "lessonIds must list every lesson in the unit exactly once.",
+        });
+      }
+      await ctx.db.$transaction(
+        input.lessonIds.map((id, i) =>
+          ctx.db.lesson.update({
+            where: { id },
+            data: { order: i + 1 },
+          })
+        )
+      );
+      return { ok: true as const, count: input.lessonIds.length };
+    }),
 });

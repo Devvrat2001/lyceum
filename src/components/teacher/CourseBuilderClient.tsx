@@ -3,6 +3,21 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   Annot,
   Btn,
   Card,
@@ -87,6 +102,11 @@ function fmtPrice(cents: number) {
 
 export function CourseBuilderClient({ course }: { course: CourseProps }) {
   const [openUnit, setOpenUnit] = useState(0);
+  // Local mirror of units so drag operations can update the UI
+  // optimistically without waiting for the server roundtrip. Mutations
+  // roll this back on error.
+  const [units, setUnits] = useState<Unit[]>(course.units);
+  const [reorderError, setReorderError] = useState<string | null>(null);
   const [settings, setSettings] = useState<Record<string, boolean>>({
     "Adaptive difficulty": true,
     "Show hints": true,
@@ -95,15 +115,71 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     "Allow retake": true,
   });
 
+  // PointerSensor with a small activation distance prevents accidental
+  // drags when the teacher just means to click the unit header to
+  // expand it. 6px is the empirically-comfortable threshold.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  const reorderUnits = trpc.teacher.reorderUnits.useMutation({
+    onError: (e) => {
+      setReorderError(`Failed to save unit order: ${e.message}`);
+      setUnits(course.units); // hard rollback to last server state
+    },
+  });
+  const reorderLessons = trpc.teacher.reorderLessons.useMutation({
+    onError: (e) => {
+      setReorderError(`Failed to save lesson order: ${e.message}`);
+      setUnits(course.units);
+    },
+  });
+
+  const handleUnitDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIdx = units.findIndex((u) => u.id === active.id);
+    const newIdx = units.findIndex((u) => u.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    const next = arrayMove(units, oldIdx, newIdx);
+    setUnits(next);
+    setReorderError(null);
+    reorderUnits.mutate({
+      courseId: course.id,
+      unitIds: next.map((u) => u.id),
+    });
+  };
+
+  const handleLessonDragEnd = (unitId: string) => (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const unitIdx = units.findIndex((u) => u.id === unitId);
+    if (unitIdx === -1) return;
+    const lessons = units[unitIdx].lessons;
+    const oldIdx = lessons.findIndex((l) => l.id === active.id);
+    const newIdx = lessons.findIndex((l) => l.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    const nextLessons = arrayMove(lessons, oldIdx, newIdx);
+    const nextUnits = units.map((u, i) =>
+      i === unitIdx ? { ...u, lessons: nextLessons } : u
+    );
+    setUnits(nextUnits);
+    setReorderError(null);
+    reorderLessons.mutate({
+      unitId,
+      lessonIds: nextLessons.map((l) => l.id),
+    });
+  };
+
   const allLessons = useMemo(
     () =>
-      course.units.flatMap((u) =>
+      units.flatMap((u) =>
         u.lessons.map((l) => ({
           id: l.id,
           label: `${u.title} · ${l.title}`,
         }))
       ),
-    [course.units]
+    [units]
   );
   const [genLessonId, setGenLessonId] = useState<string>(
     allLessons[0]?.id ?? ""
@@ -123,16 +199,13 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     onError: (e) => setGenFeedback(`Failed: ${e.message}`),
   });
 
-  const totalLessons = course.units.reduce(
-    (a, u) => a + u.lessons.length,
-    0
-  );
-  const totalDuration = course.units.reduce(
+  const totalLessons = units.reduce((a, u) => a + u.lessons.length, 0);
+  const totalDuration = units.reduce(
     (a, u) =>
       a + u.lessons.reduce((b, l) => b + (l.durationMin ?? 0), 0),
     0
   );
-  const summary = `For Grade ${course.grade} · ${course.units.length} units · ${totalLessons} lessons${
+  const summary = `For Grade ${course.grade} · ${units.length} units · ${totalLessons} lessons${
     totalDuration > 0
       ? ` · ~${Math.round(totalDuration / 60)} hr`
       : ""
@@ -311,7 +384,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
             </div>
           </Card>
 
-          {course.units.length === 0 ? (
+          {units.length === 0 ? (
             <Card
               p={28}
               style={{
@@ -332,130 +405,45 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
               </div>
             </Card>
           ) : (
-            course.units.map((u, i) => {
-              const isOpen = openUnit === i;
-              return (
-                <Card
-                  key={u.id}
-                  p={0}
-                  style={{ maxWidth: 720, margin: "0 auto 10px" }}
-                >
-                  <button
-                    onClick={() => setOpenUnit(isOpen ? -1 : i)}
-                    style={{
-                      padding: "14px 18px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      borderBottom: isOpen
-                        ? "1px solid var(--wf-hairline)"
-                        : "none",
-                      width: "100%",
-                      background: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Icon name="drag" size={14} color="var(--wf-mute)" />
-                    <span
-                      className="wf-mono"
-                      style={{
-                        fontSize: 11,
-                        color: "var(--wf-mute)",
-                        width: 50,
-                      }}
-                    >
-                      Unit {u.order}
-                    </span>
-                    <span
-                      style={{ fontSize: 14, fontWeight: 600, flex: 1 }}
-                    >
-                      {u.title}
-                    </span>
-                    <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                      {u.estLabel ?? `${u.lessons.length} lessons`}
-                    </span>
-                    <Icon
-                      name="arrow"
-                      size={14}
-                      color="var(--wf-mute)"
-                      style={{
-                        transform: isOpen ? "rotate(90deg)" : "none",
-                        transition: "transform 0.15s",
-                      }}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div style={{ padding: "10px 18px 14px 60px" }}>
-                      {u.lessons.length === 0 ? (
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "var(--wf-mute)",
-                            padding: "8px 0",
-                          }}
-                        >
-                          No lessons yet.
-                        </div>
-                      ) : (
-                        u.lessons.map((l) => (
-                          <div
-                            key={l.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              padding: "8px 10px",
-                              marginBottom: 4,
-                              border: "1px solid var(--wf-hairline)",
-                              borderRadius: 3,
-                              background: "white",
-                              fontSize: 12,
-                            }}
-                          >
-                            <Icon
-                              name="drag"
-                              size={12}
-                              color="var(--wf-mute)"
-                            />
-                            <Icon name="play" size={13} color="var(--wf-body)" />
-                            <span style={{ flex: 1, fontWeight: 500 }}>
-                              {l.title}
-                            </span>
-                            <span
-                              className="wf-mono"
-                              style={{
-                                fontSize: 10,
-                                color: "var(--wf-mute)",
-                              }}
-                            >
-                              {l.durationMin
-                                ? `${l.durationMin} min`
-                                : ""}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                      <Hatch
-                        style={{
-                          padding: "12px 10px",
-                          borderRadius: 3,
-                          marginTop: 4,
-                          fontSize: 11,
-                          color: "var(--wf-mute)",
-                          textAlign: "center",
-                          fontFamily: "var(--font-mono-stack)",
-                          letterSpacing: "0.04em",
-                        }}
-                      >
-                        + DROP A BLOCK HERE · OR ASK AI TO ADD A LESSON
-                      </Hatch>
-                    </div>
-                  )}
-                </Card>
-              );
-            })
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleUnitDragEnd}
+            >
+              <SortableContext
+                items={units.map((u) => u.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {units.map((u, i) => (
+                  <SortableUnit
+                    key={u.id}
+                    unit={u}
+                    index={i}
+                    isOpen={openUnit === i}
+                    onToggle={() => setOpenUnit(openUnit === i ? -1 : i)}
+                    onLessonDragEnd={handleLessonDragEnd(u.id)}
+                    sensors={sensors}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
+
+          {reorderError && (
+            <div
+              style={{
+                maxWidth: 720,
+                margin: "8px auto 0",
+                padding: 8,
+                fontSize: 11,
+                color: "var(--wf-accent)",
+                border: "1px solid var(--wf-accent)",
+                background: "var(--wf-accent-soft)",
+                borderRadius: 4,
+              }}
+            >
+              {reorderError}
+            </div>
           )}
 
           <div style={{ maxWidth: 720, margin: "14px auto" }}>
@@ -726,6 +714,212 @@ function Field({
         {label}
       </div>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Sortable unit card. The drag handle is the leading `drag` Icon
+ * (so a click anywhere ELSE on the header still toggles expand/collapse)
+ * — `listeners` and `attributes` are attached only to that icon's
+ * wrapper. Lessons inside the open unit get their own nested
+ * DndContext so dragging a lesson can never accidentally reorder the
+ * units list.
+ */
+function SortableUnit({
+  unit,
+  index,
+  isOpen,
+  onToggle,
+  onLessonDragEnd,
+  sensors,
+}: {
+  unit: Unit;
+  index: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  onLessonDragEnd: (e: DragEndEvent) => void;
+  sensors: ReturnType<typeof useSensors>;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: unit.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 5 : "auto",
+    maxWidth: 720,
+    margin: "0 auto 10px",
+  };
+
+  return (
+    <Card ref={setNodeRef} p={0} style={style}>
+      <div
+        style={{
+          padding: "14px 18px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          borderBottom: isOpen ? "1px solid var(--wf-hairline)" : "none",
+        }}
+      >
+        {/* Drag handle (separate so the header text/arrow can still click-toggle). */}
+        <span
+          {...attributes}
+          {...listeners}
+          aria-label={`Reorder Unit ${index + 1}`}
+          style={{
+            display: "inline-flex",
+            cursor: "grab",
+            padding: 2,
+            touchAction: "none",
+          }}
+        >
+          <Icon name="drag" size={14} color="var(--wf-mute)" />
+        </span>
+        <button
+          onClick={onToggle}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flex: 1,
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          <span
+            className="wf-mono"
+            style={{
+              fontSize: 11,
+              color: "var(--wf-mute)",
+              width: 50,
+            }}
+          >
+            Unit {unit.order}
+          </span>
+          <span style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>
+            {unit.title}
+          </span>
+          <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
+            {unit.estLabel ?? `${unit.lessons.length} lessons`}
+          </span>
+          <Icon
+            name="arrow"
+            size={14}
+            color="var(--wf-mute)"
+            style={{
+              transform: isOpen ? "rotate(90deg)" : "none",
+              transition: "transform 0.15s",
+            }}
+          />
+        </button>
+      </div>
+      {isOpen && (
+        <div style={{ padding: "10px 18px 14px 60px" }}>
+          {unit.lessons.length === 0 ? (
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--wf-mute)",
+                padding: "8px 0",
+              }}
+            >
+              No lessons yet.
+            </div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={onLessonDragEnd}
+            >
+              <SortableContext
+                items={unit.lessons.map((l) => l.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {unit.lessons.map((l) => (
+                  <SortableLesson key={l.id} lesson={l} />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
+          <Hatch
+            style={{
+              padding: "12px 10px",
+              borderRadius: 3,
+              marginTop: 4,
+              fontSize: 11,
+              color: "var(--wf-mute)",
+              textAlign: "center",
+              fontFamily: "var(--font-mono-stack)",
+              letterSpacing: "0.04em",
+            }}
+          >
+            + DROP A BLOCK HERE · OR ASK AI TO ADD A LESSON
+          </Hatch>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function SortableLesson({ lesson }: { lesson: Lesson }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: lesson.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 10px",
+    marginBottom: 4,
+    border: "1px solid var(--wf-hairline)",
+    borderRadius: 3,
+    background: "white",
+    fontSize: 12,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <span
+        {...attributes}
+        {...listeners}
+        aria-label={`Reorder lesson: ${lesson.title}`}
+        style={{
+          display: "inline-flex",
+          cursor: "grab",
+          touchAction: "none",
+        }}
+      >
+        <Icon name="drag" size={12} color="var(--wf-mute)" />
+      </span>
+      <Icon name="play" size={13} color="var(--wf-body)" />
+      <span style={{ flex: 1, fontWeight: 500 }}>{lesson.title}</span>
+      <span
+        className="wf-mono"
+        style={{ fontSize: 10, color: "var(--wf-mute)" }}
+      >
+        {lesson.durationMin ? `${lesson.durationMin} min` : ""}
+      </span>
     </div>
   );
 }

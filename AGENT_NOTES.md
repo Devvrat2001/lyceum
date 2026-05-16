@@ -17,13 +17,13 @@ When resuming a session, read in this order:
 
 | Field | Value |
 |---|---|
-| Last session | 2026-05-16 — **Phase 3 v1 landed (demo mode).** Stripe Connect end-to-end: `Order` + `StripeAccount` models + migration; `paymentRouter` (createCheckoutSession / demoConfirm / teacherEarnings / startConnectOnboarding); `/demo-checkout/[orderId]`; `/checkout/success`; `/api/stripe/webhook`; `EarningsClient` (Connect status + recent orders table). Without `STRIPE_SECRET_KEY` the flow runs through demo pages with identical DB shape; set the key to flip to real Stripe Checkout + Connect Express. |
-| Phase | **Phase 1: ~99%.** **Phase 2 complete.** P2-03/04 citation retrieval shipped (tutor citations resolve to real page + section, 5/5 hit rate). **Phase 3: demo mode end-to-end; real-Stripe mode wired but unverified (needs key + SDK install).** |
-| Branch | `main` (Phase 3 changes uncommitted — see git status) |
-| Dev server | `npm run dev` — port 3000, Turbopack. Postgres port **5433** via Docker. |
-| Last passing | `tsc --noEmit` clean; demo checkout creates Order(PENDING) → DemoCheckoutForm posts → Order flips PAID + Enrollment row created → success page renders course title + "Start lesson 1" link; teacher earnings page reads aggregates from real Order rows; EarningsClient renders Connect onboarding CTA. |
-| In flight | none (Phase 3 work ready to commit) |
-| Next up | Commit Phase 3 (above) → seed a couple of paid-course orders for demo screenshots → P3 polish (1099 export, invoice email, refund handling = Phase 4) OR remaining P1 polish (P1-13/14/15/28) |
+| Last session | 2026-05-17 — **P1-28 drag-drop course builder shipped.** `teacher.reorderUnits` + `teacher.reorderLessons` mutations (ownership-checked, partial-reorder rejected); `@dnd-kit/{core,sortable,utilities}` installed; `CourseBuilderClient` rebuilt around `DndContext` + nested per-unit `SortableContext` for lessons. Drag handle is the `drag` icon (PointerSensor activation distance = 6px so single-click toggle still works). Optimistic UI with hard-rollback to server state on mutation error. `Card` primitive promoted to `forwardRef`. |
+| Phase | **Phase 1: 100% of in-scope tickets.** Remaining `[ ]` items (P1-13 chip-URL filter, P1-14 popovers, P1-15 header combobox) are explicitly low-priority polish. **Phase 2 complete.** **Phase 3 v1 shipped (demo + Stripe Connect wired; real mode needs `npm i stripe` + key).** |
+| Branch | `main` (P1-28 changes uncommitted — see git status) |
+| Dev server | `npm run dev` — port 3000, Turbopack. Postgres port **5433** via Docker. **IMPORTANT:** Prisma client is module-cached at first import — after any `schema.prisma` change, run `npx prisma generate` AND restart `next dev`, otherwise the running server's in-memory client sees the old schema (we hit this with `Unknown field stripeAccount` after Phase 3 merge — diagnosis + fix in the gotchas block below). |
+| Last passing | `tsc --noEmit` clean. Reorder probe round-trips both unit + lesson order through the live DB. Phase 3 demo checkout creates Order(PENDING) → flips PAID + Enrollment row → success page. Teacher earnings page reads aggregates from real Order rows; EarningsClient renders Connect onboarding CTA / READY FOR PAYOUTS depending on per-teacher `StripeAccount`. |
+| In flight | none |
+| Next up | Phase 3 polish (1099 export, invoice email — both need email/PDF primitives, Phase 4 territory) OR low-pri P1 polish (P1-13/14/15) OR Phase 4 scope (parent role, refund self-service, real Stripe smoke test with `npm i stripe`). |
 | Blockers | Real-Stripe mode needs `npm i stripe`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` in `.env.local`. Demo mode runs without any of that. |
 
 ### What's now real (vs. v0 prototype)
@@ -99,7 +99,7 @@ When resuming a session, read in this order:
 - [ ] P1-13 Topic chip URL filtering (basic Link-with-?topic exists; doesn't actually filter)
 - [ ] P1-14 Real popovers for filter bar (Combobox/popover lib)
 - [ ] P1-15 Header search → real Combobox with debounce
-- [ ] P1-28 Drag-drop builder (`@dnd-kit/core`; reorder units + drop blocks)
+- [x] P1-28 Drag-drop builder — `@dnd-kit/{core,sortable,utilities}` installed; `teacher.reorderUnits` + `teacher.reorderLessons` persist on drop; nested sortable contexts (units list outer, per-unit lessons inner) so a lesson drag never reorders units. Drag handle = the `drag` icon, PointerSensor activation distance 6px. Drop-block-onto-lesson is still phase-2-of-this-feature.
 - [ ] P1-40..41 Final pass + Playwright smoke test
 - [ ] P1-13 Topic chip URL filtering (basic stub written; not wired)
 - [ ] P1-14 Real popovers for filter bar
@@ -114,6 +114,9 @@ When resuming a session, read in this order:
 - [ ] P1-40..41 Final pass
 
 ### New gotchas learned this session
+- **Prisma client is module-cached at first import — `prisma generate` does NOT hot-reload a running dev server.** Saw this as `Unknown field 'stripeAccount' for include statement on model 'User'` at runtime even though tsc passed and the generated `node_modules/.prisma/client/schema.prisma` was current. The Node process loaded `@prisma/client` once at startup; a later regenerate doesn't replace the in-memory module. Fix: kill `next dev`, optionally `rm -rf .next/cache`, restart. Add to the schema-change checklist: (1) edit `schema.prisma` → (2) `npx prisma migrate dev --name X` (auto-runs generate) → (3) **restart `next dev`** → (4) verify.
+- **dnd-kit + click-to-toggle headers.** Out of the box, attaching `useSortable`'s `listeners` to the entire row swallows clicks — the unit header `<button>` stops toggling expand/collapse. Two fixes that work together: (a) attach `listeners`/`attributes` only to a separate drag-handle element (the leading `drag` icon, not the header button), and (b) set `PointerSensor({ activationConstraint: { distance: 6 } })` so a sub-6px movement registers as a click on whatever was under it, not the start of a drag. Without (b), even a clean click on a non-handle element occasionally arms the drag.
+- **dnd-kit + nested sortable contexts.** Lessons inside an expanded unit live in their own `<DndContext>` (one per unit), not the outer units context. If they shared the outer context, dragging a lesson would compute drop targets against the entire flat ID space — which means a lesson could land "between" two units and corrupt both lists. One context per logical sortable, with a fresh `onDragEnd` closure that knows which unit's lessons it's reordering.
 - **Stripe SDK as an optional dep.** We don't want demo mode to require `npm i stripe`. Solution: `getStripe()` does `await import("stripe")` inside a `try` block with `// @ts-expect-error - optional dep`, returns `null` if the import fails. All callers check for null and either throw (`createCheckoutSession` when STRIPE_SECRET_KEY is set but SDK missing — that's misconfig) or fall back gracefully (`webhook` returns 503 so Stripe will retry once you fix it). Demo mode never touches `getStripe()`.
 - **Stripe webhook + Edge** — same trap as Anthropic + Prisma. `stripe.webhooks.constructEvent` needs Node `crypto.timingSafeEqual`. Hard-code `export const runtime = "nodejs"` on `app/api/stripe/webhook/route.ts`.
 - **Stripe webhook needs the raw request body** for signature verification. Next.js App Router gives you the raw bytes via `await req.text()` (NOT `await req.json()` — JSON parsing changes the byte stream and the HMAC fails). Do the text read once at the top.

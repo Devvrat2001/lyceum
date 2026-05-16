@@ -268,23 +268,25 @@ export function Eyebrow({
   );
 }
 
-export function Card({
-  children,
-  style,
-  p = 16,
-  className = "",
-}: {
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-  p?: number | string;
-  className?: string;
-}) {
+export const Card = React.forwardRef<
+  HTMLDivElement,
+  {
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+    p?: number | string;
+    className?: string;
+  }
+>(function Card({ children, style, p = 16, className = "" }, ref) {
   return (
-    <div className={`wf-card ${className}`} style={{ padding: p, ...style }}>
+    <div
+      ref={ref}
+      className={`wf-card ${className}`}
+      style={{ padding: p, ...style }}
+    >
       {children}
     </div>
   );
-}
+});
 
 export function Meter({
   value = 50,
