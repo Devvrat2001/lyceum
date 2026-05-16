@@ -58,6 +58,27 @@ function topicWhere(slug: string | undefined): Prisma.CourseWhereInput | null {
   }
 }
 
+/**
+ * Translate a price-bucket slug into a Prisma `where` fragment on
+ * `priceCents`. Slugs come from `MARKETPLACE_PRICE_BUCKETS` in
+ * src/lib/marketplace.ts. Unknown slug → null (treated as no filter).
+ */
+function priceWhere(slug: string | undefined): Prisma.CourseWhereInput | null {
+  if (!slug) return null;
+  switch (slug.toLowerCase()) {
+    case "free":
+      return { priceCents: 0 };
+    case "under20":
+      return { priceCents: { gt: 0, lt: 2000 } };
+    case "20to50":
+      return { priceCents: { gte: 2000, lt: 5000 } };
+    case "50plus":
+      return { priceCents: { gte: 5000 } };
+    default:
+      return null;
+  }
+}
+
 export const marketplaceRouter = router({
   /** Featured course cards (top picks). */
   featured: publicProcedure
@@ -67,12 +88,15 @@ export const marketplaceRouter = router({
           subject: z.string().optional(),
           grade: z.string().optional(),
           topic: z.string().optional(),
+          /** One of: "free" | "under20" | "20to50" | "50plus" */
+          price: z.string().optional(),
           limit: z.number().int().min(1).max(24).default(4),
         })
         .optional()
     )
     .query(async ({ ctx, input }) => {
       const topicFragment = topicWhere(input?.topic);
+      const priceFragment = priceWhere(input?.price);
       // Topic chips override the subject hint — if you've picked
       // "Reading" you want ELA courses regardless of what the page's
       // default subject was. The `grade` hint stays as a soft filter.
@@ -84,6 +108,7 @@ export const marketplaceRouter = router({
             ? { subject: input.subject }
             : {}),
         ...(input?.grade ? { grade: input.grade } : {}),
+        ...(priceFragment ?? {}),
       };
       const courses = await ctx.db.course.findMany({
         where,

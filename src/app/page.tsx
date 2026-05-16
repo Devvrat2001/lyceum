@@ -13,17 +13,16 @@ import { getServerCaller } from "@/lib/trpc/server";
 import { MarketplaceHeroSearch } from "@/components/marketplace/MarketplaceHeroSearch";
 import { PathEnrollButton } from "@/components/marketplace/PathEnrollButton";
 import { FollowButton } from "@/components/marketplace/FollowButton";
-import { MARKETPLACE_TOPICS, findTopic } from "@/lib/marketplace";
+import { MarketplaceFilters } from "@/components/marketplace/MarketplaceFilters";
+import {
+  MARKETPLACE_GRADES,
+  MARKETPLACE_PRICE_BUCKETS,
+  MARKETPLACE_SUBJECTS,
+  MARKETPLACE_TOPICS,
+  findTopic,
+  labelFor,
+} from "@/lib/marketplace";
 import { Suspense } from "react";
-
-const FILTER_LABELS = [
-  "Grade 6 ▾",
-  "Subject ▾",
-  "Format ▾",
-  "Price ▾",
-  "Length ▾",
-  "Rating ▾",
-];
 
 function fmtPrice(cents: number) {
   return cents === 0 ? "Free" : `$${(cents / 100).toFixed(0)}`;
@@ -37,21 +36,31 @@ function fmtCount(n: number): string {
 export default async function MarketplacePage({
   searchParams,
 }: {
-  searchParams: Promise<{ topic?: string }>;
+  searchParams: Promise<{
+    topic?: string;
+    grade?: string;
+    subject?: string;
+    price?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const activeTopic = findTopic(sp.topic);
+  // Filter defaults: when the user hasn't picked anything, fall back
+  // to "Grade 6 · Math" so the page lands on a populated grid.
+  const grade = sp.grade ?? "6";
+  // Subject is overridden by an active topic on the server side, so
+  // only pass it when no topic is set; defaulting to "math" matches
+  // the prior page behaviour.
+  const subject = sp.subject ?? (activeTopic ? undefined : "math");
+  const price = sp.price;
 
   const trpc = await getServerCaller();
   const [featured, paths, teachers, recommended] = await Promise.all([
-    // When a topic chip is active, drop the default subject hint so
-    // the topic's filter wins (the router does the same on the server
-    // side — this keeps "See all" counts consistent).
     trpc.marketplace.featured({
-      ...(activeTopic
-        ? { topic: activeTopic.slug }
-        : { subject: "math" }),
-      grade: "6",
+      ...(activeTopic ? { topic: activeTopic.slug } : {}),
+      ...(subject ? { subject } : {}),
+      grade,
+      ...(price ? { price } : {}),
       limit: 4,
     }),
     trpc.marketplace.paths(),
@@ -59,9 +68,15 @@ export default async function MarketplacePage({
     trpc.marketplace.recommendedFor(),
   ]);
 
-  const featuredHeader = activeTopic
-    ? `Top picks for Grade 6 · ${activeTopic.label}`
-    : "Top picks for Grade 6 · Math";
+  // Section header reflects the most specific dimension the user has
+  // selected. Topic wins (it's the highest-level), then subject,
+  // then a plain grade label as fallback.
+  const gradeLabel = labelFor(MARKETPLACE_GRADES, sp.grade) ?? "Grade 6";
+  const subjectLabel = labelFor(MARKETPLACE_SUBJECTS, sp.subject);
+  const priceLabel = labelFor(MARKETPLACE_PRICE_BUCKETS, sp.price);
+  const featuredHeader = `Top picks for ${gradeLabel} · ${
+    activeTopic?.label ?? subjectLabel ?? "Math"
+  }${priceLabel ? ` · ${priceLabel}` : ""}`;
 
   return (
     <MarketChrome>
@@ -218,11 +233,33 @@ export default async function MarketplacePage({
           }}
         >
           <Eyebrow style={{ marginRight: 8 }}>Filter</Eyebrow>
-          {FILTER_LABELS.map((f) => (
-            <span key={f} className="wf-chip">
-              {f}
-            </span>
-          ))}
+          <MarketplaceFilters />
+          {/* Static placeholders for filter dimensions we haven't
+              wired yet — Format/Length/Rating need data we don't
+              collect (course delivery format, est. completion time,
+              rating threshold). Left here so the row visually matches
+              the original spec; deferring as a P2+ polish item. */}
+          <span
+            className="wf-chip"
+            style={{ opacity: 0.5, cursor: "not-allowed" }}
+            title="Coming soon"
+          >
+            Format ▾
+          </span>
+          <span
+            className="wf-chip"
+            style={{ opacity: 0.5, cursor: "not-allowed" }}
+            title="Coming soon"
+          >
+            Length ▾
+          </span>
+          <span
+            className="wf-chip"
+            style={{ opacity: 0.5, cursor: "not-allowed" }}
+            title="Coming soon"
+          >
+            Rating ▾
+          </span>
           <div style={{ flex: 1 }} />
           <span
             className="wf-mono"
