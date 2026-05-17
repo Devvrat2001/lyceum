@@ -588,13 +588,72 @@ export const teacherRouter = router({
     }),
 
   /**
+   * Persist a new block ordering within a single lesson. Same shape
+   * as reorderUnits/reorderLessons — rewrites Block.order to 1..N
+   * inside a $transaction. Rejects partial reorders (caller must
+   * supply every block id exactly once) so the (lessonId, order)
+   * invariant stays trivially correct after the operation.
+   *
+   * Note: this DOES tighten the previously-sparse Block.order back
+   * down to a contiguous 1..N. That's fine — sparse order is a
+   * post-delete property, not a guarantee callers depend on, and
+   * compacting on every reorder keeps subsequent addBlock numbers
+   * small.
+   */
+  reorderBlocks: teacherProcedure
+    .input(
+      z.object({
+        lessonId: z.string(),
+        blockIds: z.array(z.string()).min(1).max(200),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const lesson = await ctx.db.lesson.findUnique({
+        where: { id: input.lessonId },
+        select: {
+          id: true,
+          unit: { select: { course: { select: { authorId: true } } } },
+          blocks: { select: { id: true } },
+        },
+      });
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const existing = new Set(lesson.blocks.map((b) => b.id));
+      if (
+        input.blockIds.length !== existing.size ||
+        input.blockIds.some((id) => !existing.has(id))
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "blockIds must list every block in the lesson exactly once.",
+        });
+      }
+      await ctx.db.$transaction(
+        input.blockIds.map((id, i) =>
+          ctx.db.block.update({
+            where: { id },
+            data: { order: i + 1 },
+          })
+        )
+      );
+      return { ok: true as const, count: input.blockIds.length };
+    }),
+
+  /**
    * Remove a block from a lesson. Resolves ownership through
    * block.lesson.unit.course.authorId. We deliberately do NOT
    * renumber the remaining blocks — `order` is sparse on purpose, so
    * a deletion in the middle of the list leaves a gap (e.g. 1, 2,
    * 4 → fine, the next add becomes 5). This keeps the mutation
    * O(1) and avoids a $transaction that would have to update every
-   * row after the deleted one.
+   * row after the deleted one. (reorderBlocks above compacts back
+   * to 1..N when the teacher actually rearranges.)
    */
   deleteBlock: teacherProcedure
     .input(z.object({ blockId: z.string() }))

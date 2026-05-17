@@ -161,6 +161,54 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     onError: (e) => setReorderError(`Failed to delete block: ${e.message}`),
   });
 
+  const reorderBlocks = trpc.teacher.reorderBlocks.useMutation({
+    onError: (e) => {
+      setReorderError(`Failed to save block order: ${e.message}`);
+      setUnits(course.units);
+    },
+  });
+
+  const handleBlockDragEnd =
+    (lessonId: string) => (e: DragEndEvent) => {
+      const { active, over } = e;
+      if (!over || active.id === over.id) return;
+      // Find the lesson in local state — we mutate its `blocks`
+      // array. Walking units+lessons is fine at the cardinalities
+      // we expect (≤20 units × ≤30 lessons).
+      let unitIdx = -1;
+      let lessonIdx = -1;
+      for (let i = 0; i < units.length; i++) {
+        const li = units[i].lessons.findIndex((l) => l.id === lessonId);
+        if (li !== -1) {
+          unitIdx = i;
+          lessonIdx = li;
+          break;
+        }
+      }
+      if (unitIdx === -1) return;
+      const blocks = units[unitIdx].lessons[lessonIdx].blocks;
+      const oldIdx = blocks.findIndex((b) => b.id === active.id);
+      const newIdx = blocks.findIndex((b) => b.id === over.id);
+      if (oldIdx === -1 || newIdx === -1) return;
+      const nextBlocks = arrayMove(blocks, oldIdx, newIdx);
+      const nextUnits = units.map((u, ui) =>
+        ui !== unitIdx
+          ? u
+          : {
+              ...u,
+              lessons: u.lessons.map((l, li) =>
+                li === lessonIdx ? { ...l, blocks: nextBlocks } : l
+              ),
+            }
+      );
+      setUnits(nextUnits);
+      setReorderError(null);
+      reorderBlocks.mutate({
+        lessonId,
+        blockIds: nextBlocks.map((b) => b.id),
+      });
+    };
+
   const handleBlockDelete = (lessonId: string, blockId: string) => {
     // Optimistic remove; if the mutation errors, the onError handler
     // surfaces the message but we leave the optimistic state alone —
@@ -468,6 +516,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
                     onLessonDragEnd={handleLessonDragEnd(u.id)}
                     onBlockAdded={handleBlockAdded}
                     onBlockDelete={handleBlockDelete}
+                    onBlockDragEnd={handleBlockDragEnd}
                     sensors={sensors}
                   />
                 ))}
@@ -780,6 +829,7 @@ function SortableUnit({
   onLessonDragEnd,
   onBlockAdded,
   onBlockDelete,
+  onBlockDragEnd,
   sensors,
 }: {
   unit: Unit;
@@ -789,6 +839,7 @@ function SortableUnit({
   onLessonDragEnd: (e: DragEndEvent) => void;
   onBlockAdded: (lessonId: string, block: LessonBlock) => void;
   onBlockDelete: (lessonId: string, blockId: string) => void;
+  onBlockDragEnd: (lessonId: string) => (e: DragEndEvent) => void;
   sensors: ReturnType<typeof useSensors>;
 }) {
   const {
@@ -903,6 +954,8 @@ function SortableUnit({
                     lesson={l}
                     onBlockAdded={(block) => onBlockAdded(l.id, block)}
                     onBlockDelete={(blockId) => onBlockDelete(l.id, blockId)}
+                    onBlockDragEnd={onBlockDragEnd(l.id)}
+                    sensors={sensors}
                   />
                 ))}
               </SortableContext>
@@ -932,10 +985,14 @@ function SortableLesson({
   lesson,
   onBlockAdded,
   onBlockDelete,
+  onBlockDragEnd,
+  sensors,
 }: {
   lesson: Lesson;
   onBlockAdded: (block: LessonBlock) => void;
   onBlockDelete: (blockId: string) => void;
+  onBlockDragEnd: (e: DragEndEvent) => void;
+  sensors: ReturnType<typeof useSensors>;
 }) {
   const {
     attributes,
@@ -1003,7 +1060,9 @@ function SortableLesson({
       {/* Inline block list — one row per block, indented under the
           lesson header. Empty state suppressed (the count badge of 0
           is enough signal; rendering a placeholder here would just
-          add noise). */}
+          add noise). The blocks live in their OWN nested DndContext
+          for the same reason lessons do — a block drag should never
+          accidentally reorder its parent lesson. */}
       {count > 0 && (
         <div
           style={{
@@ -1014,73 +1073,121 @@ function SortableLesson({
             gap: 2,
           }}
         >
-          {lesson.blocks.map((b) => {
-            const meta = findBlockMeta(b.type);
-            return (
-              <div
-                key={b.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "4px 8px",
-                  border: "1px solid var(--wf-hairline)",
-                  borderRadius: 2,
-                  background: "var(--wf-fillsoft)",
-                  fontSize: 11,
-                }}
-              >
-                <Icon
-                  name={meta.icon as "play"}
-                  size={11}
-                  color={meta.ai ? "var(--wf-ai)" : "var(--wf-body)"}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={onBlockDragEnd}
+          >
+            <SortableContext
+              items={lesson.blocks.map((b) => b.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {lesson.blocks.map((b) => (
+                <SortableBlock
+                  key={b.id}
+                  block={b}
+                  onDelete={() => onBlockDelete(b.id)}
                 />
-                <span
-                  style={{
-                    flex: 1,
-                    color: meta.ai ? "var(--wf-ai)" : "var(--wf-ink)",
-                    fontWeight: 500,
-                  }}
-                >
-                  {meta.label}
-                </span>
-                {meta.ai && (
-                  <span
-                    className="wf-mono"
-                    style={{
-                      fontSize: 8,
-                      color: "var(--wf-ai)",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    AI
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onBlockDelete(b.id);
-                  }}
-                  aria-label={`Delete ${meta.label} block`}
-                  title="Delete block"
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    color: "var(--wf-mute)",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    lineHeight: 1,
-                    padding: "0 4px",
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })}
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
       )}
+    </div>
+  );
+}
+
+function SortableBlock({
+  block,
+  onDelete,
+}: {
+  block: LessonBlock;
+  onDelete: () => void;
+}) {
+  const meta = findBlockMeta(block.type);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: block.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "4px 8px",
+    border: "1px solid var(--wf-hairline)",
+    borderRadius: 2,
+    background: "var(--wf-fillsoft)",
+    fontSize: 11,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <span
+        {...attributes}
+        {...listeners}
+        aria-label={`Reorder ${meta.label} block`}
+        style={{
+          display: "inline-flex",
+          cursor: "grab",
+          touchAction: "none",
+        }}
+      >
+        <Icon name="drag" size={10} color="var(--wf-mute)" />
+      </span>
+      <Icon
+        name={meta.icon as "play"}
+        size={11}
+        color={meta.ai ? "var(--wf-ai)" : "var(--wf-body)"}
+      />
+      <span
+        style={{
+          flex: 1,
+          color: meta.ai ? "var(--wf-ai)" : "var(--wf-ink)",
+          fontWeight: 500,
+        }}
+      >
+        {meta.label}
+      </span>
+      {meta.ai && (
+        <span
+          className="wf-mono"
+          style={{
+            fontSize: 8,
+            color: "var(--wf-ai)",
+            letterSpacing: "0.06em",
+          }}
+        >
+          AI
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        aria-label={`Delete ${meta.label} block`}
+        title="Delete block"
+        style={{
+          border: "none",
+          background: "transparent",
+          color: "var(--wf-mute)",
+          cursor: "pointer",
+          fontSize: 14,
+          lineHeight: 1,
+          padding: "0 4px",
+        }}
+      >
+        ×
+      </button>
     </div>
   );
 }
