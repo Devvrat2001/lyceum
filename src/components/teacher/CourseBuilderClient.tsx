@@ -1478,6 +1478,11 @@ function describeBlockSettings(block: LessonBlock): string | null {
         day: "numeric",
       });
     }
+    case "QUIZ": {
+      const qs = Array.isArray(s.questions) ? s.questions : [];
+      if (qs.length === 0) return null;
+      return `${qs.length} Q${qs.length === 1 ? "" : "s"}`;
+    }
     default:
       return null;
   }

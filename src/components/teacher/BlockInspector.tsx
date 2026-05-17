@@ -60,6 +60,13 @@ export type BlockSettingsShape = {
   };
   // DRAG_MATCH
   pairs?: Array<{ left: string; right: string }>;
+  // QUIZ (curated multi-question MCQ deck; same shape as AI_QUIZ's generated.questions)
+  questions?: Array<{
+    stem: string;
+    difficulty?: number;
+    answers: Array<{ key: string; text: string; correct: boolean }>;
+    hint?: string | null;
+  }>;
   // LIVE (scheduled session)
   startsAt?: string; // ISO timestamp
   durationMin?: number;
@@ -302,6 +309,8 @@ function renderTypeFields(
       return <DragMatchFields draft={draft} update={update} />;
     case "LIVE":
       return <LiveFields draft={draft} update={update} />;
+    case "QUIZ":
+      return <QuizFields draft={draft} update={update} />;
     default:
       return (
         <div
@@ -924,6 +933,257 @@ function AiQuizFields({
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+type QuizQuestion = NonNullable<BlockSettingsShape["questions"]>[number];
+
+const ANSWER_KEYS = ["A", "B", "C", "D"] as const;
+
+function blankQuizQuestion(): QuizQuestion {
+  return {
+    stem: "",
+    answers: ANSWER_KEYS.map((key, i) => ({
+      key,
+      text: "",
+      // First option defaults to correct so a new question is always
+      // valid (exactly-one-correct) even before the teacher edits.
+      correct: i === 0,
+    })),
+    hint: "",
+  };
+}
+
+function QuizFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  const questions: QuizQuestion[] = Array.isArray(draft.questions)
+    ? (draft.questions as QuizQuestion[])
+    : [];
+
+  const setQuestions = (next: QuizQuestion[]) => update("questions", next);
+
+  const addQuestion = () => {
+    if (questions.length >= 8) return;
+    setQuestions([...questions, blankQuizQuestion()]);
+  };
+  const removeQuestion = (idx: number) => {
+    if (questions.length <= 1) return;
+    setQuestions(questions.filter((_, i) => i !== idx));
+  };
+  const setStem = (idx: number, stem: string) =>
+    setQuestions(questions.map((q, i) => (i === idx ? { ...q, stem } : q)));
+  const setHint = (idx: number, hint: string) =>
+    setQuestions(
+      questions.map((q, i) => (i === idx ? { ...q, hint } : q))
+    );
+  const setAnswerText = (qIdx: number, aIdx: number, text: string) =>
+    setQuestions(
+      questions.map((q, i) =>
+        i === qIdx
+          ? {
+              ...q,
+              answers: q.answers.map((a, j) =>
+                j === aIdx ? { ...a, text } : a
+              ),
+            }
+          : q
+      )
+    );
+  const setCorrect = (qIdx: number, aIdx: number) =>
+    setQuestions(
+      questions.map((q, i) =>
+        i === qIdx
+          ? {
+              ...q,
+              answers: q.answers.map((a, j) => ({
+                ...a,
+                correct: j === aIdx,
+              })),
+            }
+          : q
+      )
+    );
+
+  // Start a question on first render if the inspector is empty — saves
+  // the teacher from staring at a do-nothing pane.
+  useEffect(() => {
+    if (questions.length === 0) {
+      setQuestions([blankQuizQuestion()]);
+    }
+    // questions.length is enough — setQuestions identity isn't stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <>
+      {questions.map((q, qIdx) => (
+        <div
+          key={qIdx}
+          style={{
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 4,
+            padding: 8,
+            marginBottom: 8,
+            background: "var(--wf-fillsoft)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 6,
+            }}
+          >
+            <span
+              className="wf-mono"
+              style={{
+                fontSize: 10,
+                color: "var(--wf-mute)",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Q{qIdx + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => removeQuestion(qIdx)}
+              disabled={questions.length <= 1}
+              aria-label={`Remove question ${qIdx + 1}`}
+              title={
+                questions.length <= 1
+                  ? "Need at least 1 question"
+                  : "Remove this question"
+              }
+              style={{
+                border: "none",
+                background: "transparent",
+                color:
+                  questions.length <= 1
+                    ? "var(--wf-hairline)"
+                    : "var(--wf-mute)",
+                cursor:
+                  questions.length <= 1 ? "not-allowed" : "pointer",
+                fontSize: 13,
+                lineHeight: 1,
+                padding: "0 4px",
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <textarea
+            value={q.stem}
+            onChange={(e) => setStem(qIdx, e.target.value)}
+            placeholder="Question stem (e.g. 'What is 3 × 4?')"
+            rows={2}
+            maxLength={500}
+            style={{
+              width: "100%",
+              padding: "5px 7px",
+              fontSize: 11,
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              fontFamily: "inherit",
+              resize: "vertical",
+              marginBottom: 6,
+            }}
+          />
+          {q.answers.map((a, aIdx) => (
+            <div
+              key={aIdx}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 4,
+              }}
+            >
+              <input
+                type="radio"
+                name={`quiz-correct-${qIdx}`}
+                checked={a.correct}
+                onChange={() => setCorrect(qIdx, aIdx)}
+                aria-label={`Mark answer ${a.key} as correct`}
+                style={{ accentColor: "var(--wf-good)" }}
+              />
+              <span
+                className="wf-mono"
+                style={{
+                  fontSize: 10,
+                  color: "var(--wf-mute)",
+                  width: 12,
+                }}
+              >
+                {a.key}
+              </span>
+              <input
+                type="text"
+                value={a.text}
+                onChange={(e) => setAnswerText(qIdx, aIdx, e.target.value)}
+                placeholder={`Answer ${a.key}`}
+                maxLength={200}
+                style={{
+                  flex: 1,
+                  padding: "5px 7px",
+                  fontSize: 11,
+                  border: "1px solid var(--wf-hairline)",
+                  borderRadius: 3,
+                  background: "white",
+                  fontFamily: "inherit",
+                }}
+              />
+            </div>
+          ))}
+          <input
+            type="text"
+            value={q.hint ?? ""}
+            onChange={(e) => setHint(qIdx, e.target.value)}
+            placeholder="Hint (optional)"
+            maxLength={200}
+            style={{
+              width: "100%",
+              marginTop: 4,
+              padding: "5px 7px",
+              fontSize: 11,
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              fontFamily: "inherit",
+              color: "var(--wf-ai)",
+            }}
+          />
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addQuestion}
+        disabled={questions.length >= 8}
+        style={{
+          marginTop: 4,
+          padding: "5px 10px",
+          border: "1px solid var(--wf-hairline)",
+          borderRadius: 3,
+          background: "white",
+          fontSize: 10,
+          fontWeight: 600,
+          color:
+            questions.length >= 8 ? "var(--wf-mute)" : "var(--wf-body)",
+          cursor: questions.length >= 8 ? "not-allowed" : "pointer",
+        }}
+      >
+        + Add question ({questions.length}/8)
+      </button>
     </>
   );
 }

@@ -114,6 +114,8 @@ function renderBody(block: BlockReaderProps) {
       return <DragMatchBody blockId={block.id} settings={block.settings} />;
     case "LIVE":
       return <LiveBody settings={block.settings} />;
+    case "QUIZ":
+      return <QuizBody settings={block.settings} />;
     default:
       return (
         <div
@@ -1259,6 +1261,64 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
   );
 }
 
+/* ── QUIZ ─────────────────────────────────────────────────── */
+
+function QuizBody({ settings }: { settings: Record<string, unknown> }) {
+  const questions = (
+    Array.isArray(settings.questions) ? settings.questions : []
+  ) as QuizQuestion[];
+
+  // Validate each question has the expected shape — defensive in case
+  // teacher saves a malformed JSON (shouldn't happen via inspector but
+  // settings is open JSON).
+  const valid = questions.filter(
+    (q) =>
+      q !== null &&
+      typeof q === "object" &&
+      typeof q.stem === "string" &&
+      Array.isArray(q.answers) &&
+      q.answers.length >= 2 &&
+      q.answers.some((a: { correct?: boolean }) => a?.correct === true)
+  );
+
+  if (valid.length === 0) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't added any questions to this quiz yet." />
+    );
+  }
+
+  return (
+    <div>
+      <div
+        className="wf-mono"
+        style={{
+          fontSize: 9,
+          color: "var(--wf-mute)",
+          letterSpacing: "0.06em",
+          marginBottom: 12,
+        }}
+      >
+        {valid.length} QUESTION{valid.length === 1 ? "" : "S"} · SELF-CHECK
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {valid.map((q, i) => (
+          <QuizQuestionCard key={i} index={i} question={q} />
+        ))}
+      </div>
+      <div
+        style={{
+          marginTop: 14,
+          fontSize: 10,
+          color: "var(--wf-mute)",
+          fontStyle: "italic",
+        }}
+      >
+        Self-check only — XP persistence ships in a follow-up.
+      </div>
+    </div>
+  );
+}
+
 /* ── DRAG_MATCH ───────────────────────────────────────────── */
 
 type DragMatchPair = { left: string; right: string };
@@ -1702,7 +1762,7 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
 
 /* ── AI_QUIZ ──────────────────────────────────────────────── */
 
-type AiQuizQuestion = {
+type QuizQuestion = {
   stem: string;
   difficulty: number;
   answers: Array<{ key: string; text: string; correct: boolean }>;
@@ -1712,7 +1772,7 @@ type AiQuizQuestion = {
 function AiQuizBody({ settings }: { settings: Record<string, unknown> }) {
   const generated = settings.generated as
     | {
-        questions: AiQuizQuestion[];
+        questions: QuizQuestion[];
         generatedAt: string;
         mode?: string;
       }
@@ -1740,7 +1800,7 @@ function AiQuizBody({ settings }: { settings: Record<string, unknown> }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {generated.questions.map((q, i) => (
-          <AiQuizQuestion key={i} index={i} question={q} />
+          <QuizQuestionCard key={i} index={i} question={q} />
         ))}
       </div>
       <div
@@ -1757,12 +1817,12 @@ function AiQuizBody({ settings }: { settings: Record<string, unknown> }) {
   );
 }
 
-function AiQuizQuestion({
+function QuizQuestionCard({
   index,
   question,
 }: {
   index: number;
-  question: AiQuizQuestion;
+  question: QuizQuestion;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);

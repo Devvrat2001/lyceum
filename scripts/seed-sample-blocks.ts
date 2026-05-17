@@ -25,7 +25,8 @@ type Seed = {
     | "DISCUSSION"
     | "AI_QUIZ"
     | "DRAG_MATCH"
-    | "LIVE";
+    | "LIVE"
+    | "QUIZ";
   // Prisma's Json input rejects loose Record<string, unknown> because
   // values could be undefined/functions. InputJsonObject keeps us
   // honest while staying flexible per-type.
@@ -157,6 +158,34 @@ const SAMPLES: Seed[] = [
       startsAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
       durationMin: 45,
       joinUrl: "https://meet.google.com/example-demo-room",
+    },
+  },
+  {
+    type: "QUIZ",
+    settings: {
+      label: MARKER_LABEL,
+      questions: [
+        {
+          stem: "Which expression equals ½ × 8?",
+          answers: [
+            { key: "A", text: "2", correct: false },
+            { key: "B", text: "4", correct: true },
+            { key: "C", text: "6", correct: false },
+            { key: "D", text: "8", correct: false },
+          ],
+          hint: "Half of 8 is one of these.",
+        },
+        {
+          stem: "If you split 15 grapes into 5 equal piles, how many in each pile?",
+          answers: [
+            { key: "A", text: "2", correct: false },
+            { key: "B", text: "3", correct: true },
+            { key: "C", text: "5", correct: false },
+            { key: "D", text: "15", correct: false },
+          ],
+          hint: "Divide the total by the number of piles.",
+        },
+      ],
     },
   },
 ];
