@@ -29,10 +29,10 @@ export default async function CourseDetailPage({
     throw err;
   }
 
-  const reviews = await trpc.course.reviews({
-    courseId: course.id,
-    limit: 4,
-  });
+  const [reviews, myStatus] = await Promise.all([
+    trpc.course.reviews({ courseId: course.id, limit: 4 }),
+    trpc.course.myStatus({ courseId: course.id }),
+  ]);
 
   const totalLessons = course.units.reduce((a, u) => a + u.lessons.length, 0);
   const totalDurationMin = course.units.reduce(
@@ -279,6 +279,8 @@ export default async function CourseDetailPage({
                 totalLessons={totalLessons}
                 upgradeNote={course.upgradeNote}
                 aiHint={course.aiHint}
+                isEnrolled={myStatus.isEnrolled}
+                firstLessonSlug={myStatus.firstLessonSlug}
               />
             </Card>
           </aside>

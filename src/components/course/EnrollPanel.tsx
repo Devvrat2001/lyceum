@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Annot, Btn, Eyebrow, Icon } from "@/components/wf/primitives";
@@ -13,6 +14,20 @@ type Props = {
   totalLessons: number;
   upgradeNote: string | null;
   aiHint: string | null;
+  /**
+   * Whether the current viewer is already enrolled in this course.
+   * When true, the panel flips from "Buy / Enroll / Add to library"
+   * to a single "Continue learning" CTA so we never invite a paying
+   * student to re-purchase a course they already own.
+   * Undefined (e.g. for anon visitors) treated as false.
+   */
+  isEnrolled?: boolean;
+  /**
+   * Slug of the first lesson in the course — used by the
+   * "Continue learning" deep-link. Null if the course has no
+   * lessons yet (very early draft state).
+   */
+  firstLessonSlug?: string | null;
 };
 
 function fmtPrice(cents: number) {
@@ -26,6 +41,8 @@ export function EnrollPanel({
   totalLessons,
   upgradeNote,
   aiHint,
+  isEnrolled = false,
+  firstLessonSlug = null,
 }: Props) {
   const { status } = useSession();
   const router = useRouter();
@@ -102,6 +119,10 @@ export function EnrollPanel({
   const cta = isPaid ? "Buy & start" : "Enroll & start";
   const isPending = isPaid ? checkout.isPending : enroll.isPending;
 
+  const continueHref = firstLessonSlug
+    ? `/student/lesson/${firstLessonSlug}`
+    : "/student/library";
+
   return (
     <div>
       <div
@@ -117,47 +138,75 @@ export function EnrollPanel({
           marginBottom: 14,
         }}
       >
-        {upgradeNote ?? ""}
+        {isEnrolled ? "In your library" : upgradeNote ?? ""}
       </div>
 
-      <Btn
-        variant="primary"
-        full
-        onClick={handleEnroll}
-        disabled={isPending}
-      >
-        {isPending ? (isPaid ? "Starting checkout…" : "Enrolling…") : cta}
-      </Btn>
+      {isEnrolled ? (
+        <>
+          <Link
+            href={continueHref}
+            style={{ textDecoration: "none", display: "block" }}
+          >
+            <Btn variant="primary" full>
+              Continue learning →
+            </Btn>
+          </Link>
+          <Link
+            href="/student/library"
+            style={{
+              display: "block",
+              textAlign: "center",
+              marginTop: 8,
+              fontSize: 12,
+              color: "var(--wf-mute)",
+              textDecoration: "none",
+            }}
+          >
+            Open library
+          </Link>
+        </>
+      ) : (
+        <>
+          <Btn
+            variant="primary"
+            full
+            onClick={handleEnroll}
+            disabled={isPending}
+          >
+            {isPending ? (isPaid ? "Starting checkout…" : "Enrolling…") : cta}
+          </Btn>
 
-      {error && (
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--wf-accent)",
-            padding: "6px 10px",
-            border: "1px solid var(--wf-accent)",
-            background: "var(--wf-accent-soft)",
-            borderRadius: 4,
-            marginTop: 8,
-          }}
-        >
-          {error}
-        </div>
+          {error && (
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--wf-accent)",
+                padding: "6px 10px",
+                border: "1px solid var(--wf-accent)",
+                background: "var(--wf-accent-soft)",
+                borderRadius: 4,
+                marginTop: 8,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <Btn
+            variant="ghost"
+            full
+            style={{ marginTop: 8 }}
+            onClick={handleAddToLibrary}
+            disabled={addToLibrary.isPending}
+          >
+            {savedFlash
+              ? "✓ Added to library"
+              : addToLibrary.isPending
+              ? "Saving…"
+              : "Add to library"}
+          </Btn>
+        </>
       )}
-
-      <Btn
-        variant="ghost"
-        full
-        style={{ marginTop: 8 }}
-        onClick={handleAddToLibrary}
-        disabled={addToLibrary.isPending}
-      >
-        {savedFlash
-          ? "✓ Added to library"
-          : addToLibrary.isPending
-          ? "Saving…"
-          : "Add to library"}
-      </Btn>
 
       <div
         style={{

@@ -77,6 +77,46 @@ export const courseRouter = router({
     ),
 
   /**
+   * Per-user enrollment status for a course. Used by the course detail
+   * page to flip the EnrollPanel from "Buy/Enroll" to "Continue learning"
+   * once the student already owns the course.
+   *
+   * publicProcedure on purpose — anon visitors see the course page and
+   * should get `{ isEnrolled: false }` rather than a 401. The
+   * firstLessonSlug is returned so the UI can deep-link straight into
+   * the first lesson.
+   */
+  myStatus: publicProcedure
+    .input(z.object({ courseId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      // First lesson lookup is shared between branches — compute once.
+      const firstLesson = await ctx.db.lesson.findFirst({
+        where: { unit: { courseId: input.courseId } },
+        orderBy: [{ unit: { order: "asc" } }, { order: "asc" }],
+        select: { slug: true },
+      });
+      const firstLessonSlug = firstLesson?.slug ?? null;
+
+      if (!ctx.session?.user) {
+        return { isEnrolled: false as const, firstLessonSlug };
+      }
+
+      const enrollment = await ctx.db.enrollment.findUnique({
+        where: {
+          userId_courseId: {
+            userId: ctx.session.user.id,
+            courseId: input.courseId,
+          },
+        },
+        select: { id: true },
+      });
+      return {
+        isEnrolled: enrollment !== null,
+        firstLessonSlug,
+      };
+    }),
+
+  /**
    * Phase-1: free-only enrollment. Paid checkout = Phase 3.
    * Returns the slug of the first lesson so the client can route there.
    */
