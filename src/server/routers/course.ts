@@ -77,6 +77,24 @@ export const courseRouter = router({
     ),
 
   /**
+   * Return the set of course ids the current viewer is enrolled in.
+   * Used by list surfaces (marketplace homepage, search results) to
+   * badge cards the student already owns so we never invite them to
+   * re-purchase a course visible in their library.
+   *
+   * publicProcedure on purpose — anon visitors get [] rather than a
+   * 401 so the marketplace stays browseable without sign-in.
+   */
+  myEnrolledIds: publicProcedure.query(async ({ ctx }) => {
+    if (!ctx.session?.user) return [] as string[];
+    const rows = await ctx.db.enrollment.findMany({
+      where: { userId: ctx.session.user.id },
+      select: { courseId: true },
+    });
+    return rows.map((r) => r.courseId);
+  }),
+
+  /**
    * Per-user enrollment status for a course. Used by the course detail
    * page to flip the EnrollPanel from "Buy/Enroll" to "Continue learning"
    * once the student already owns the course.

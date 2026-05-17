@@ -55,18 +55,22 @@ export default async function MarketplacePage({
   const price = sp.price;
 
   const trpc = await getServerCaller();
-  const [featured, paths, teachers, recommended] = await Promise.all([
-    trpc.marketplace.featured({
-      ...(activeTopic ? { topic: activeTopic.slug } : {}),
-      ...(subject ? { subject } : {}),
-      grade,
-      ...(price ? { price } : {}),
-      limit: 4,
-    }),
-    trpc.marketplace.paths(),
-    trpc.marketplace.teachers({ limit: 4 }),
-    trpc.marketplace.recommendedFor(),
-  ]);
+  const [featured, paths, teachers, recommended, enrolledIdList] =
+    await Promise.all([
+      trpc.marketplace.featured({
+        ...(activeTopic ? { topic: activeTopic.slug } : {}),
+        ...(subject ? { subject } : {}),
+        grade,
+        ...(price ? { price } : {}),
+        limit: 4,
+      }),
+      trpc.marketplace.paths(),
+      trpc.marketplace.teachers({ limit: 4 }),
+      trpc.marketplace.recommendedFor(),
+      trpc.course.myEnrolledIds(),
+    ]);
+  // O(1) lookups while rendering cards. Empty Set for anon visitors.
+  const enrolledIds = new Set(enrolledIdList);
 
   // Section header reflects the most specific dimension the user has
   // selected. Topic wins (it's the highest-level), then subject,
@@ -358,77 +362,98 @@ export default async function MarketplacePage({
                 gap: 12,
               }}
             >
-              {featured.courses.map((c) => (
-                <Link
-                  key={c.slug}
-                  href={`/course/${c.slug}`}
-                  style={{ textDecoration: "none", color: "inherit" }}
-                >
-                  <Card p={0}>
-                    <ImageBox h={130} kind="image" />
-                    <div style={{ padding: 12 }}>
-                      <div
-                        className="wf-mono"
-                        style={{
-                          fontSize: 9,
-                          color: "var(--wf-accent)",
-                          letterSpacing: "0.06em",
-                          marginBottom: 4,
-                        }}
-                      >
-                        {c.tag ?? ""}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          marginBottom: 4,
-                          lineHeight: 1.25,
-                        }}
-                      >
-                        {c.title}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "var(--wf-mute)",
-                          marginBottom: 8,
-                        }}
-                      >
-                        {c.authorLabel}
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span
-                          style={{ fontSize: 11, color: "var(--wf-body)" }}
-                        >
-                          ★ {c.ratingAvg.toFixed(1)}{" "}
-                          <span style={{ color: "var(--wf-mute)" }}>
-                            ({fmtCount(c.ratingCount)})
-                          </span>
-                        </span>
-                        <span
+              {featured.courses.map((c) => {
+                const owned = enrolledIds.has(c.id);
+                return (
+                  <Link
+                    key={c.slug}
+                    href={`/course/${c.slug}`}
+                    style={{ textDecoration: "none", color: "inherit" }}
+                  >
+                    <Card p={0}>
+                      <ImageBox h={130} kind="image" />
+                      <div style={{ padding: 12 }}>
+                        <div
+                          className="wf-mono"
                           style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color:
-                              c.priceCents === 0
-                                ? "var(--wf-good)"
-                                : "var(--wf-ink)",
+                            fontSize: 9,
+                            // When the student already owns the course we
+                            // surface that here, replacing the marketing
+                            // tag (BESTSELLER / NEW / ...). It's the most
+                            // useful signal to render at-a-glance.
+                            color: owned
+                              ? "var(--wf-good)"
+                              : "var(--wf-accent)",
+                            letterSpacing: "0.06em",
+                            marginBottom: 4,
                           }}
                         >
-                          {fmtPrice(c.priceCents)}
-                        </span>
+                          {owned ? "✓ IN LIBRARY" : c.tag ?? ""}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            marginBottom: 4,
+                            lineHeight: 1.25,
+                          }}
+                        >
+                          {c.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--wf-mute)",
+                            marginBottom: 8,
+                          }}
+                        >
+                          {c.authorLabel}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <span
+                            style={{ fontSize: 11, color: "var(--wf-body)" }}
+                          >
+                            ★ {c.ratingAvg.toFixed(1)}{" "}
+                            <span style={{ color: "var(--wf-mute)" }}>
+                              ({fmtCount(c.ratingCount)})
+                            </span>
+                          </span>
+                          {owned ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: "var(--wf-good)",
+                              }}
+                            >
+                              Continue →
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color:
+                                  c.priceCents === 0
+                                    ? "var(--wf-good)"
+                                    : "var(--wf-ink)",
+                              }}
+                            >
+                              {fmtPrice(c.priceCents)}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </Card>
-                </Link>
-              ))}
+                    </Card>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>

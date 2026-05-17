@@ -115,6 +115,9 @@ export const marketplaceRouter = router({
         orderBy: [{ enrollCount: "desc" }, { ratingAvg: "desc" }],
         take: input?.limit ?? 4,
         select: {
+          // id is consumed by the marketplace page to cross-reference
+          // course.myEnrolledIds and badge cards the student owns.
+          id: true,
           slug: true,
           title: true,
           authorLabel: true,
