@@ -1428,7 +1428,8 @@ function describeBlockSettings(block: LessonBlock): string | null {
       return `${opts.length} opts · ${correct} ✓`;
     }
     case "SLIDES":
-    case "PDF": {
+    case "PDF":
+    case "SIMULATION": {
       const url = typeof s.url === "string" ? s.url.trim() : "";
       if (!url) return null;
       try {

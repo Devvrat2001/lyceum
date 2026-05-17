@@ -311,6 +311,8 @@ function renderTypeFields(
       return <LiveFields draft={draft} update={update} />;
     case "QUIZ":
       return <QuizFields draft={draft} update={update} />;
+    case "SIMULATION":
+      return <SimulationFields draft={draft} update={update} />;
     default:
       return (
         <div
@@ -953,6 +955,37 @@ function blankQuizQuestion(): QuizQuestion {
     })),
     hint: "",
   };
+}
+
+function SimulationFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  return (
+    <>
+      <TextField
+        label="SIMULATION URL"
+        value={typeof draft.url === "string" ? draft.url : ""}
+        onChange={(v) => update("url", v)}
+        placeholder="https://phet.colorado.edu/… · https://www.desmos.com/… · any iframe-able URL"
+        maxLength={500}
+        hint="Most PhET, Desmos, and GeoGebra sims embed cleanly. Reader falls back to a link for hosts that block embedding."
+      />
+      <TextField
+        label="CAPTION (OPTIONAL)"
+        value={typeof draft.caption === "string" ? draft.caption : ""}
+        onChange={(v) => update("caption", v)}
+        placeholder="One-line description shown under the sim"
+        maxLength={200}
+      />
+    </>
+  );
 }
 
 function QuizFields({

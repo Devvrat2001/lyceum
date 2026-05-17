@@ -26,7 +26,8 @@ type Seed = {
     | "AI_QUIZ"
     | "DRAG_MATCH"
     | "LIVE"
-    | "QUIZ";
+    | "QUIZ"
+    | "SIMULATION";
   // Prisma's Json input rejects loose Record<string, unknown> because
   // values could be undefined/functions. InputJsonObject keeps us
   // honest while staying flexible per-type.
@@ -186,6 +187,16 @@ const SAMPLES: Seed[] = [
           hint: "Divide the total by the number of piles.",
         },
       ],
+    },
+  },
+  {
+    type: "SIMULATION",
+    settings: {
+      label: MARKER_LABEL,
+      // PhET "Fractions: Intro" — embeddable HTML5 sim. PhET sims sit
+      // on a stable CDN URL pattern that's been steady for years.
+      url: "https://phet.colorado.edu/sims/html/fractions-intro/latest/fractions-intro_en.html",
+      caption: "PhET · Fractions Intro — drag the pies to build matching fractions.",
     },
   },
 ];

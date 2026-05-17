@@ -116,6 +116,8 @@ function renderBody(block: BlockReaderProps) {
       return <LiveBody settings={block.settings} />;
     case "QUIZ":
       return <QuizBody settings={block.settings} />;
+    case "SIMULATION":
+      return <SimulationBody settings={block.settings} />;
     default:
       return (
         <div
@@ -1257,6 +1259,113 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
           Join link hasn&apos;t been added yet.
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── SIMULATION ───────────────────────────────────────────── */
+
+function SimulationBody({ settings }: { settings: Record<string, unknown> }) {
+  const rawUrl =
+    typeof settings.url === "string" ? settings.url.trim() : "";
+  const caption =
+    typeof settings.caption === "string" ? settings.caption.trim() : "";
+
+  if (!rawUrl) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't added a simulation URL yet." />
+    );
+  }
+
+  // Cheap URL validity check — bad strings render the link fallback
+  // instead of an iframe with a broken src that the browser would
+  // chew on for a few seconds before erroring.
+  let valid = false;
+  try {
+    new URL(rawUrl);
+    valid = true;
+  } catch {
+    valid = false;
+  }
+
+  return (
+    <div>
+      {valid ? (
+        <div
+          style={{
+            position: "relative",
+            paddingTop: "62.5%", // 16:10 — most sims sit between 16:9 and 4:3
+            background: "var(--wf-fill)",
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 4,
+            overflow: "hidden",
+            marginBottom: 10,
+          }}
+        >
+          <iframe
+            src={rawUrl}
+            title="Simulation"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            allowFullScreen
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              border: "none",
+            }}
+          />
+        </div>
+      ) : (
+        <a
+          href={rawUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            color: "var(--wf-ink)",
+            textDecoration: "none",
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            padding: "8px 12px",
+            fontSize: 13,
+            marginBottom: 10,
+          }}
+        >
+          Open simulation ↗
+        </a>
+      )}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
+          fontSize: 12,
+          color: "var(--wf-body)",
+          flexWrap: "wrap",
+        }}
+      >
+        <a
+          href={rawUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="wf-mono"
+          style={{
+            fontSize: 10,
+            color: "var(--wf-mute)",
+            textDecoration: "none",
+            letterSpacing: "0.06em",
+          }}
+        >
+          OPEN IN NEW TAB ↗
+        </a>
+        {caption && (
+          <span style={{ color: "var(--wf-body)" }}>· {caption}</span>
+        )}
+      </div>
     </div>
   );
 }
