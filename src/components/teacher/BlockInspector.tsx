@@ -71,6 +71,9 @@ export type BlockSettingsShape = {
   startsAt?: string; // ISO timestamp
   durationMin?: number;
   joinUrl?: string;
+  // SPEAK (voice prompt + transcription)
+  expected?: string;
+  language?: string;
   // unknown / future
   [k: string]: unknown;
 };
@@ -313,6 +316,8 @@ function renderTypeFields(
       return <QuizFields draft={draft} update={update} />;
     case "SIMULATION":
       return <SimulationFields draft={draft} update={update} />;
+    case "SPEAK":
+      return <SpeakFields draft={draft} update={update} />;
     default:
       return (
         <div
@@ -955,6 +960,52 @@ function blankQuizQuestion(): QuizQuestion {
     })),
     hint: "",
   };
+}
+
+function SpeakFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  // SPEAK has two parts: the prompt the reader reads aloud, and an
+  // optional `expected` target phrase the reader compares the
+  // transcript against. Language is BCP-47 (default en-US) so
+  // SpeechRecognition + voice picker stay correct for non-English
+  // classrooms.
+  return (
+    <>
+      <TextAreaField
+        label="PROMPT (READ ALOUD)"
+        value={typeof draft.prompt === "string" ? draft.prompt : ""}
+        onChange={(v) => update("prompt", v)}
+        placeholder="Read this sentence aloud, paying attention to the underlined words."
+        rows={3}
+        maxLength={500}
+        hint="The reader speaks this via the browser's text-to-speech."
+      />
+      <TextField
+        label="EXPECTED RESPONSE (OPTIONAL)"
+        value={typeof draft.expected === "string" ? draft.expected : ""}
+        onChange={(v) => update("expected", v)}
+        placeholder="The phrase the student should say back"
+        maxLength={300}
+        hint="When set, the reader compares the student's transcript to this."
+      />
+      <TextField
+        label="LANGUAGE CODE"
+        value={typeof draft.language === "string" ? draft.language : ""}
+        onChange={(v) => update("language", v)}
+        placeholder="en-US"
+        maxLength={16}
+        hint="BCP-47 code. Leave blank for en-US. Examples: es-ES, fr-FR, hi-IN."
+      />
+    </>
+  );
 }
 
 function SimulationFields({

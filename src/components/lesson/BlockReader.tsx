@@ -118,6 +118,8 @@ function renderBody(block: BlockReaderProps) {
       return <QuizBody settings={block.settings} />;
     case "SIMULATION":
       return <SimulationBody settings={block.settings} />;
+    case "SPEAK":
+      return <SpeakBody settings={block.settings} />;
     default:
       return (
         <div
@@ -1261,6 +1263,352 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
       )}
     </div>
   );
+}
+
+/* ── SPEAK ────────────────────────────────────────────────── */
+
+/**
+ * Minimal shape for the WebSpeech SpeechRecognition API. The full
+ * types live in the DOM lib but aren't always shipped under standard
+ * names — we just need start/stop, the event shape, and a couple of
+ * properties we set on the instance.
+ */
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>>; resultIndex: number }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+};
+
+function getSpeechRecognitionCtor(): { new (): SpeechRecognitionLike } | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: { new (): SpeechRecognitionLike };
+    webkitSpeechRecognition?: { new (): SpeechRecognitionLike };
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
+  const prompt =
+    typeof settings.prompt === "string" ? settings.prompt.trim() : "";
+  const expected =
+    typeof settings.expected === "string" ? settings.expected.trim() : "";
+  const language =
+    typeof settings.language === "string" && settings.language.trim() !== ""
+      ? settings.language.trim()
+      : "en-US";
+
+  const [speaking, setSpeaking] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [typedFallback, setTypedFallback] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Feature-detect on mount and remember per-render. The actual
+  // recognition instance lives in a ref so the same one is reused
+  // across start/stop cycles.
+  const recognitionCtor = useMemo(() => getSpeechRecognitionCtor(), []);
+  const ttsAvailable = useMemo(
+    () => typeof window !== "undefined" && "speechSynthesis" in window,
+    []
+  );
+
+  const recognitionRef = useMemo(() => {
+    // useRef would be more conventional but useMemo with stable deps
+    // gives the same single-instance semantic without an extra import.
+    return { current: null as SpeechRecognitionLike | null };
+  }, []);
+
+  // Cleanup any in-flight TTS / STT when the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      try {
+        recognitionRef.current?.abort();
+      } catch {
+        // Some browsers throw when abort() is called on an already-stopped
+        // instance. The cleanup path doesn't care.
+      }
+    };
+  }, [recognitionRef]);
+
+  if (!prompt) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't added a speaking prompt yet." />
+    );
+  }
+
+  const speakPrompt = () => {
+    if (!ttsAvailable) return;
+    // Cancel any in-flight utterance so re-clicks restart cleanly
+    // instead of queueing.
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(prompt);
+    utterance.lang = language;
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const startListening = () => {
+    if (!recognitionCtor) return;
+    setErrorMsg(null);
+    setTranscript("");
+    const r = new recognitionCtor();
+    r.lang = language;
+    r.continuous = false;
+    r.interimResults = true;
+    r.onresult = (event) => {
+      // Collect all final + interim segments into one string so the
+      // student sees their words appear as they speak.
+      let out = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const alt = event.results[i][0];
+        if (alt) out += alt.transcript;
+      }
+      setTranscript(out);
+    };
+    r.onerror = (event) => {
+      // "no-speech" fires when the user starts then doesn't say
+      // anything — friendlier wording than the raw event name.
+      const friendly =
+        event.error === "no-speech"
+          ? "Didn't catch anything — try again."
+          : event.error === "not-allowed"
+            ? "Microphone permission denied. Allow access and retry."
+            : `Recognition error: ${event.error}`;
+      setErrorMsg(friendly);
+      setListening(false);
+    };
+    r.onend = () => setListening(false);
+    recognitionRef.current = r;
+    try {
+      r.start();
+      setListening(true);
+    } catch {
+      setErrorMsg("Couldn't start recording. Refresh and try again.");
+    }
+  };
+
+  const stopListening = () => {
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // No-op — same defensive pattern as the unmount cleanup.
+    }
+    setListening(false);
+  };
+
+  // Compare transcript (or typed fallback) to expected. Case-
+  // insensitive, whitespace-collapsed, punctuation-stripped. Good
+  // enough for k-12 speaking exercises; full phonetic match is a
+  // future iteration.
+  const submittedText = (transcript || typedFallback).trim();
+  const checkResult: "match" | "close" | "different" | null =
+    expected && submittedText
+      ? matchScore(submittedText, expected)
+      : null;
+
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 14,
+          color: "var(--wf-body)",
+          lineHeight: 1.5,
+          marginBottom: 12,
+          padding: "10px 12px",
+          background: "var(--wf-fillsoft)",
+          borderLeft: "3px solid var(--wf-ai)",
+          borderRadius: 3,
+        }}
+      >
+        {prompt}
+      </div>
+
+      {/* TTS row */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+        {ttsAvailable ? (
+          <button
+            type="button"
+            onClick={speakPrompt}
+            disabled={speaking}
+            style={{
+              padding: "6px 12px",
+              fontSize: 12,
+              border: "1px solid var(--wf-ai)",
+              borderRadius: 3,
+              background: speaking ? "var(--wf-fillsoft)" : "white",
+              color: "var(--wf-ai)",
+              cursor: speaking ? "default" : "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {speaking ? "🔊 Speaking…" : "🔊 Read aloud"}
+          </button>
+        ) : (
+          <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
+            Text-to-speech isn&apos;t available in this browser.
+          </span>
+        )}
+      </div>
+
+      {/* STT row OR text fallback */}
+      {recognitionCtor ? (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={listening ? stopListening : startListening}
+            style={{
+              padding: "6px 12px",
+              fontSize: 12,
+              border: "none",
+              borderRadius: 3,
+              background: listening ? "var(--wf-accent)" : "var(--wf-ink)",
+              color: "white",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {listening ? "● Stop" : "🎤 Speak your answer"}
+          </button>
+          {listening && (
+            <span style={{ fontSize: 11, color: "var(--wf-accent)" }}>
+              Listening — speak now.
+            </span>
+          )}
+        </div>
+      ) : (
+        // Firefox / Safari iOS — fall back to a text input so the
+        // student can still complete the exercise.
+        <div style={{ marginBottom: 10 }}>
+          <div
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              color: "var(--wf-mute)",
+              marginBottom: 4,
+              letterSpacing: "0.06em",
+            }}
+          >
+            TYPE YOUR ANSWER (VOICE NOT AVAILABLE)
+          </div>
+          <input
+            type="text"
+            value={typedFallback}
+            onChange={(e) => setTypedFallback(e.target.value)}
+            placeholder="Type what you would say…"
+            maxLength={500}
+            style={{
+              width: "100%",
+              padding: "6px 9px",
+              fontSize: 13,
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              fontFamily: "inherit",
+            }}
+          />
+        </div>
+      )}
+
+      {(transcript || typedFallback) && (
+        <div
+          style={{
+            padding: "8px 10px",
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            fontSize: 13,
+            color: "var(--wf-body)",
+            background: "white",
+            marginBottom: 8,
+            minHeight: 32,
+          }}
+        >
+          <div
+            className="wf-mono"
+            style={{
+              fontSize: 9,
+              color: "var(--wf-mute)",
+              letterSpacing: "0.06em",
+              marginBottom: 4,
+            }}
+          >
+            HEARD
+          </div>
+          {transcript || typedFallback}
+        </div>
+      )}
+
+      {checkResult && (
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color:
+              checkResult === "match"
+                ? "var(--wf-good)"
+                : checkResult === "close"
+                  ? "var(--wf-ai)"
+                  : "var(--wf-accent)",
+            marginBottom: 8,
+          }}
+        >
+          {checkResult === "match"
+            ? "✓ Match!"
+            : checkResult === "close"
+              ? "Close — try again for an exact match."
+              : `Different — expected: "${expected}"`}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--wf-accent)",
+            marginBottom: 4,
+          }}
+        >
+          {errorMsg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Quick lexical match: normalize then compare. Counts a "close"
+ *  result when the Levenshtein-style word-set overlap is high. */
+function matchScore(
+  said: string,
+  expected: string
+): "match" | "close" | "different" {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^\p{Letter}\p{Number}\s]/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  const a = norm(said);
+  const b = norm(expected);
+  if (a === b) return "match";
+  if (!a || !b) return "different";
+  // Word-set overlap heuristic — good enough for speaking practice.
+  const aSet = new Set(a.split(" "));
+  const bSet = new Set(b.split(" "));
+  let shared = 0;
+  for (const w of aSet) if (bSet.has(w)) shared += 1;
+  const overlap = shared / Math.max(aSet.size, bSet.size);
+  return overlap >= 0.7 ? "close" : "different";
 }
 
 /* ── SIMULATION ───────────────────────────────────────────── */

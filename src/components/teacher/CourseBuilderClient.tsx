@@ -1484,6 +1484,13 @@ function describeBlockSettings(block: LessonBlock): string | null {
       if (qs.length === 0) return null;
       return `${qs.length} Q${qs.length === 1 ? "" : "s"}`;
     }
+    case "SPEAK": {
+      const prompt = typeof s.prompt === "string" ? s.prompt.trim() : "";
+      if (!prompt) return null;
+      const expected =
+        typeof s.expected === "string" && s.expected.trim() !== "";
+      return expected ? "checked" : "open response";
+    }
     default:
       return null;
   }

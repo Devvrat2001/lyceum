@@ -27,7 +27,8 @@ type Seed = {
     | "DRAG_MATCH"
     | "LIVE"
     | "QUIZ"
-    | "SIMULATION";
+    | "SIMULATION"
+    | "SPEAK";
   // Prisma's Json input rejects loose Record<string, unknown> because
   // values could be undefined/functions. InputJsonObject keeps us
   // honest while staying flexible per-type.
@@ -197,6 +198,15 @@ const SAMPLES: Seed[] = [
       // on a stable CDN URL pattern that's been steady for years.
       url: "https://phet.colorado.edu/sims/html/fractions-intro/latest/fractions-intro_en.html",
       caption: "PhET · Fractions Intro — drag the pies to build matching fractions.",
+    },
+  },
+  {
+    type: "SPEAK",
+    settings: {
+      label: MARKER_LABEL,
+      prompt: "Say this aloud: one-third times six equals two.",
+      expected: "one third times six equals two",
+      language: "en-US",
     },
   },
 ];
