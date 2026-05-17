@@ -494,6 +494,13 @@ export default async function MarketplacePage({
             {paths.map((p) => {
               const totalSlots = 12;
               const filledSlots = Math.min(totalSlots, p.courses.length || 4);
+              // Intersect this path's course IDs with the viewer's
+              // enrolled set so the button can flip 0-owned →
+              // "Enroll →", partial → with "N / M OWNED" hint, and
+              // fully-owned → "✓ In your library".
+              const ownedInPath = p.courses.filter((pc) =>
+                enrolledIds.has(pc.course.id)
+              ).length;
               return (
                 <Card key={p.id} p={16}>
                   <div
@@ -567,7 +574,12 @@ export default async function MarketplacePage({
                     <span style={{ fontSize: 18, fontWeight: 700 }}>
                       {fmtPrice(p.priceCents)}
                     </span>
-                    <PathEnrollButton pathId={p.id} pathSlug={p.slug} />
+                    <PathEnrollButton
+                      pathId={p.id}
+                      pathSlug={p.slug}
+                      ownedCount={ownedInPath}
+                      totalCount={p.courses.length}
+                    />
                   </div>
                 </Card>
               );
