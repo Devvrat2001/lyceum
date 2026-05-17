@@ -119,10 +119,10 @@ export const teacherRouter = router({
                   slug: true,
                   title: true,
                   durationMin: true,
-                  // Block count badge in the builder. Cheap to add via
-                  // _count and removes the need for a follow-up roundtrip
-                  // when the AddBlockPopover renders.
-                  _count: { select: { blocks: true } },
+                  blocks: {
+                    orderBy: { order: "asc" },
+                    select: { id: true, type: true, order: true },
+                  },
                 },
               },
             },
@@ -585,6 +585,39 @@ export const teacherRouter = router({
         select: { id: true, type: true, order: true },
       });
       return { ok: true as const, block };
+    }),
+
+  /**
+   * Remove a block from a lesson. Resolves ownership through
+   * block.lesson.unit.course.authorId. We deliberately do NOT
+   * renumber the remaining blocks — `order` is sparse on purpose, so
+   * a deletion in the middle of the list leaves a gap (e.g. 1, 2,
+   * 4 → fine, the next add becomes 5). This keeps the mutation
+   * O(1) and avoids a $transaction that would have to update every
+   * row after the deleted one.
+   */
+  deleteBlock: teacherProcedure
+    .input(z.object({ blockId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: {
+          id: true,
+          lessonId: true,
+          lesson: {
+            select: { unit: { select: { course: { select: { authorId: true } } } } },
+          },
+        },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        block.lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      await ctx.db.block.delete({ where: { id: block.id } });
+      return { ok: true as const, blockId: block.id };
     }),
 
   /**

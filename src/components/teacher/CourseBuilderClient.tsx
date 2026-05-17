@@ -28,13 +28,20 @@ import {
 } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 import { AddBlockPopover } from "@/components/teacher/AddBlockPopover";
+import { findBlockMeta, type BlockType } from "@/lib/blocks";
+
+type LessonBlock = {
+  id: string;
+  type: BlockType;
+  order: number;
+};
 
 type Lesson = {
   id: string;
   slug: string | null;
   title: string;
   durationMin: number | null;
-  blockCount: number;
+  blocks: LessonBlock[];
 };
 
 type Unit = {
@@ -137,19 +144,39 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     },
   });
 
-  // Bump the local blockCount on a lesson when its AddBlockPopover
-  // fires successfully. Avoids a full course refetch for a counter
-  // update — the underlying Block row is already persisted by the
-  // mutation, and the count badge is purely visual.
-  const handleBlockAdded = (lessonId: string) => {
+  // Append the freshly-created block to its lesson's local list.
+  // Avoids a course refetch for what's already-persisted server-side.
+  const handleBlockAdded = (lessonId: string, block: LessonBlock) => {
     setUnits((prev) =>
       prev.map((u) => ({
         ...u,
         lessons: u.lessons.map((l) =>
-          l.id === lessonId ? { ...l, blockCount: l.blockCount + 1 } : l
+          l.id === lessonId ? { ...l, blocks: [...l.blocks, block] } : l
         ),
       }))
     );
+  };
+
+  const deleteBlock = trpc.teacher.deleteBlock.useMutation({
+    onError: (e) => setReorderError(`Failed to delete block: ${e.message}`),
+  });
+
+  const handleBlockDelete = (lessonId: string, blockId: string) => {
+    // Optimistic remove; if the mutation errors, the onError handler
+    // surfaces the message but we leave the optimistic state alone —
+    // user can retry the delete (or refresh) without us snapping the
+    // block back into the list mid-interaction.
+    setUnits((prev) =>
+      prev.map((u) => ({
+        ...u,
+        lessons: u.lessons.map((l) =>
+          l.id === lessonId
+            ? { ...l, blocks: l.blocks.filter((b) => b.id !== blockId) }
+            : l
+        ),
+      }))
+    );
+    deleteBlock.mutate({ blockId });
   };
 
   const handleUnitDragEnd = (e: DragEndEvent) => {
@@ -440,6 +467,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
                     onToggle={() => setOpenUnit(openUnit === i ? -1 : i)}
                     onLessonDragEnd={handleLessonDragEnd(u.id)}
                     onBlockAdded={handleBlockAdded}
+                    onBlockDelete={handleBlockDelete}
                     sensors={sensors}
                   />
                 ))}
@@ -751,6 +779,7 @@ function SortableUnit({
   onToggle,
   onLessonDragEnd,
   onBlockAdded,
+  onBlockDelete,
   sensors,
 }: {
   unit: Unit;
@@ -758,7 +787,8 @@ function SortableUnit({
   isOpen: boolean;
   onToggle: () => void;
   onLessonDragEnd: (e: DragEndEvent) => void;
-  onBlockAdded: (lessonId: string) => void;
+  onBlockAdded: (lessonId: string, block: LessonBlock) => void;
+  onBlockDelete: (lessonId: string, blockId: string) => void;
   sensors: ReturnType<typeof useSensors>;
 }) {
   const {
@@ -871,7 +901,8 @@ function SortableUnit({
                   <SortableLesson
                     key={l.id}
                     lesson={l}
-                    onBlockAdded={() => onBlockAdded(l.id)}
+                    onBlockAdded={(block) => onBlockAdded(l.id, block)}
+                    onBlockDelete={(blockId) => onBlockDelete(l.id, blockId)}
                   />
                 ))}
               </SortableContext>
@@ -900,9 +931,11 @@ function SortableUnit({
 function SortableLesson({
   lesson,
   onBlockAdded,
+  onBlockDelete,
 }: {
   lesson: Lesson;
-  onBlockAdded: () => void;
+  onBlockAdded: (block: LessonBlock) => void;
+  onBlockDelete: (blockId: string) => void;
 }) {
   const {
     attributes,
@@ -913,51 +946,141 @@ function SortableLesson({
     isDragging,
   } = useSortable({ id: lesson.id });
 
-  const style: React.CSSProperties = {
+  // The sortable wrapper handles transform/opacity; the inner content
+  // is a Card-like column so we can stack the row + block list.
+  const wrapperStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.6 : 1,
+    marginBottom: 4,
+  };
+
+  const rowStyle: React.CSSProperties = {
     display: "flex",
     alignItems: "center",
     gap: 10,
     padding: "8px 10px",
-    marginBottom: 4,
     border: "1px solid var(--wf-hairline)",
     borderRadius: 3,
     background: "white",
     fontSize: 12,
   };
 
+  const count = lesson.blocks.length;
+
   return (
-    <div ref={setNodeRef} style={style}>
-      <span
-        {...attributes}
-        {...listeners}
-        aria-label={`Reorder lesson: ${lesson.title}`}
-        style={{
-          display: "inline-flex",
-          cursor: "grab",
-          touchAction: "none",
-        }}
-      >
-        <Icon name="drag" size={12} color="var(--wf-mute)" />
-      </span>
-      <Icon name="play" size={13} color="var(--wf-body)" />
-      <span style={{ flex: 1, fontWeight: 500 }}>{lesson.title}</span>
-      <span
-        className="wf-mono"
-        style={{ fontSize: 10, color: "var(--wf-mute)" }}
-        title={`${lesson.blockCount} block${lesson.blockCount === 1 ? "" : "s"}`}
-      >
-        {lesson.blockCount} ▦
-      </span>
-      <span
-        className="wf-mono"
-        style={{ fontSize: 10, color: "var(--wf-mute)" }}
-      >
-        {lesson.durationMin ? `${lesson.durationMin} min` : ""}
-      </span>
-      <AddBlockPopover lessonId={lesson.id} onAdded={onBlockAdded} />
+    <div ref={setNodeRef} style={wrapperStyle}>
+      <div style={rowStyle}>
+        <span
+          {...attributes}
+          {...listeners}
+          aria-label={`Reorder lesson: ${lesson.title}`}
+          style={{
+            display: "inline-flex",
+            cursor: "grab",
+            touchAction: "none",
+          }}
+        >
+          <Icon name="drag" size={12} color="var(--wf-mute)" />
+        </span>
+        <Icon name="play" size={13} color="var(--wf-body)" />
+        <span style={{ flex: 1, fontWeight: 500 }}>{lesson.title}</span>
+        <span
+          className="wf-mono"
+          style={{ fontSize: 10, color: "var(--wf-mute)" }}
+          title={`${count} block${count === 1 ? "" : "s"}`}
+        >
+          {count} ▦
+        </span>
+        <span
+          className="wf-mono"
+          style={{ fontSize: 10, color: "var(--wf-mute)" }}
+        >
+          {lesson.durationMin ? `${lesson.durationMin} min` : ""}
+        </span>
+        <AddBlockPopover lessonId={lesson.id} onAdded={onBlockAdded} />
+      </div>
+      {/* Inline block list — one row per block, indented under the
+          lesson header. Empty state suppressed (the count badge of 0
+          is enough signal; rendering a placeholder here would just
+          add noise). */}
+      {count > 0 && (
+        <div
+          style={{
+            marginLeft: 22,
+            marginTop: 4,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          {lesson.blocks.map((b) => {
+            const meta = findBlockMeta(b.type);
+            return (
+              <div
+                key={b.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "4px 8px",
+                  border: "1px solid var(--wf-hairline)",
+                  borderRadius: 2,
+                  background: "var(--wf-fillsoft)",
+                  fontSize: 11,
+                }}
+              >
+                <Icon
+                  name={meta.icon as "play"}
+                  size={11}
+                  color={meta.ai ? "var(--wf-ai)" : "var(--wf-body)"}
+                />
+                <span
+                  style={{
+                    flex: 1,
+                    color: meta.ai ? "var(--wf-ai)" : "var(--wf-ink)",
+                    fontWeight: 500,
+                  }}
+                >
+                  {meta.label}
+                </span>
+                {meta.ai && (
+                  <span
+                    className="wf-mono"
+                    style={{
+                      fontSize: 8,
+                      color: "var(--wf-ai)",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    AI
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onBlockDelete(b.id);
+                  }}
+                  aria-label={`Delete ${meta.label} block`}
+                  title="Delete block"
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--wf-mute)",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    lineHeight: 1,
+                    padding: "0 4px",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

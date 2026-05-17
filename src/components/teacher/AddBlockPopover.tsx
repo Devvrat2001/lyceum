@@ -3,74 +3,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/react";
 import { Icon } from "@/components/wf/primitives";
-
-/**
- * Block-type catalog the popover offers. Mirrors `BlockType` in
- * prisma/schema.prisma but adds the user-facing label + icon + an
- * `ai` flag so AI-powered blocks can pick up the purple accent.
- *
- * Grouped to match the block library sidebar's visual order.
- */
-const BLOCK_GROUPS: ReadonlyArray<{
-  group: string;
-  items: ReadonlyArray<{
-    type:
-      | "VIDEO"
-      | "READING"
-      | "SLIDES"
-      | "PDF"
-      | "QUIZ"
-      | "MCQ"
-      | "SPEAK"
-      | "AI_QUIZ"
-      | "SIMULATION"
-      | "BRANCHING"
-      | "DRAG_MATCH"
-      | "POLL"
-      | "SECTION"
-      | "DISCUSSION"
-      | "LIVE";
-    icon: string;
-    label: string;
-    ai?: boolean;
-  }>;
-}> = [
-  {
-    group: "Content",
-    items: [
-      { type: "VIDEO", icon: "play", label: "Video" },
-      { type: "READING", icon: "book", label: "Reading" },
-      { type: "SLIDES", icon: "grid", label: "Slides" },
-      { type: "PDF", icon: "download", label: "PDF / file" },
-    ],
-  },
-  {
-    group: "Practice",
-    items: [
-      { type: "QUIZ", icon: "star", label: "Quiz" },
-      { type: "MCQ", icon: "check", label: "Multiple choice" },
-      { type: "SPEAK", icon: "mic", label: "Speak / record" },
-      { type: "AI_QUIZ", icon: "sparkles", label: "AI quiz", ai: true },
-    ],
-  },
-  {
-    group: "Interactive",
-    items: [
-      { type: "SIMULATION", icon: "bolt", label: "Simulation" },
-      { type: "BRANCHING", icon: "branch", label: "Branching scenario" },
-      { type: "DRAG_MATCH", icon: "grid", label: "Drag & match" },
-      { type: "POLL", icon: "chart", label: "Live poll" },
-    ],
-  },
-  {
-    group: "Structure",
-    items: [
-      { type: "SECTION", icon: "plus", label: "Section break" },
-      { type: "DISCUSSION", icon: "chat", label: "Discussion thread" },
-      { type: "LIVE", icon: "user", label: "Live session" },
-    ],
-  },
-];
+import { BLOCK_GROUPS, type BlockType } from "@/lib/blocks";
 
 /**
  * Click "+ block" on a lesson row → opens this popover → pick a type
@@ -90,16 +23,17 @@ export function AddBlockPopover({
   onAdded,
 }: {
   lessonId: string;
-  onAdded?: (newCount: number) => void;
+  /** Receives the freshly-created block so the caller can append it
+   *  to its local list (and let the count badge derive from list
+   *  length). */
+  onAdded?: (block: { id: string; type: BlockType; order: number }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const addBlock = trpc.teacher.addBlock.useMutation({
-    onSuccess: () => {
-      // Defer to caller for the block count update — they own the
-      // local state and may want to do something else too (toast etc).
-      onAdded?.(0);
+    onSuccess: (r) => {
+      onAdded?.(r.block);
       setOpen(false);
     },
     onError: (e) => setError(e.message),
