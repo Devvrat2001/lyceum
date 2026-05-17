@@ -1468,6 +1468,16 @@ function describeBlockSettings(block: LessonBlock): string | null {
       if (pairs.length === 0) return null;
       return `${pairs.length} pair${pairs.length === 1 ? "" : "s"}`;
     }
+    case "LIVE": {
+      const startsAt = typeof s.startsAt === "string" ? s.startsAt : "";
+      if (!startsAt) return null;
+      const d = new Date(startsAt);
+      if (Number.isNaN(d.getTime())) return "scheduled";
+      return d.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      });
+    }
     default:
       return null;
   }

@@ -60,6 +60,10 @@ export type BlockSettingsShape = {
   };
   // DRAG_MATCH
   pairs?: Array<{ left: string; right: string }>;
+  // LIVE (scheduled session)
+  startsAt?: string; // ISO timestamp
+  durationMin?: number;
+  joinUrl?: string;
   // unknown / future
   [k: string]: unknown;
 };
@@ -296,6 +300,8 @@ function renderTypeFields(
       );
     case "DRAG_MATCH":
       return <DragMatchFields draft={draft} update={update} />;
+    case "LIVE":
+      return <LiveFields draft={draft} update={update} />;
     default:
       return (
         <div
@@ -918,6 +924,125 @@ function AiQuizFields({
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+function LiveFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  // datetime-local inputs work in local time without offset; convert
+  // both directions so storage stays canonical ISO with timezone.
+  const localValue = (() => {
+    if (typeof draft.startsAt !== "string" || !draft.startsAt) return "";
+    const d = new Date(draft.startsAt);
+    if (Number.isNaN(d.getTime())) return "";
+    // YYYY-MM-DDTHH:mm in local time (what datetime-local expects)
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  })();
+  const durationMin =
+    typeof draft.durationMin === "number" && draft.durationMin > 0
+      ? draft.durationMin
+      : 60;
+  const joinUrl = typeof draft.joinUrl === "string" ? draft.joinUrl : "";
+  const title = typeof draft.title === "string" ? draft.title : "";
+
+  return (
+    <>
+      <TextField
+        label="SESSION TITLE (OPTIONAL)"
+        value={title}
+        onChange={(v) => update("title", v)}
+        placeholder="Live review · Q&A"
+        maxLength={120}
+      />
+      <div style={{ marginBottom: 12 }}>
+        <div
+          className="wf-mono"
+          style={{
+            fontSize: 10,
+            color: "var(--wf-mute)",
+            marginBottom: 4,
+            letterSpacing: "0.06em",
+          }}
+        >
+          STARTS AT (LOCAL TIME)
+        </div>
+        <input
+          type="datetime-local"
+          value={localValue}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!v) {
+              update("startsAt", "");
+              return;
+            }
+            // datetime-local gives a no-offset string; constructing a Date
+            // from it uses local zone, then toISOString() canonicalizes to UTC.
+            const iso = new Date(v).toISOString();
+            update("startsAt", iso);
+          }}
+          style={{
+            width: "100%",
+            padding: "5px 7px",
+            fontSize: 11,
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            background: "white",
+            fontFamily: "inherit",
+          }}
+        />
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div
+          className="wf-mono"
+          style={{
+            fontSize: 10,
+            color: "var(--wf-mute)",
+            marginBottom: 4,
+            letterSpacing: "0.06em",
+          }}
+        >
+          DURATION (MINUTES)
+        </div>
+        <input
+          type="number"
+          min={5}
+          max={600}
+          step={5}
+          value={durationMin}
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10);
+            if (Number.isFinite(n) && n >= 5 && n <= 600)
+              update("durationMin", n);
+          }}
+          style={{
+            width: 100,
+            padding: "5px 7px",
+            fontSize: 11,
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            background: "white",
+            fontFamily: "inherit",
+          }}
+        />
+      </div>
+      <TextField
+        label="JOIN URL"
+        value={joinUrl}
+        onChange={(v) => update("joinUrl", v)}
+        placeholder="https://meet.google.com/… or https://zoom.us/…"
+        maxLength={500}
+        hint="Zoom / Google Meet / Teams — whatever your class uses."
+      />
     </>
   );
 }

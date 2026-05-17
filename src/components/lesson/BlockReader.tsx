@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -112,6 +112,8 @@ function renderBody(block: BlockReaderProps) {
       return <AiQuizBody settings={block.settings} />;
     case "DRAG_MATCH":
       return <DragMatchBody blockId={block.id} settings={block.settings} />;
+    case "LIVE":
+      return <LiveBody settings={block.settings} />;
     default:
       return (
         <div
@@ -1056,6 +1058,201 @@ function PollBody({
           }}
         >
           {localError}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── LIVE ─────────────────────────────────────────────────── */
+
+type LivePhase = "scheduled" | "live" | "ended";
+
+function LiveBody({ settings }: { settings: Record<string, unknown> }) {
+  const title =
+    typeof settings.title === "string" ? settings.title.trim() : "";
+  const startsAtRaw =
+    typeof settings.startsAt === "string" ? settings.startsAt : "";
+  const durationMin =
+    typeof settings.durationMin === "number" && settings.durationMin > 0
+      ? settings.durationMin
+      : 60;
+  const joinUrl =
+    typeof settings.joinUrl === "string" ? settings.joinUrl.trim() : "";
+
+  // Re-render every 30s so the "starts in X" / "live now" / "ended"
+  // affordance stays current without a refetch. The interval kicks off
+  // a fresh now-state which derives all the display flags.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const startsAt = (() => {
+    if (!startsAtRaw) return null;
+    const d = new Date(startsAtRaw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  })();
+
+  if (!startsAt) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't scheduled this live session yet." />
+    );
+  }
+
+  const endsAt = new Date(startsAt.getTime() + durationMin * 60_000);
+  const phase: LivePhase =
+    now < startsAt.getTime()
+      ? "scheduled"
+      : now < endsAt.getTime()
+        ? "live"
+        : "ended";
+
+  const phaseColor =
+    phase === "live"
+      ? "var(--wf-accent)"
+      : phase === "scheduled"
+        ? "var(--wf-ai)"
+        : "var(--wf-mute)";
+  const phaseLabel =
+    phase === "live"
+      ? "● LIVE NOW"
+      : phase === "scheduled"
+        ? "● UPCOMING"
+        : "● ENDED";
+
+  const relative = (() => {
+    if (phase === "scheduled") {
+      const diffMin = Math.round((startsAt.getTime() - now) / 60_000);
+      if (diffMin < 1) return "starting now";
+      if (diffMin < 60) return `starts in ${diffMin}m`;
+      const diffHr = Math.round(diffMin / 60);
+      if (diffHr < 24) return `starts in ${diffHr}h`;
+      const diffDay = Math.round(diffHr / 24);
+      return `starts in ${diffDay}d`;
+    }
+    if (phase === "live") {
+      const diffMin = Math.round((endsAt.getTime() - now) / 60_000);
+      return diffMin > 0 ? `ends in ${diffMin}m` : "wrapping up";
+    }
+    // ended
+    const diffMin = Math.round((now - endsAt.getTime()) / 60_000);
+    if (diffMin < 60) return `ended ${diffMin}m ago`;
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return `ended ${diffHr}h ago`;
+    const diffDay = Math.round(diffHr / 24);
+    return `ended ${diffDay}d ago`;
+  })();
+
+  const formattedWhen = startsAt.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  const canJoin = phase === "live" && joinUrl !== "";
+
+  return (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 8,
+        }}
+      >
+        <span
+          className="wf-mono"
+          style={{
+            fontSize: 10,
+            color: phaseColor,
+            fontWeight: 700,
+            letterSpacing: "0.06em",
+          }}
+        >
+          {phaseLabel}
+        </span>
+        <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
+          {relative}
+        </span>
+      </div>
+      {title && (
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            marginBottom: 6,
+            lineHeight: 1.3,
+          }}
+        >
+          {title}
+        </div>
+      )}
+      <div
+        style={{
+          fontSize: 12,
+          color: "var(--wf-body)",
+          marginBottom: 12,
+        }}
+      >
+        {formattedWhen} · {durationMin} min
+      </div>
+      {joinUrl ? (
+        <a
+          href={canJoin ? joinUrl : undefined}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-disabled={!canJoin}
+          onClick={(e) => {
+            if (!canJoin) e.preventDefault();
+          }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            fontSize: 13,
+            fontWeight: 600,
+            border: "none",
+            borderRadius: 3,
+            // Big-accent button only when actually live; otherwise muted
+            // so the page doesn't tempt students to click prematurely.
+            background:
+              phase === "live"
+                ? "var(--wf-accent)"
+                : phase === "scheduled"
+                  ? "var(--wf-fillsoft)"
+                  : "var(--wf-fill)",
+            color:
+              phase === "live"
+                ? "white"
+                : phase === "scheduled"
+                  ? "var(--wf-mute)"
+                  : "var(--wf-mute)",
+            cursor: canJoin ? "pointer" : "not-allowed",
+            textDecoration: "none",
+            opacity: canJoin ? 1 : 0.85,
+          }}
+        >
+          {phase === "live"
+            ? "Join now →"
+            : phase === "scheduled"
+              ? "Join opens at start time"
+              : "Session ended"}
+        </a>
+      ) : (
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--wf-mute)",
+            fontStyle: "italic",
+          }}
+        >
+          Join link hasn&apos;t been added yet.
         </div>
       )}
     </div>

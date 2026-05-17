@@ -24,7 +24,8 @@ type Seed = {
     | "POLL"
     | "DISCUSSION"
     | "AI_QUIZ"
-    | "DRAG_MATCH";
+    | "DRAG_MATCH"
+    | "LIVE";
   // Prisma's Json input rejects loose Record<string, unknown> because
   // values could be undefined/functions. InputJsonObject keeps us
   // honest while staying flexible per-type.
@@ -143,6 +144,19 @@ const SAMPLES: Seed[] = [
         { left: "¼ × 12", right: "3" },
         { left: "⅕ × 10", right: "2" },
       ],
+    },
+  },
+  {
+    type: "LIVE",
+    settings: {
+      label: MARKER_LABEL,
+      title: "Live Q&A · Multiplying Fractions",
+      // ~2 hours from when this seed runs — gives the reader something
+      // to render in the "UPCOMING" phase. Re-run the seed (or use
+      // `db:reset`) to refresh.
+      startsAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      durationMin: 45,
+      joinUrl: "https://meet.google.com/example-demo-room",
     },
   },
 ];
