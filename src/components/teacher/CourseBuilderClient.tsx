@@ -1248,6 +1248,7 @@ function SortableBlock({
       ? block.settings.label.trim()
       : null;
   const displayLabel = customLabel ?? meta.label;
+  const hint = describeBlockSettings(block);
   const {
     attributes,
     listeners,
@@ -1341,6 +1342,19 @@ function SortableBlock({
           )}
         </span>
       </button>
+      {hint && (
+        <span
+          className="wf-mono"
+          style={{
+            fontSize: 9,
+            color: "var(--wf-mute)",
+            letterSpacing: "0.04em",
+          }}
+          title={hint}
+        >
+          {hint}
+        </span>
+      )}
       {meta.ai && (
         <span
           className="wf-mono"
@@ -1375,4 +1389,45 @@ function SortableBlock({
       </button>
     </div>
   );
+}
+
+/**
+ * One-line summary of the block's type-specific settings to render
+ * inline on the canvas row. Returns null when the block has nothing
+ * type-specific configured yet (so a fresh-added block is visually
+ * distinguishable from one with content).
+ */
+function describeBlockSettings(block: LessonBlock): string | null {
+  const s = block.settings;
+  switch (block.type) {
+    case "VIDEO": {
+      const url = typeof s.url === "string" ? s.url.trim() : "";
+      if (!url) return null;
+      try {
+        const host = new URL(url).hostname.replace(/^www\./, "");
+        return host;
+      } catch {
+        return "linked";
+      }
+    }
+    case "READING": {
+      const body = typeof s.body === "string" ? s.body.trim() : "";
+      if (!body) return null;
+      const words = body.split(/\s+/).filter(Boolean).length;
+      return `${words.toLocaleString()} word${words === 1 ? "" : "s"}`;
+    }
+    case "MCQ": {
+      const opts = Array.isArray(s.options) ? s.options : [];
+      if (opts.length === 0) return null;
+      const correct = opts.filter(
+        (o: unknown) =>
+          typeof o === "object" &&
+          o !== null &&
+          (o as { correct?: boolean }).correct === true
+      ).length;
+      return `${opts.length} opts · ${correct} ✓`;
+    }
+    default:
+      return null;
+  }
 }
