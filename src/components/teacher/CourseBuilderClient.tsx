@@ -1491,6 +1491,15 @@ function describeBlockSettings(block: LessonBlock): string | null {
         typeof s.expected === "string" && s.expected.trim() !== "";
       return expected ? "checked" : "open response";
     }
+    case "BRANCHING": {
+      const nodes = Array.isArray(s.nodes) ? s.nodes : [];
+      if (nodes.length === 0) return null;
+      const edges = nodes.reduce((n: number, node: unknown) => {
+        const choices = (node as { choices?: unknown }).choices;
+        return n + (Array.isArray(choices) ? choices.length : 0);
+      }, 0);
+      return `${nodes.length} node${nodes.length === 1 ? "" : "s"} · ${edges} edge${edges === 1 ? "" : "s"}`;
+    }
     default:
       return null;
   }

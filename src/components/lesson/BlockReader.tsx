@@ -120,6 +120,8 @@ function renderBody(block: BlockReaderProps) {
       return <SimulationBody settings={block.settings} />;
     case "SPEAK":
       return <SpeakBody settings={block.settings} />;
+    case "BRANCHING":
+      return <BranchingBody settings={block.settings} />;
     default:
       return (
         <div
@@ -1259,6 +1261,248 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
           }}
         >
           Join link hasn&apos;t been added yet.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── BRANCHING ────────────────────────────────────────────── */
+
+type BranchingNode = {
+  id: string;
+  title: string;
+  body: string;
+  choices: Array<{ label: string; to: string }>;
+};
+
+function BranchingBody({ settings }: { settings: Record<string, unknown> }) {
+  const rawNodes: BranchingNode[] = Array.isArray(settings.nodes)
+    ? (settings.nodes as unknown[]).filter(
+        (n): n is BranchingNode =>
+          !!n &&
+          typeof n === "object" &&
+          typeof (n as { id?: unknown }).id === "string" &&
+          typeof (n as { title?: unknown }).title === "string" &&
+          typeof (n as { body?: unknown }).body === "string" &&
+          Array.isArray((n as { choices?: unknown }).choices)
+      )
+    : [];
+
+  // Build a lookup once per render. The graph is small (≤8 nodes) so
+  // even rebuilding every render is negligible.
+  const byId = useMemo(() => {
+    const m = new Map<string, BranchingNode>();
+    for (const n of rawNodes) m.set(n.id, n);
+    return m;
+  }, [rawNodes]);
+
+  const startId = rawNodes[0]?.id ?? null;
+  const [currentId, setCurrentId] = useState<string | null>(startId);
+  // Visited path for the breadcrumb. Trims the head if the student
+  // loops, so the breadcrumb stays linear-ish.
+  const [path, setPath] = useState<string[]>(
+    startId ? [startId] : []
+  );
+
+  if (rawNodes.length === 0 || !startId) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't built the branching scenario yet." />
+    );
+  }
+
+  const node = currentId ? byId.get(currentId) : null;
+
+  const onChoose = (targetId: string) => {
+    if (!byId.has(targetId)) return; // dangling — render handles it
+    setCurrentId(targetId);
+    setPath((prev) =>
+      prev[prev.length - 1] === targetId ? prev : [...prev, targetId]
+    );
+  };
+  const onRestart = () => {
+    setCurrentId(startId);
+    setPath([startId]);
+  };
+
+  // Dangling-target edge: teacher deleted a node, an old choice still
+  // points at it. Bail to a friendly "End" rather than crashing.
+  if (!node) {
+    return (
+      <div>
+        <div
+          style={{
+            fontSize: 13,
+            color: "var(--wf-mute)",
+            fontStyle: "italic",
+            marginBottom: 10,
+          }}
+        >
+          This branch ends here — destination node is missing.
+        </div>
+        <button
+          type="button"
+          onClick={onRestart}
+          style={{
+            padding: "5px 10px",
+            fontSize: 11,
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            background: "white",
+            cursor: "pointer",
+            color: "var(--wf-body)",
+          }}
+        >
+          Restart
+        </button>
+      </div>
+    );
+  }
+
+  const isTerminal = node.choices.length === 0;
+  const isStart = node.id === startId;
+
+  return (
+    <div>
+      {/* Breadcrumb */}
+      <div
+        className="wf-mono"
+        style={{
+          fontSize: 9,
+          color: "var(--wf-mute)",
+          letterSpacing: "0.06em",
+          marginBottom: 10,
+          display: "flex",
+          gap: 4,
+          flexWrap: "wrap",
+        }}
+      >
+        {path.map((id, i) => {
+          const n = byId.get(id);
+          const title = n?.title || "(missing)";
+          return (
+            <span key={`${id}-${i}`}>
+              {i > 0 && <span style={{ margin: "0 4px" }}>›</span>}
+              {title.toUpperCase()}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Current node */}
+      <div
+        style={{
+          fontSize: 16,
+          fontWeight: 600,
+          marginBottom: 6,
+          lineHeight: 1.3,
+        }}
+      >
+        {node.title}
+      </div>
+      {node.body && (
+        <div
+          style={{
+            fontSize: 13,
+            color: "var(--wf-body)",
+            lineHeight: 1.5,
+            marginBottom: 12,
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {node.body}
+        </div>
+      )}
+
+      {/* Choices or End */}
+      {isTerminal ? (
+        <div>
+          <div
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              color: "var(--wf-good)",
+              letterSpacing: "0.06em",
+              fontWeight: 700,
+              marginBottom: 8,
+            }}
+          >
+            ● END
+          </div>
+          {!isStart && (
+            <button
+              type="button"
+              onClick={onRestart}
+              style={{
+                padding: "5px 10px",
+                fontSize: 11,
+                border: "1px solid var(--wf-hairline)",
+                borderRadius: 3,
+                background: "white",
+                cursor: "pointer",
+                color: "var(--wf-body)",
+              }}
+            >
+              ↺ Restart
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 6 }}>
+          {node.choices.map((c, i) => {
+            const targetExists = byId.has(c.to);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onChoose(c.to)}
+                disabled={!targetExists}
+                style={{
+                  padding: "8px 12px",
+                  fontSize: 13,
+                  textAlign: "left",
+                  border: "1px solid var(--wf-hairline)",
+                  background: targetExists ? "white" : "var(--wf-fill)",
+                  borderRadius: 3,
+                  cursor: targetExists ? "pointer" : "not-allowed",
+                  color: targetExists ? "var(--wf-ink)" : "var(--wf-mute)",
+                  fontFamily: "inherit",
+                }}
+              >
+                {c.label || `(unlabeled choice ${i + 1})`}
+                {!targetExists && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      fontSize: 10,
+                      color: "var(--wf-mute)",
+                    }}
+                  >
+                    (missing target)
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {!isStart && (
+            <button
+              type="button"
+              onClick={onRestart}
+              style={{
+                marginTop: 4,
+                padding: "5px 10px",
+                fontSize: 11,
+                border: "1px solid var(--wf-hairline)",
+                borderRadius: 3,
+                background: "white",
+                cursor: "pointer",
+                color: "var(--wf-body)",
+                alignSelf: "flex-start",
+              }}
+            >
+              ↺ Restart
+            </button>
+          )}
         </div>
       )}
     </div>

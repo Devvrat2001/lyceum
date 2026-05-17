@@ -28,7 +28,8 @@ type Seed = {
     | "LIVE"
     | "QUIZ"
     | "SIMULATION"
-    | "SPEAK";
+    | "SPEAK"
+    | "BRANCHING";
   // Prisma's Json input rejects loose Record<string, unknown> because
   // values could be undefined/functions. InputJsonObject keeps us
   // honest while staying flexible per-type.
@@ -207,6 +208,59 @@ const SAMPLES: Seed[] = [
       prompt: "Say this aloud: one-third times six equals two.",
       expected: "one third times six equals two",
       language: "en-US",
+    },
+  },
+  {
+    type: "BRANCHING",
+    settings: {
+      label: MARKER_LABEL,
+      nodes: [
+        {
+          id: "start",
+          title: "The pizza problem",
+          body:
+            "Your group orders 2 pizzas. Each is cut into 8 slices. Three friends each eat ¼ of a pizza. How would you find the total slices eaten?",
+          choices: [
+            { label: "Multiply ¼ × 8 first to find slices per friend", to: "slices-per-friend" },
+            { label: "Add ¼ + ¼ + ¼ to find total pizzas first", to: "fraction-sum" },
+            { label: "I'm not sure where to start", to: "hint" },
+          ],
+        },
+        {
+          id: "slices-per-friend",
+          title: "Slices per friend",
+          body: "¼ × 8 = 2 slices per friend. With 3 friends, that's 3 × 2 = 6 slices total.",
+          choices: [
+            { label: "Great — let's try a harder one", to: "challenge" },
+            { label: "Take me back to the start", to: "start" },
+          ],
+        },
+        {
+          id: "fraction-sum",
+          title: "Total fraction first",
+          body: "¼ + ¼ + ¼ = ¾ of a pizza eaten. ¾ × 8 = 6 slices total. Same answer!",
+          choices: [
+            { label: "Nice — try a harder one", to: "challenge" },
+            { label: "Go back to the start", to: "start" },
+          ],
+        },
+        {
+          id: "hint",
+          title: "Think it through",
+          body:
+            "Try one of these two approaches: (a) figure out how many slices ONE friend eats, then multiply by 3, OR (b) add the fractions to get total pizzas eaten, then convert to slices.",
+          choices: [
+            { label: "OK — try approach (a)", to: "slices-per-friend" },
+            { label: "OK — try approach (b)", to: "fraction-sum" },
+          ],
+        },
+        {
+          id: "challenge",
+          title: "Bonus: 5 friends",
+          body: "If 5 friends each eat ¼ of a pizza, how many whole pizzas is that?",
+          choices: [],
+        },
+      ],
     },
   },
 ];

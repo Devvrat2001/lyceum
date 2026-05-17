@@ -74,6 +74,13 @@ export type BlockSettingsShape = {
   // SPEAK (voice prompt + transcription)
   expected?: string;
   language?: string;
+  // BRANCHING (choose-your-own-adventure graph). nodes[0] is the start.
+  nodes?: Array<{
+    id: string;
+    title: string;
+    body: string;
+    choices: Array<{ label: string; to: string }>;
+  }>;
   // unknown / future
   [k: string]: unknown;
 };
@@ -318,6 +325,8 @@ function renderTypeFields(
       return <SimulationFields draft={draft} update={update} />;
     case "SPEAK":
       return <SpeakFields draft={draft} update={update} />;
+    case "BRANCHING":
+      return <BranchingFields draft={draft} update={update} />;
     default:
       return (
         <div
@@ -960,6 +969,344 @@ function blankQuizQuestion(): QuizQuestion {
     })),
     hint: "",
   };
+}
+
+type BranchingNode = NonNullable<BlockSettingsShape["nodes"]>[number];
+
+let _branchingIdSeq = 0;
+function nextNodeId(): string {
+  _branchingIdSeq += 1;
+  // Prefix is stable enough that we don't need crypto.randomUUID for
+  // an in-block identifier.
+  return `n${Date.now().toString(36)}${_branchingIdSeq}`;
+}
+
+function blankBranchingNode(label: string): BranchingNode {
+  return {
+    id: nextNodeId(),
+    title: label,
+    body: "",
+    choices: [],
+  };
+}
+
+function BranchingFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  const nodes: BranchingNode[] = Array.isArray(draft.nodes)
+    ? (draft.nodes as BranchingNode[])
+    : [];
+
+  const setNodes = (next: BranchingNode[]) => update("nodes", next);
+
+  const addNode = () => {
+    if (nodes.length >= 8) return;
+    setNodes([
+      ...nodes,
+      blankBranchingNode(`Node ${nodes.length + 1}`),
+    ]);
+  };
+  const removeNode = (idx: number) => {
+    if (nodes.length <= 2) return;
+    const removedId = nodes[idx]?.id;
+    // Drop the node, and prune any choice still pointing at it so the
+    // reader doesn't render a dangling "(missing)" target. Teacher
+    // would have to rewire choices anyway; do it for them.
+    const next = nodes
+      .filter((_, i) => i !== idx)
+      .map((n) => ({
+        ...n,
+        choices: n.choices.filter((c) => c.to !== removedId),
+      }));
+    setNodes(next);
+  };
+  const updateNode = (idx: number, patch: Partial<BranchingNode>) =>
+    setNodes(nodes.map((n, i) => (i === idx ? { ...n, ...patch } : n)));
+  const addChoice = (nodeIdx: number) => {
+    const node = nodes[nodeIdx];
+    if (!node || node.choices.length >= 4) return;
+    // Default target: the next node in the array, or self if last.
+    const defaultTo = nodes[nodeIdx + 1]?.id ?? node.id;
+    updateNode(nodeIdx, {
+      choices: [...node.choices, { label: "", to: defaultTo }],
+    });
+  };
+  const removeChoice = (nodeIdx: number, choiceIdx: number) => {
+    const node = nodes[nodeIdx];
+    if (!node) return;
+    updateNode(nodeIdx, {
+      choices: node.choices.filter((_, i) => i !== choiceIdx),
+    });
+  };
+  const updateChoice = (
+    nodeIdx: number,
+    choiceIdx: number,
+    patch: Partial<{ label: string; to: string }>
+  ) => {
+    const node = nodes[nodeIdx];
+    if (!node) return;
+    updateNode(nodeIdx, {
+      choices: node.choices.map((c, i) =>
+        i === choiceIdx ? { ...c, ...patch } : c
+      ),
+    });
+  };
+
+  // Seed two nodes on first render so the teacher has a meaningful
+  // starting graph (single-node graphs are also valid but unusual).
+  useEffect(() => {
+    if (nodes.length === 0) {
+      setNodes([
+        blankBranchingNode("Start"),
+        blankBranchingNode("Outcome"),
+      ]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <>
+      <div
+        style={{
+          fontSize: 11,
+          color: "var(--wf-mute)",
+          marginBottom: 8,
+          lineHeight: 1.5,
+        }}
+      >
+        The student starts at the first node and walks the graph by
+        clicking choices. Each choice points at another node (or loops
+        back).
+      </div>
+      {nodes.map((node, idx) => (
+        <div
+          key={node.id}
+          style={{
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 4,
+            padding: 8,
+            marginBottom: 8,
+            background: idx === 0 ? "var(--wf-fillsoft)" : "white",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 6,
+            }}
+          >
+            <span
+              className="wf-mono"
+              style={{
+                fontSize: 10,
+                color:
+                  idx === 0 ? "var(--wf-accent)" : "var(--wf-mute)",
+                fontWeight: idx === 0 ? 700 : 500,
+                letterSpacing: "0.06em",
+              }}
+            >
+              {idx === 0 ? "START · " : ""}NODE {idx + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => removeNode(idx)}
+              disabled={nodes.length <= 2}
+              aria-label={`Remove node ${idx + 1}`}
+              title={
+                nodes.length <= 2
+                  ? "Need at least 2 nodes"
+                  : "Remove this node"
+              }
+              style={{
+                border: "none",
+                background: "transparent",
+                color:
+                  nodes.length <= 2
+                    ? "var(--wf-hairline)"
+                    : "var(--wf-mute)",
+                cursor: nodes.length <= 2 ? "not-allowed" : "pointer",
+                fontSize: 13,
+                lineHeight: 1,
+                padding: "0 4px",
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <input
+            type="text"
+            value={node.title}
+            onChange={(e) => updateNode(idx, { title: e.target.value })}
+            placeholder="Node title"
+            maxLength={120}
+            style={{
+              width: "100%",
+              padding: "5px 7px",
+              fontSize: 11,
+              fontWeight: 600,
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              fontFamily: "inherit",
+              marginBottom: 4,
+            }}
+          />
+          <textarea
+            value={node.body}
+            onChange={(e) => updateNode(idx, { body: e.target.value })}
+            placeholder="Body shown to the student at this node"
+            rows={3}
+            maxLength={2_000}
+            style={{
+              width: "100%",
+              padding: "5px 7px",
+              fontSize: 11,
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              fontFamily: "inherit",
+              resize: "vertical",
+              marginBottom: 6,
+            }}
+          />
+          {/* Choices */}
+          <div
+            className="wf-mono"
+            style={{
+              fontSize: 9,
+              color: "var(--wf-mute)",
+              letterSpacing: "0.06em",
+              marginBottom: 4,
+            }}
+          >
+            CHOICES ·{" "}
+            {node.choices.length === 0
+              ? "TERMINAL"
+              : `${node.choices.length}/4`}
+          </div>
+          {node.choices.map((c, cIdx) => (
+            <div
+              key={cIdx}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto auto",
+                gap: 4,
+                marginBottom: 4,
+                alignItems: "center",
+              }}
+            >
+              <input
+                type="text"
+                value={c.label}
+                onChange={(e) =>
+                  updateChoice(idx, cIdx, { label: e.target.value })
+                }
+                placeholder={`Choice ${cIdx + 1} label`}
+                maxLength={120}
+                style={{
+                  padding: "4px 6px",
+                  fontSize: 11,
+                  border: "1px solid var(--wf-hairline)",
+                  borderRadius: 3,
+                  background: "white",
+                  fontFamily: "inherit",
+                  minWidth: 0,
+                }}
+              />
+              <select
+                value={c.to}
+                onChange={(e) =>
+                  updateChoice(idx, cIdx, { to: e.target.value })
+                }
+                style={{
+                  padding: "4px 6px",
+                  fontSize: 11,
+                  border: "1px solid var(--wf-hairline)",
+                  borderRadius: 3,
+                  background: "white",
+                  fontFamily: "inherit",
+                }}
+              >
+                {nodes.map((n, ni) => (
+                  <option key={n.id} value={n.id}>
+                    → {n.title || `Node ${ni + 1}`}
+                    {n.id === node.id ? " (self)" : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => removeChoice(idx, cIdx)}
+                aria-label={`Remove choice ${cIdx + 1}`}
+                title="Remove choice"
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--wf-mute)",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  lineHeight: 1,
+                  padding: "0 4px",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => addChoice(idx)}
+            disabled={node.choices.length >= 4}
+            style={{
+              marginTop: 2,
+              padding: "3px 8px",
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              fontSize: 10,
+              fontWeight: 600,
+              color:
+                node.choices.length >= 4
+                  ? "var(--wf-mute)"
+                  : "var(--wf-body)",
+              cursor:
+                node.choices.length >= 4 ? "not-allowed" : "pointer",
+            }}
+          >
+            + Add choice ({node.choices.length}/4)
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addNode}
+        disabled={nodes.length >= 8}
+        style={{
+          marginTop: 4,
+          padding: "5px 10px",
+          border: "1px solid var(--wf-hairline)",
+          borderRadius: 3,
+          background: "white",
+          fontSize: 10,
+          fontWeight: 600,
+          color:
+            nodes.length >= 8 ? "var(--wf-mute)" : "var(--wf-body)",
+          cursor: nodes.length >= 8 ? "not-allowed" : "pointer",
+        }}
+      >
+        + Add node ({nodes.length}/8)
+      </button>
+    </>
+  );
 }
 
 function SpeakFields({
