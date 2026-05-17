@@ -10,6 +10,7 @@
  * Idempotency: we check if the lesson already has a block of each
  * type with our marker label, and skip when present. Safe to re-run.
  */
+import type { Prisma } from "@prisma/client";
 import { db } from "../src/lib/db";
 
 const LESSON_SLUG = "multiplying-fractions";
@@ -17,7 +18,10 @@ const MARKER_LABEL = "seed:sample-block-v1";
 
 type Seed = {
   type: "SLIDES" | "PDF" | "SECTION";
-  settings: Record<string, unknown>;
+  // Prisma's Json input rejects loose Record<string, unknown> because
+  // values could be undefined/functions. InputJsonObject keeps us
+  // honest while staying flexible per-type.
+  settings: Prisma.InputJsonObject;
 };
 
 const SAMPLES: Seed[] = [
