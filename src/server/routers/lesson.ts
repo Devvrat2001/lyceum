@@ -338,4 +338,122 @@ export const lessonRouter = router({
 
       return { tallies, totalVotes, myChoice: input.chosenIndex };
     }),
+
+  /**
+   * Read the comment thread for a DISCUSSION block. Public — students
+   * benefit from seeing classmates' takes even before they post their
+   * own. Newest-last so the thread reads top-to-bottom like a chat.
+   */
+  discussionThread: publicProcedure
+    .input(
+      z.object({
+        blockId: z.string(),
+        limit: z.number().int().min(1).max(200).default(50),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: { id: true, type: true },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "DISCUSSION") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not a DISCUSSION",
+        });
+      }
+      const rows = await ctx.db.blockComment.findMany({
+        where: { blockId: block.id },
+        orderBy: { createdAt: "asc" },
+        take: input.limit,
+        select: {
+          id: true,
+          body: true,
+          createdAt: true,
+          user: {
+            select: { id: true, name: true, firstName: true, avatarUrl: true },
+          },
+        },
+      });
+      return {
+        comments: rows.map((c) => ({
+          id: c.id,
+          body: c.body,
+          createdAt: c.createdAt,
+          author: {
+            id: c.user.id,
+            // Prefer first name for the avatar-style row; full name only if first is missing.
+            name: c.user.firstName ?? c.user.name ?? "Student",
+            avatarUrl: c.user.avatarUrl,
+          },
+          // Surface "is this my comment?" so the UI can subtly highlight
+          // the viewer's own posts without leaking other users' ids.
+          isMine: ctx.session?.user?.id === c.user.id,
+        })),
+        total: rows.length,
+      };
+    }),
+
+  /**
+   * Post a comment to a DISCUSSION block. Body is trimmed + capped at
+   * 2 000 chars (lesson-thread scale, not full essays). Returns the
+   * fresh thread so the client can update without a refetch.
+   */
+  postComment: protectedProcedure
+    .input(
+      z.object({
+        blockId: z.string(),
+        body: z.string().trim().min(1).max(2_000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: { id: true, type: true },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "DISCUSSION") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not a DISCUSSION",
+        });
+      }
+      await ctx.db.blockComment.create({
+        data: {
+          blockId: block.id,
+          userId: ctx.user.id,
+          body: input.body,
+        },
+      });
+      // Return the fresh thread so the reader updates without a
+      // follow-up roundtrip.
+      const rows = await ctx.db.blockComment.findMany({
+        where: { blockId: block.id },
+        orderBy: { createdAt: "asc" },
+        take: 50,
+        select: {
+          id: true,
+          body: true,
+          createdAt: true,
+          user: {
+            select: { id: true, name: true, firstName: true, avatarUrl: true },
+          },
+        },
+      });
+      return {
+        comments: rows.map((c) => ({
+          id: c.id,
+          body: c.body,
+          createdAt: c.createdAt,
+          author: {
+            id: c.user.id,
+            name: c.user.firstName ?? c.user.name ?? "Student",
+            avatarUrl: c.user.avatarUrl,
+          },
+          isMine: ctx.user.id === c.user.id,
+        })),
+        total: rows.length,
+      };
+    }),
 });

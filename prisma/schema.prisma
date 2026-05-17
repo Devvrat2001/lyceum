@@ -82,6 +82,7 @@ model User {
   ordersSold     Order[]     @relation("OrderTeacher")
   stripeAccount  StripeAccount?
   blockVotes     BlockVote[]
+  blockComments  BlockComment[]
 
   @@index([role])
 }
@@ -242,15 +243,33 @@ model LessonStep {
 }
 
 model Block {
-  id       String      @id @default(cuid())
+  id       String         @id @default(cuid())
   lessonId String
-  lesson   Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lesson   Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   order    Int
   type     BlockType
   settings Json
   attempts Attempt[]
   votes    BlockVote[]
+  comments BlockComment[]
   @@index([lessonId, order])
+}
+
+/// One comment per row, flat thread (no replies in v1). DISCUSSION
+/// blocks host a class conversation about the lesson — public read so
+/// every student sees the same thread, protected write so we have
+/// authorship for moderation.
+model BlockComment {
+  id        String   @id @default(cuid())
+  blockId   String
+  block     Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([blockId, createdAt])
+  @@index([userId, createdAt])
 }
 
 /// One vote per (user, block) for POLL blocks. Unlike Attempt this is

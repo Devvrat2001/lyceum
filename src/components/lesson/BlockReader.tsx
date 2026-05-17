@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
+import { Avatar, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { findBlockMeta, type BlockType } from "@/lib/blocks";
 import { trpc } from "@/lib/trpc/react";
 
@@ -97,6 +97,8 @@ function renderBody(block: BlockReaderProps) {
       return <SectionBody settings={block.settings} />;
     case "POLL":
       return <PollBody blockId={block.id} settings={block.settings} />;
+    case "DISCUSSION":
+      return <DiscussionBody blockId={block.id} settings={block.settings} />;
     default:
       return (
         <div
@@ -1045,6 +1047,262 @@ function PollBody({
       )}
     </div>
   );
+}
+
+/* ── DISCUSSION ───────────────────────────────────────────── */
+
+function DiscussionBody({
+  blockId,
+  settings,
+}: {
+  blockId: string;
+  settings: Record<string, unknown>;
+}) {
+  const prompt =
+    typeof settings.prompt === "string" ? settings.prompt.trim() : "";
+
+  const thread = trpc.lesson.discussionThread.useQuery({ blockId });
+  const utils = trpc.useUtils();
+  const post = trpc.lesson.postComment.useMutation({
+    onSuccess: (res) => {
+      utils.lesson.discussionThread.setData({ blockId }, res);
+      setDraft("");
+      setSubmitError(null);
+    },
+    onError: (err) => {
+      setSubmitError(
+        err.data?.code === "UNAUTHORIZED"
+          ? "Sign in to post."
+          : err.message ?? "Couldn't post your comment. Try again."
+      );
+    },
+  });
+
+  const [draft, setDraft] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const comments = thread.data?.comments ?? [];
+  const trimmed = draft.trim();
+  const canPost = trimmed.length > 0 && !post.isPending;
+
+  return (
+    <div>
+      {prompt && (
+        <div
+          style={{
+            padding: "8px 10px",
+            background: "var(--wf-fillsoft)",
+            border: "1px solid var(--wf-hairline)",
+            borderLeft: "3px solid var(--wf-accent)",
+            borderRadius: 3,
+            fontSize: 13,
+            color: "var(--wf-body)",
+            lineHeight: 1.5,
+            marginBottom: 14,
+          }}
+        >
+          {prompt}
+        </div>
+      )}
+
+      {/* Thread */}
+      {thread.isLoading ? (
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--wf-mute)",
+            padding: "4px 0 14px",
+          }}
+        >
+          Loading thread…
+        </div>
+      ) : comments.length === 0 ? (
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--wf-mute)",
+            fontStyle: "italic",
+            padding: "4px 0 14px",
+          }}
+        >
+          No comments yet — be the first.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
+          {comments.map((c) => (
+            <CommentRow key={c.id} comment={c} />
+          ))}
+        </div>
+      )}
+
+      {/* Composer */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          alignItems: "flex-end",
+        }}
+      >
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Share a thought…"
+          rows={2}
+          maxLength={2_000}
+          disabled={post.isPending}
+          style={{
+            flex: 1,
+            padding: "8px 10px",
+            fontSize: 13,
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 4,
+            background: "white",
+            fontFamily: "inherit",
+            resize: "vertical",
+            color: "var(--wf-ink)",
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            if (!canPost) return;
+            post.mutate({ blockId, body: trimmed });
+          }}
+          disabled={!canPost}
+          style={{
+            padding: "8px 14px",
+            fontSize: 12,
+            fontWeight: 600,
+            border: "none",
+            borderRadius: 3,
+            background: canPost ? "var(--wf-ink)" : "var(--wf-fill)",
+            color: canPost ? "white" : "var(--wf-mute)",
+            cursor: canPost ? "pointer" : "default",
+            alignSelf: "stretch",
+          }}
+        >
+          {post.isPending ? "Posting…" : "Post"}
+        </button>
+      </div>
+      {submitError && (
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            color: "var(--wf-accent)",
+          }}
+        >
+          {submitError}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CommentRow({
+  comment,
+}: {
+  comment: {
+    id: string;
+    body: string;
+    createdAt: Date | string;
+    author: { id: string; name: string; avatarUrl: string | null };
+    isMine: boolean;
+  };
+}) {
+  const created =
+    typeof comment.createdAt === "string"
+      ? new Date(comment.createdAt)
+      : comment.createdAt;
+  const initials = initialsOf(comment.author.name);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 10,
+        padding: 10,
+        border: "1px solid var(--wf-hairline)",
+        background: comment.isMine ? "var(--wf-fillsoft)" : "white",
+        borderRadius: 4,
+      }}
+    >
+      <Avatar initials={initials} size={28} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: 8,
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 600 }}>
+            {comment.author.name}
+            {comment.isMine && (
+              <span
+                className="wf-mono"
+                style={{
+                  marginLeft: 6,
+                  fontSize: 9,
+                  color: "var(--wf-mute)",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                YOU
+              </span>
+            )}
+          </span>
+          <span style={{ fontSize: 10, color: "var(--wf-mute)" }}>
+            {relativeTime(created)}
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: 13,
+            color: "var(--wf-body)",
+            lineHeight: 1.45,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {comment.body}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "??";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+/** Coarse relative time — minute / hour / day / explicit date. */
+function relativeTime(d: Date): string {
+  const now = Date.now();
+  const diffMs = now - d.getTime();
+  const sec = Math.floor(diffMs / 1_000);
+  if (sec < 45) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d ago`;
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 /* ── SECTION ──────────────────────────────────────────────── */

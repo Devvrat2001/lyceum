@@ -43,6 +43,8 @@ export type BlockSettingsShape = {
   // SECTION (structural divider — title is the visible heading, subtitle is optional)
   title?: string;
   subtitle?: string;
+  // DISCUSSION
+  prompt?: string;
   // unknown / future
   [k: string]: unknown;
 };
@@ -261,6 +263,8 @@ function renderTypeFields(
       return <SectionFields draft={draft} update={update} />;
     case "POLL":
       return <PollFields draft={draft} update={update} />;
+    case "DISCUSSION":
+      return <DiscussionFields draft={draft} update={update} />;
     default:
       return (
         <div
@@ -699,6 +703,32 @@ function PollFields({
         </button>
       </div>
     </>
+  );
+}
+
+function DiscussionFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  // DISCUSSION is mostly student-driven — the only authoring control
+  // is an optional prompt question that opens the thread. Stored in
+  // the `prompt` field; falls back to a generic placeholder if unset.
+  return (
+    <TextAreaField
+      label="DISCUSSION PROMPT (OPTIONAL)"
+      value={typeof draft.prompt === "string" ? draft.prompt : ""}
+      onChange={(v) => update("prompt", v)}
+      placeholder="What's one moment in this lesson that confused you, and how did you work past it?"
+      rows={3}
+      maxLength={500}
+      hint="Shown above the thread to anchor the conversation."
+    />
   );
 }
 

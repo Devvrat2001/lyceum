@@ -1448,6 +1448,11 @@ function describeBlockSettings(block: LessonBlock): string | null {
       if (opts.length === 0) return null;
       return `${opts.length} opt${opts.length === 1 ? "" : "s"}`;
     }
+    case "DISCUSSION": {
+      const prompt =
+        typeof s.prompt === "string" ? s.prompt.trim() : "";
+      return prompt ? "with prompt" : "open thread";
+    }
     default:
       return null;
   }

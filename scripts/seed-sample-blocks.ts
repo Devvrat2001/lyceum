@@ -17,7 +17,7 @@ const LESSON_SLUG = "multiplying-fractions";
 const MARKER_LABEL = "seed:sample-block-v1";
 
 type Seed = {
-  type: "SLIDES" | "PDF" | "SECTION" | "POLL";
+  type: "SLIDES" | "PDF" | "SECTION" | "POLL" | "DISCUSSION";
   // Prisma's Json input rejects loose Record<string, unknown> because
   // values could be undefined/functions. InputJsonObject keeps us
   // honest while staying flexible per-type.
@@ -65,6 +65,14 @@ const SAMPLES: Seed[] = [
         "Split the whole into thirds, then take one third of 6",
         "Multiply numerators then divide: (1 × 6) ÷ 3",
       ],
+    },
+  },
+  {
+    type: "DISCUSSION",
+    settings: {
+      label: MARKER_LABEL,
+      prompt:
+        "Share one place where you still need a model or a worked example. What kind of help would unstick you?",
     },
   },
 ];
