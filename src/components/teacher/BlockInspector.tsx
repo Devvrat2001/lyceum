@@ -259,6 +259,8 @@ function renderTypeFields(
       return <PdfFields draft={draft} update={update} />;
     case "SECTION":
       return <SectionFields draft={draft} update={update} />;
+    case "POLL":
+      return <PollFields draft={draft} update={update} />;
     default:
       return (
         <div
@@ -546,6 +548,156 @@ function PdfFields({
         placeholder="One-line description shown under the PDF"
         maxLength={200}
       />
+    </>
+  );
+}
+
+function PollFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  // POLL options are plain strings — no correctness flag, no shared
+  // shape with MCQ. Stored in the same `options` field; the router
+  // discriminates by Block.type and filters to typeof "string".
+  const options: string[] = Array.isArray(draft.options)
+    ? (draft.options as unknown[]).filter(
+        (o): o is string => typeof o === "string"
+      )
+    : [];
+
+  const setOptions = (next: string[]) =>
+    // The Json type accepts string[] but the shared BlockSettingsShape
+    // declares `options` as McqOption[] for the MCQ case. Cast through
+    // unknown — the runtime shape is just "array of strings", which
+    // the POLL inspector and reader both expect.
+    update("options", next as unknown as BlockSettingsShape["options"]);
+
+  const addOption = () => {
+    if (options.length >= 6) return;
+    setOptions([...options, ""]);
+  };
+  const removeOption = (idx: number) => {
+    if (options.length <= 2) return;
+    setOptions(options.filter((_, i) => i !== idx));
+  };
+  const setText = (idx: number, text: string) => {
+    setOptions(options.map((o, i) => (i === idx ? text : o)));
+  };
+
+  return (
+    <>
+      <TextAreaField
+        label="POLL QUESTION"
+        value={typeof draft.stem === "string" ? draft.stem : ""}
+        onChange={(v) => update("stem", v)}
+        placeholder="Which method is easier to remember?"
+        rows={3}
+        maxLength={500}
+      />
+      <div style={{ marginBottom: 12 }}>
+        <div
+          className="wf-mono"
+          style={{
+            fontSize: 10,
+            color: "var(--wf-mute)",
+            marginBottom: 4,
+            letterSpacing: "0.06em",
+          }}
+        >
+          POLL OPTIONS · 2 – 6
+        </div>
+        {options.length === 0 ? (
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--wf-mute)",
+              padding: "8px 0",
+            }}
+          >
+            No options yet — add at least two.
+          </div>
+        ) : (
+          options.map((text, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 4,
+              }}
+            >
+              <input
+                type="text"
+                value={text}
+                onChange={(e) => setText(i, e.target.value)}
+                placeholder={`Option ${i + 1}`}
+                maxLength={200}
+                style={{
+                  flex: 1,
+                  padding: "5px 7px",
+                  fontSize: 11,
+                  border: "1px solid var(--wf-hairline)",
+                  borderRadius: 3,
+                  background: "white",
+                  fontFamily: "inherit",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => removeOption(i)}
+                disabled={options.length <= 2}
+                title={
+                  options.length <= 2
+                    ? "Need at least 2 options"
+                    : "Remove option"
+                }
+                aria-label={`Remove option ${i + 1}`}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color:
+                    options.length <= 2
+                      ? "var(--wf-hairline)"
+                      : "var(--wf-mute)",
+                  cursor:
+                    options.length <= 2 ? "not-allowed" : "pointer",
+                  fontSize: 13,
+                  lineHeight: 1,
+                  padding: "0 4px",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))
+        )}
+        <button
+          type="button"
+          onClick={addOption}
+          disabled={options.length >= 6}
+          style={{
+            marginTop: 6,
+            padding: "4px 8px",
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            background: "white",
+            fontSize: 10,
+            fontWeight: 600,
+            color:
+              options.length >= 6 ? "var(--wf-mute)" : "var(--wf-body)",
+            cursor: options.length >= 6 ? "not-allowed" : "pointer",
+          }}
+        >
+          + Add option ({options.length}/6)
+        </button>
+      </div>
     </>
   );
 }

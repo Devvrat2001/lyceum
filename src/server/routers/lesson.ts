@@ -3,6 +3,9 @@ import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
 import { awardCorrectAttempt } from "../services/awardForAttempt";
 
+/** Max poll options. Mirrors the inspector cap (2–6). */
+const MAX_POLL_OPTIONS = 9;
+
 const XP_PER_CORRECT = 20;
 const XP_HINT_PENALTY = 5;
 
@@ -194,5 +197,145 @@ export const lessonRouter = router({
         streak: award?.streak ?? null,
         badgeAwarded: award?.badgeAwarded ?? null,
       };
+    }),
+
+  /**
+   * Read the tallies for a POLL block. Public — anon visitors can see
+   * the counts even when they can't vote, so the bars render
+   * immediately on lesson load. `myChoice` is the current user's vote
+   * index (null if not signed in or hasn't voted).
+   */
+  pollResults: publicProcedure
+    .input(z.object({ blockId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: { id: true, type: true, settings: true },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "POLL") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not a POLL",
+        });
+      }
+      const settings = (block.settings ?? {}) as Record<string, unknown>;
+      const options = Array.isArray(settings.options)
+        ? (settings.options as unknown[]).filter(
+            (o) => typeof o === "string"
+          )
+        : [];
+
+      const tallies = new Array(options.length).fill(0) as number[];
+      const groups = await ctx.db.blockVote.groupBy({
+        by: ["chosenKey"],
+        where: { blockId: block.id },
+        _count: { chosenKey: true },
+      });
+      for (const g of groups) {
+        const idx = parseInt(g.chosenKey, 10);
+        if (Number.isFinite(idx) && idx >= 0 && idx < options.length) {
+          tallies[idx] = g._count.chosenKey;
+        }
+      }
+      const totalVotes = tallies.reduce((a, b) => a + b, 0);
+
+      let myChoice: number | null = null;
+      if (ctx.session?.user) {
+        const mine = await ctx.db.blockVote.findUnique({
+          where: {
+            blockId_userId: {
+              blockId: block.id,
+              userId: ctx.session.user.id,
+            },
+          },
+          select: { chosenKey: true },
+        });
+        if (mine) {
+          const idx = parseInt(mine.chosenKey, 10);
+          if (Number.isFinite(idx) && idx >= 0 && idx < options.length) {
+            myChoice = idx;
+          }
+        }
+      }
+
+      return { tallies, totalVotes, myChoice };
+    }),
+
+  /**
+   * Cast / change a vote on a POLL block. Upserted so the same student
+   * can change their mind. Returns the fresh tallies + their new
+   * choice in the same shape as `pollResults` so the client can update
+   * without a follow-up roundtrip.
+   */
+  votePoll: protectedProcedure
+    .input(
+      z.object({
+        blockId: z.string(),
+        chosenIndex: z.number().int().min(0).max(MAX_POLL_OPTIONS - 1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "POLL") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not a POLL",
+        });
+      }
+      const settings = (block.settings ?? {}) as Record<string, unknown>;
+      const options = Array.isArray(settings.options)
+        ? (settings.options as unknown[]).filter(
+            (o) => typeof o === "string"
+          )
+        : [];
+      if (options.length < 2) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Poll has no options yet",
+        });
+      }
+      if (input.chosenIndex >= options.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Chosen option out of range",
+        });
+      }
+
+      const chosenKey = String(input.chosenIndex);
+      await ctx.db.blockVote.upsert({
+        where: {
+          blockId_userId: {
+            blockId: block.id,
+            userId: ctx.user.id,
+          },
+        },
+        create: {
+          blockId: block.id,
+          userId: ctx.user.id,
+          chosenKey,
+        },
+        update: { chosenKey },
+      });
+
+      // Recompute tallies for the response. Same shape as pollResults.
+      const tallies = new Array(options.length).fill(0) as number[];
+      const groups = await ctx.db.blockVote.groupBy({
+        by: ["chosenKey"],
+        where: { blockId: block.id },
+        _count: { chosenKey: true },
+      });
+      for (const g of groups) {
+        const idx = parseInt(g.chosenKey, 10);
+        if (Number.isFinite(idx) && idx >= 0 && idx < options.length) {
+          tallies[idx] = g._count.chosenKey;
+        }
+      }
+      const totalVotes = tallies.reduce((a, b) => a + b, 0);
+
+      return { tallies, totalVotes, myChoice: input.chosenIndex };
     }),
 });

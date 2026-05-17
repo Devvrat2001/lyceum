@@ -17,7 +17,7 @@ const LESSON_SLUG = "multiplying-fractions";
 const MARKER_LABEL = "seed:sample-block-v1";
 
 type Seed = {
-  type: "SLIDES" | "PDF" | "SECTION";
+  type: "SLIDES" | "PDF" | "SECTION" | "POLL";
   // Prisma's Json input rejects loose Record<string, unknown> because
   // values could be undefined/functions. InputJsonObject keeps us
   // honest while staying flexible per-type.
@@ -53,6 +53,18 @@ const SAMPLES: Seed[] = [
       // embed in browsers that support PDF iframes.
       url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
       caption: "Worked-example handout (1 page) — print or download.",
+    },
+  },
+  {
+    type: "POLL",
+    settings: {
+      label: MARKER_LABEL,
+      stem: "Which approach feels clearer for ⅓ × 6 in your head?",
+      options: [
+        "Repeated addition: ⅓ + ⅓ + ⅓ + ⅓ + ⅓ + ⅓",
+        "Split the whole into thirds, then take one third of 6",
+        "Multiply numerators then divide: (1 × 6) ÷ 3",
+      ],
     },
   },
 ];

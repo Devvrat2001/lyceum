@@ -95,6 +95,8 @@ function renderBody(block: BlockReaderProps) {
       return <PdfBody settings={block.settings} />;
     case "SECTION":
       return <SectionBody settings={block.settings} />;
+    case "POLL":
+      return <PollBody blockId={block.id} settings={block.settings} />;
     default:
       return (
         <div
@@ -855,6 +857,192 @@ function PdfBody({ settings }: { settings: Record<string, unknown> }) {
           <span style={{ color: "var(--wf-body)" }}>· {caption}</span>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ── POLL ─────────────────────────────────────────────────── */
+
+function PollBody({
+  blockId,
+  settings,
+}: {
+  blockId: string;
+  settings: Record<string, unknown>;
+}) {
+  const stem = typeof settings.stem === "string" ? settings.stem : "";
+  const opts: string[] = Array.isArray(settings.options)
+    ? (settings.options as unknown[]).filter(
+        (o): o is string => typeof o === "string"
+      )
+    : [];
+
+  // Initial tallies + the viewer's current vote (null for anon /
+  // hasn't voted). Re-fetched on focus so the bars stay fresh-ish
+  // without us building a real subscription channel.
+  const results = trpc.lesson.pollResults.useQuery(
+    { blockId },
+    { enabled: opts.length >= 2 }
+  );
+
+  const utils = trpc.useUtils();
+  const vote = trpc.lesson.votePoll.useMutation({
+    onSuccess: (res) => {
+      // Server returned the new tallies — push them into the cache so
+      // bars update without a refetch.
+      utils.lesson.pollResults.setData({ blockId }, res);
+      setLocalError(null);
+    },
+    onError: (err) => {
+      setLocalError(
+        err.data?.code === "UNAUTHORIZED"
+          ? "Sign in to vote."
+          : err.message ?? "Couldn't record your vote. Try again."
+      );
+    },
+  });
+
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  if (!stem.trim() || opts.length < 2) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't finished setting up this poll yet." />
+    );
+  }
+
+  const data = results.data ?? {
+    tallies: new Array(opts.length).fill(0) as number[],
+    totalVotes: 0,
+    myChoice: null as number | null,
+  };
+  const hasVoted = data.myChoice !== null;
+  const pending = vote.isPending;
+
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 14,
+          color: "var(--wf-body)",
+          marginBottom: 14,
+          lineHeight: 1.5,
+        }}
+      >
+        {stem}
+      </div>
+      <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+        {opts.map((text, i) => {
+          const count = data.tallies[i] ?? 0;
+          const pct =
+            data.totalVotes > 0
+              ? Math.round((count / data.totalVotes) * 100)
+              : 0;
+          const isMine = data.myChoice === i;
+
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                if (pending) return;
+                if (data.myChoice === i) return; // already mine — noop
+                vote.mutate({ blockId, chosenIndex: i });
+              }}
+              disabled={pending}
+              style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 12px",
+                fontSize: 13,
+                textAlign: "left",
+                // Highlight viewer's pick with the accent border;
+                // others show subtle hairline.
+                border: isMine
+                  ? "1.5px solid var(--wf-accent)"
+                  : "1px solid var(--wf-hairline)",
+                background: "white",
+                borderRadius: 4,
+                cursor: pending ? "default" : "pointer",
+                color: "var(--wf-ink)",
+                fontFamily: "inherit",
+                overflow: "hidden",
+              }}
+            >
+              {/* Bar fill — only show once at least one vote exists. */}
+              {hasVoted && pct > 0 && (
+                <span
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: `${pct}%`,
+                    background: isMine
+                      ? "var(--wf-accent-soft)"
+                      : "var(--wf-fill)",
+                    transition: "width 240ms ease-out",
+                  }}
+                />
+              )}
+              <span
+                style={{
+                  position: "relative",
+                  flex: 1,
+                  zIndex: 1,
+                }}
+              >
+                {text}
+              </span>
+              {hasVoted && (
+                <span
+                  className="wf-mono"
+                  style={{
+                    position: "relative",
+                    zIndex: 1,
+                    fontSize: 11,
+                    color: "var(--wf-mute)",
+                  }}
+                >
+                  {pct}% · {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          color: "var(--wf-mute)",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <span>
+          {hasVoted
+            ? `${data.totalVotes} ${data.totalVotes === 1 ? "vote" : "votes"} · click another option to change yours`
+            : `${data.totalVotes} ${data.totalVotes === 1 ? "vote" : "votes"} so far — pick one to see the results`}
+        </span>
+        {pending && (
+          <span className="wf-mono" style={{ fontSize: 10 }}>
+            saving…
+          </span>
+        )}
+      </div>
+      {localError && (
+        <div
+          style={{
+            marginTop: 10,
+            fontSize: 11,
+            color: "var(--wf-accent)",
+          }}
+        >
+          {localError}
+        </div>
+      )}
     </div>
   );
 }

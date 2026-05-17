@@ -1441,6 +1441,13 @@ function describeBlockSettings(block: LessonBlock): string | null {
       const title = typeof s.title === "string" ? s.title.trim() : "";
       return title || null;
     }
+    case "POLL": {
+      const opts = Array.isArray(s.options)
+        ? (s.options as unknown[]).filter((o) => typeof o === "string")
+        : [];
+      if (opts.length === 0) return null;
+      return `${opts.length} opt${opts.length === 1 ? "" : "s"}`;
+    }
     default:
       return null;
   }
