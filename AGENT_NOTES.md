@@ -26,6 +26,115 @@ When resuming a session, read in this order:
 | Next up | **XP persistence for self-check blocks** is the highest leverage — AI_QUIZ / QUIZ / DRAG_MATCH / BRANCHING all render correctly but their "Check" buttons don't write Attempts or award XP yet. Design problem to decide before coding: per-question (AI_QUIZ/QUIZ are N-question decks → either extend `attemptBlock` with `subIndex`, or add `BlockSubAttempt`) vs per-block "completed" (DRAG_MATCH/BRANCHING are atomic). Other lanes: **Phase 4** (parent role, refund self-service, real-Stripe smoke); **browser verification + restart** (overdue — 4 migrations stacked, untested in browser); **AGENT_NOTES gotcha cleanup** as the gotchas section grows. |
 | Blockers | Real-Stripe mode needs `npm i stripe`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` in `.env.local`. Demo mode runs without any of that. AI_QUIZ needs `ANTHROPIC_API_KEY` (already used by tutor streaming) for real generation; demo fallback works without keys. |
 
+## § Forward plan
+
+Prioritized work for the next 3-6 sessions. Each item has a size, a why, and concrete steps. Updated 2026-05-17 after closing block-reader coverage at 15/15.
+
+### Tier 1 — Immediate (next session)
+
+**1.1 Browser smoke-test the 18-commit stretch** · ~30 min if clean
+- *Why now:* Nothing this session is browser-verified. 3 stacked migrations are module-cached on the running `next dev` (port 3000, PID set hours ago).
+- *Steps:* (1) Kill `next dev`; (2) `rm -rf .next/cache`; (3) `npm run dev`; (4) sign in as Jordan, open `/student/lesson/multiplying-fractions` — every block type 1-15 should render against the seeded samples; (5) submit MCQ, vote on POLL, post in DISCUSSION — verify XP / streak chips appear; (6) walk teacher inspector for one of each new type to confirm settings persistence; (7) check marketplace homepage for "✓ IN LIBRARY" badging.
+- *Bugs found:* file a follow-up commit per bug — small focused fixes.
+
+**1.2 XP persistence for the 4 self-check block types** · ~1 session
+- *Why:* AI_QUIZ / QUIZ / DRAG_MATCH / BRANCHING render correctly but their "Check" doesn't write Attempts or bump streak. Single biggest gap in the lesson-engagement loop.
+- *Design decision (do first):* Per-question vs per-block attempts.
+  - AI_QUIZ + QUIZ are N-question decks → per-question Attempt rows make sense (treat each question like a mini-MCQ).
+  - DRAG_MATCH + BRANCHING are atomic → single per-block Attempt with `correct: bool` + maybe a `partialScore` JSON field.
+  - **Recommended:** Extend `lesson.attemptBlock` to accept optional `subIndex: number?`. Encode in existing `chosenKey` string column as `"3:1"` (question 3, answer index 1) so no schema migration needed. DRAG_MATCH/BRANCHING use subIndex=null, single attempt.
+- *Steps:* (1) Update `attemptBlock` Zod input + Block.type dispatch; (2) AI_QUIZ + QUIZ: each `QuizQuestionCard` gets its own mutation call on Check, awards XP per question; (3) DRAG_MATCH: "Check matches" calls mutation once with `correct = (correctCount === totalPairs)`; (4) BRANCHING: terminal-node first-visit calls mutation; (5) reader UI mirrors MCQ's XP/STREAK chips.
+
+**1.3 Fix the duplicate SIMULATION block on multiplying-fractions** · 2 min
+- *Why:* Cosmetic. Original seed had a placeholder SIMULATION at order 4; this session seeded a real one at order 14. Both render.
+- *Steps:* via Prisma Studio or one-off script, delete the order-4 SIMULATION block on the multiplying-fractions lesson.
+
+### Tier 2 — Phase 4 (Institution + Polish)
+
+**2.1 Refund self-service UI** · ~1 session
+- *Why:* Phase 3 wired the webhook for `charge.refunded` (flips Order to REFUNDED + deletes Enrollment). What's missing is a button for teachers to *initiate* a refund.
+- *Steps:* (1) Add `payment.refundOrder({ orderId })` mutation — ownership check (teacher owns the course); calls `stripe.refunds.create({charge})` for real-mode, in demo just flips status; (2) Teacher earnings page gets a "Refund" button per PAID order; (3) Confirm dialog with order amount + buyer email; (4) Audit log entry.
+
+**2.2 Real-Stripe smoke test** · ~30 min if creds ready
+- *Why:* The whole Stripe Connect path is built but never run against real Stripe. Demo mode works; real mode is unverified.
+- *Steps:* (1) `npm i stripe`; (2) Create a Stripe test account + Connect platform setup; (3) Set `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` in `.env.local`; (4) Walk the full flow — buy course → real Stripe checkout → webhook (use Stripe CLI for local) → enrollment.
+
+**2.3 Parent role surface** · ~2-3 sessions
+- *Why:* `PARENT` enum exists in schema but no UI / role-gated pages. K-12 parents want to see kid progress.
+- *Steps:* (1) New `ParentChild` model linking parent userId → student userId (or `User.parentIds: String[]`); (2) Admin UI to add parents and link kids; (3) `/parent` dashboard showing each kid's enrollments, recent XP, streaks; (4) Weekly digest notification (kicks off Tier 3 email work); (5) `proxy.ts` updates for PARENT role gate.
+
+**2.4 1099 / annual tax export for teachers (US)** · ~1 session
+- *Why:* Marketplace teachers need this for taxes if they earn > $600/yr. Required for US compliance once we have real money flowing.
+- *Steps:* (1) Server route that aggregates Order rows per teacher per calendar year; (2) CSV export endpoint (PDF can come later — needs a primitive); (3) Teacher earnings page gets a "Download 1099 data" link.
+
+**2.5 Invoice email after purchase** · ~1 session (includes email provider setup)
+- *Why:* Right now PAID orders have no receipt. UX expectation + legal protection.
+- *Steps:* (1) Set up Resend (recommended for Next.js, has React Email integration); (2) Simple receipt template (order details, course, amount, refund policy); (3) Webhook on `checkout.session.completed` sends; (4) Add `RESEND_API_KEY` to env.
+
+### Tier 3 — Production readiness
+
+**3.1 Error monitoring** · ~1 hour
+- Sentry is the safe pick. Next.js has first-class integration. Wraps server actions, tRPC, edge.
+
+**3.2 Email delivery infrastructure** · ~30 min (covered by 2.5 if done first)
+
+**3.3 Database backup strategy** · ~1 hour
+- Production: `pg_dump` daily cron → S3 or equivalent. Restore drill once.
+
+**3.4 Deploy to Vercel** · ~30 min if env is documented
+- Hardest part: managed Postgres provider (Neon / Supabase / Vercel Postgres). Lyceum is currently local Docker only.
+
+**3.5 Mobile responsive audit** · ~1-2 sessions
+- Phase 5 territory. Most chromes are desktop-first (grid layouts, fixed widths). Worth scoping before committing.
+
+### Tier 4 — Block-system v2 enhancements
+
+**4.1 Block library drag-and-drop into lesson** · ~1 session
+- v2 of the original P1-28 ticket. Currently teacher clicks "+" per row; wireframe shows drag from a left-rail library. Top-level DndContext spanning library + lesson lists.
+
+**4.2 Block reorder across lessons** · ~1 session
+- "Move block to lesson X" — currently you can only reorder within a lesson.
+
+**4.3 AI_QUIZ adaptive regeneration** · ~1 session
+- When teacher hits Regenerate, server includes recent student-attempt data ("3 of 12 students missed the multiplication question") so the new batch targets weak spots.
+
+**4.4 Block templates library** · ~1 session
+- Pre-built starter blocks ("4-option MCQ", "5-pair matching", "Reflection discussion prompt"). One-click insert.
+
+**4.5 Refactor BlockSettingsShape into discriminated union** · ~1 session
+- Currently a sprawling union with ~20 optional fields and a note about shared field names (e.g. `options` differs between MCQ and POLL). Discriminated union keyed by Block.type would catch shape mismatches at compile time. Data doesn't need to migrate — purely a type-level refactor.
+
+### Tier 5 — Tech debt / known issues
+
+**5.1 Block reader iframe sandboxing** · ~30 min
+- VIDEO, SLIDES, PDF, SIMULATION iframes don't set `sandbox` attribute. Teacher-supplied URLs could be hostile. Add `sandbox="allow-scripts allow-same-origin allow-popups"` (tune per-type). Loses some sim functionality if too strict.
+
+**5.2 Stripe webhook idempotency** · ~30 min
+- Webhook should check if Order is already PAID before re-processing. Stripe retries on non-2xx; double-processing would re-create the Enrollment.
+
+**5.3 Tighten `chosenKey` typing** · ~1 session
+- Column is overloaded across attempt types. After Tier 1.2 ships, the encoding gets even denser (`"3:1"` etc). Long-term: add real `chosenIndex Int?` + `subIndex Int?` columns. Defer until analytics queries actually need structured access.
+
+**5.4 No tests** · ~1 session for a starter suite
+- Throwaway probes have shipped; no automated tests. Recommend Vitest + 1 smoke per critical path: auth signup → course buy → enrollment, lesson load, MCQ submit, POLL vote.
+
+**5.5 AGENT_NOTES gotchas section is sprawling** · ~30 min
+- 30+ gotchas in one flat list. Consider grouping by topic (Prisma, Auth, Stripe, Blocks, dnd-kit, etc.) or extracting to `docs/gotchas/*.md` for searchability.
+
+### Tier 6 — Stretch / Phase 5
+
+**6.1 PWA / offline lesson reading**
+**6.2 i18n** — currently every string is en-US
+**6.3 Skill-tree mastery flow** — page renders but visualization-only; no progression
+**6.4 Teacher discussions + storefront pages** — wireframes exist; pages may be stubs
+**6.5 Admin pages** — people, classes, curriculum, analytics, integrations, branding, billing, audit (status varies per page)
+
+### Decision log placeholder
+
+Drop architectural decisions here as they happen. Example: *"2026-MM-DD — decided to encode block subAttempts in chosenKey as `subIdx:choiceIdx` rather than add a column. Defer real columns until query patterns require them."*
+
+---
+
 ### What's now real (vs. v0 prototype)
 - **DB**: Postgres 16 in Docker, port 5433, volume `lyceum_pg_data`. Prisma 7.8.0 with `@prisma/adapter-pg`.
 - **Schema**: `prisma/schema.prisma` — Identity + Catalog + Skills + Progress + light Social/Commerce + Auth.js tables (Account / Session / VerificationToken).
