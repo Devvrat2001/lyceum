@@ -11,6 +11,10 @@ import {
   XPChip,
 } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
+import {
+  BlockReader,
+  type BlockReaderProps,
+} from "@/components/lesson/BlockReader";
 
 type Step = {
   id: string;
@@ -35,6 +39,7 @@ type LessonProps = {
   courseLabel: string;
   steps: Step[];
   questions: Question[];
+  blocks: BlockReaderProps[];
 };
 
 type Msg = {
@@ -410,19 +415,31 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
 
         {/* Content */}
         <main style={{ overflow: "auto", padding: "32px 48px" }}>
+          {/* Teacher-authored blocks render first (when present). The
+              existing Question flow below stays as the primary
+              practice surface until Block-driven attempts ship. */}
+          {lesson.blocks.length > 0 && (
+            <section style={{ marginBottom: 24, maxWidth: 720 }}>
+              {lesson.blocks.map((b) => (
+                <BlockReader key={b.id} block={b} />
+              ))}
+            </section>
+          )}
           {!question ? (
-            <Card p={32} style={{ textAlign: "center" }}>
-              <Eyebrow>No questions yet</Eyebrow>
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 13,
-                  color: "var(--wf-body)",
-                }}
-              >
-                This lesson is content-only for now.
-              </div>
-            </Card>
+            lesson.blocks.length === 0 && (
+              <Card p={32} style={{ textAlign: "center" }}>
+                <Eyebrow>No questions yet</Eyebrow>
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 13,
+                    color: "var(--wf-body)",
+                  }}
+                >
+                  This lesson is content-only for now.
+                </div>
+              </Card>
+            )
           ) : (
             <>
               <Annot style={{ marginBottom: 12 }}>

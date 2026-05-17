@@ -45,6 +45,13 @@ export default async function LessonPage({
               correct: boolean;
             }>,
           })),
+          blocks: lesson.blocks.map((b) => ({
+            id: b.id,
+            type: b.type,
+            order: b.order,
+            // Block.settings is Prisma.JsonValue; narrow at the seam.
+            settings: (b.settings ?? {}) as Record<string, unknown>,
+          })),
         }}
       />
     </StudentChrome>

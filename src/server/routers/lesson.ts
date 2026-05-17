@@ -31,6 +31,10 @@ export const lessonRouter = router({
           },
           questions: { orderBy: { order: "asc" } },
           steps: { orderBy: { order: "asc" } },
+          blocks: {
+            orderBy: { order: "asc" },
+            select: { id: true, type: true, order: true, settings: true },
+          },
         },
       });
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
