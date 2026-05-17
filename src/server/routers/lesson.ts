@@ -1,11 +1,17 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
-import { bumpStreak } from "../services/streakEngine";
+import { awardCorrectAttempt } from "../services/awardForAttempt";
 
 const XP_PER_CORRECT = 20;
 const XP_HINT_PENALTY = 5;
-const STREAK_BONUS_XP = 25;
+
+/** Minimum XP awarded for a correct answer (after hint penalties). */
+const XP_FLOOR = 5;
+
+function xpForCorrect(hintsUsed: number): number {
+  return Math.max(XP_FLOOR, XP_PER_CORRECT - hintsUsed * XP_HINT_PENALTY);
+}
 
 export const lessonRouter = router({
   bySlug: publicProcedure
@@ -42,8 +48,9 @@ export const lessonRouter = router({
     }),
 
   /**
-   * Submit a question attempt. Idempotent per (user, question, attempt#).
-   * Awards XP server-side.
+   * Submit a Question-based attempt. Awards XP server-side; bumps
+   * streak / awards milestone bonuses + badges via the shared
+   * `awardCorrectAttempt` helper.
    */
   attempt: protectedProcedure
     .input(
@@ -61,13 +68,10 @@ export const lessonRouter = router({
       if (!q) throw new TRPCError({ code: "NOT_FOUND" });
 
       const answers = q.answers as Array<{ key: string; correct: boolean }>;
-      const correct = !!answers.find(
+      const correct = answers.some(
         (a) => a.key === input.chosenKey && a.correct
       );
-
-      const points = correct
-        ? Math.max(5, XP_PER_CORRECT - input.hintsUsed * XP_HINT_PENALTY)
-        : 0;
+      const points = correct ? xpForCorrect(input.hintsUsed) : 0;
 
       await ctx.db.attempt.create({
         data: {
@@ -81,87 +85,114 @@ export const lessonRouter = router({
         },
       });
 
-      let bonusPoints = 0;
-      let streakInfo: { current: number; milestone: number | null } | null = null;
-      let badgeAwarded: string | null = null;
-
-      if (points > 0) {
-        await ctx.db.xPEvent.create({
-          data: {
-            userId: ctx.user.id,
-            points,
-            source: "quiz_correct",
-            refId: q.id,
-          },
-        });
-
-        // Streak: bump on first correct attempt of the day; award bonus XP
-        // when crossing a milestone.
-        const { current, milestoneHit } = await bumpStreak(
-          ctx.db,
-          ctx.user.id
-        );
-        streakInfo = { current, milestone: milestoneHit };
-
-        if (milestoneHit) {
-          bonusPoints = STREAK_BONUS_XP;
-          await ctx.db.xPEvent.create({
-            data: {
-              userId: ctx.user.id,
-              points: bonusPoints,
-              source: "streak_bonus",
-              refId: `day-${milestoneHit}`,
-            },
-          });
-
-          // Award the corresponding badge if it exists.
-          const badgeSlug =
-            milestoneHit >= 7 && milestoneHit < 14
-              ? "hot-streak"
-              : milestoneHit >= 14
-              ? "hot-streak"
-              : null;
-          if (badgeSlug) {
-            const badge = await ctx.db.badge.findUnique({
-              where: { slug: badgeSlug },
-            });
-            if (badge) {
-              const existed = await ctx.db.userBadge.findUnique({
-                where: {
-                  userId_badgeId: {
-                    userId: ctx.user.id,
-                    badgeId: badge.id,
-                  },
-                },
-              });
-              if (!existed) {
-                await ctx.db.userBadge.create({
-                  data: { userId: ctx.user.id, badgeId: badge.id },
-                });
-                badgeAwarded = badge.name;
-
-                // Surface the achievement as a notification.
-                await ctx.db.notification.create({
-                  data: {
-                    userId: ctx.user.id,
-                    kind: "badge_earned",
-                    title: `🔥 ${badge.name} — ${milestoneHit} days`,
-                    body: `You've practiced ${milestoneHit} days in a row.`,
-                  },
-                });
-              }
-            }
-          }
-        }
-      }
+      const award =
+        points > 0
+          ? await awardCorrectAttempt(
+              ctx.db,
+              ctx.user.id,
+              points,
+              "quiz_correct",
+              q.id
+            )
+          : null;
 
       return {
         correct,
         points,
-        bonusPoints,
+        bonusPoints: award?.bonusPoints ?? 0,
         correctKey: answers.find((a) => a.correct)?.key ?? null,
-        streak: streakInfo,
-        badgeAwarded,
+        streak: award?.streak ?? null,
+        badgeAwarded: award?.badgeAwarded ?? null,
+      };
+    }),
+
+  /**
+   * Submit a Block-based MCQ attempt. Block.settings.options is a
+   * positional array (no per-option `key`), so we identify the choice
+   * by index. Same XP/streak/badge pipeline as `attempt`.
+   */
+  attemptBlock: protectedProcedure
+    .input(
+      z.object({
+        blockId: z.string(),
+        chosenIndex: z.number().int().min(0).max(9),
+        hintsUsed: z.number().int().min(0).max(3).default(0),
+        timeMs: z.number().int().nonnegative().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "MCQ") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not an MCQ",
+        });
+      }
+
+      const settings = (block.settings ?? {}) as Record<string, unknown>;
+      const rawOptions = Array.isArray(settings.options) ? settings.options : [];
+      const options = rawOptions.filter(
+        (o): o is { text: string; correct: boolean } =>
+          o !== null &&
+          typeof o === "object" &&
+          typeof (o as { text?: unknown }).text === "string" &&
+          typeof (o as { correct?: unknown }).correct === "boolean"
+      );
+
+      if (options.length < 2) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not yet a valid MCQ (needs ≥2 options)",
+        });
+      }
+      if (input.chosenIndex >= options.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Chosen option out of range",
+        });
+      }
+
+      const chosen = options[input.chosenIndex];
+      const correct = chosen.correct;
+      const correctIndex = options.findIndex((o) => o.correct);
+      const points = correct ? xpForCorrect(input.hintsUsed) : 0;
+
+      await ctx.db.attempt.create({
+        data: {
+          userId: ctx.user.id,
+          lessonId: block.lessonId,
+          blockId: block.id,
+          // We store the index as a string so the existing `chosenKey`
+          // column can hold either lettered keys (Question MCQs) or
+          // numeric indices (Block MCQs) without a schema change.
+          chosenKey: String(input.chosenIndex),
+          correct,
+          hintsUsed: input.hintsUsed,
+          timeMs: input.timeMs,
+        },
+      });
+
+      const award =
+        points > 0
+          ? await awardCorrectAttempt(
+              ctx.db,
+              ctx.user.id,
+              points,
+              "block_mcq_correct",
+              block.id
+            )
+          : null;
+
+      return {
+        correct,
+        points,
+        bonusPoints: award?.bonusPoints ?? 0,
+        correctIndex,
+        streak: award?.streak ?? null,
+        badgeAwarded: award?.badgeAwarded ?? null,
       };
     }),
 });

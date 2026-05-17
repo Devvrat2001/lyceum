@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { findBlockMeta, type BlockType } from "@/lib/blocks";
+import { trpc } from "@/lib/trpc/react";
 
 /**
  * Student-facing render of a single Block from a Lesson. Mirrors the
@@ -10,11 +11,12 @@ import { findBlockMeta, type BlockType } from "@/lib/blocks";
  * every other type renders a small placeholder card so the layout
  * doesn't break for blocks whose reader hasn't shipped yet.
  *
- * No tRPC here — pure presentation. Answer-attempt persistence for
- * MCQ blocks lives with the existing `lesson.attempt` mutation
- * against the Question model and ships in a follow-up; this v1 lets
- * the student SELF-CHECK their answer locally so they can see the
- * lesson flow front-to-back even before attempts are wired.
+ * MCQ blocks call `lesson.attemptBlock` server-side on "Check answer"
+ * — that writes an `Attempt` row, awards XP via the shared
+ * `awardCorrectAttempt` helper, and runs the streak / badge pipeline
+ * (same engine the legacy Question-based attempt uses). Until the
+ * request resolves the UI shows a pending state; on success the
+ * server-reported correctness + XP chip render.
  */
 export type BlockReaderProps = {
   id: string;
@@ -86,7 +88,7 @@ function renderBody(block: BlockReaderProps) {
     case "READING":
       return <ReadingBody settings={block.settings} />;
     case "MCQ":
-      return <McqBody settings={block.settings} />;
+      return <McqBody blockId={block.id} settings={block.settings} />;
     default:
       return (
         <div
@@ -382,7 +384,22 @@ function applyInline(text: string): React.ReactNode {
 
 type McqOption = { text: string; correct: boolean };
 
-function McqBody({ settings }: { settings: Record<string, unknown> }) {
+type McqFeedback = {
+  correct: boolean;
+  points: number;
+  bonusPoints: number;
+  correctIndex: number;
+  streak: { current: number; milestone: number | null } | null;
+  badgeAwarded: string | null;
+};
+
+function McqBody({
+  blockId,
+  settings,
+}: {
+  blockId: string;
+  settings: Record<string, unknown>;
+}) {
   const stem = typeof settings.stem === "string" ? settings.stem : "";
   const opts: McqOption[] = Array.isArray(settings.options)
     ? (settings.options as McqOption[]).filter(
@@ -393,8 +410,26 @@ function McqBody({ settings }: { settings: Record<string, unknown> }) {
           typeof o.correct === "boolean"
       )
     : [];
+
   const [selected, setSelected] = useState<number | null>(null);
-  const [checked, setChecked] = useState(false);
+  const [feedback, setFeedback] = useState<McqFeedback | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const attempt = trpc.lesson.attemptBlock.useMutation({
+    onSuccess: (res) => {
+      setFeedback(res);
+      setSubmitError(null);
+    },
+    onError: (err) => {
+      // Auth-gated mutation — surfaces a friendly hint instead of
+      // failing silently when the user isn't signed in.
+      setSubmitError(
+        err.data?.code === "UNAUTHORIZED"
+          ? "Sign in to save your answer."
+          : err.message ?? "Couldn't submit your answer. Try again."
+      );
+    },
+  });
 
   if (!stem.trim() || opts.length < 2) {
     return (
@@ -402,7 +437,25 @@ function McqBody({ settings }: { settings: Record<string, unknown> }) {
     );
   }
 
-  const correctIdx = opts.findIndex((o) => o.correct);
+  // Once the server returns, `feedback.correctIndex` is authoritative.
+  // Before submit we don't know which is correct (the client receives
+  // `correct: true/false` per option in settings, but UI shouldn't
+  // colour anything until the student commits an answer).
+  const correctIdx = feedback ? feedback.correctIndex : -1;
+  const checked = feedback !== null;
+  const pending = attempt.isPending;
+
+  const onCheck = () => {
+    if (selected === null || pending) return;
+    setSubmitError(null);
+    attempt.mutate({ blockId, chosenIndex: selected });
+  };
+
+  const onReset = () => {
+    setSelected(null);
+    setFeedback(null);
+    setSubmitError(null);
+  };
 
   return (
     <div>
@@ -432,10 +485,10 @@ function McqBody({ settings }: { settings: Record<string, unknown> }) {
               key={i}
               type="button"
               onClick={() => {
-                if (checked) return;
+                if (checked || pending) return;
                 setSelected(i);
               }}
-              disabled={checked}
+              disabled={checked || pending}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -456,7 +509,7 @@ function McqBody({ settings }: { settings: Record<string, unknown> }) {
                     ? "var(--wf-accent-soft)"
                     : "white",
                 borderRadius: 4,
-                cursor: checked ? "default" : "pointer",
+                cursor: checked || pending ? "default" : "pointer",
                 color: "var(--wf-ink)",
                 fontFamily: "inherit",
               }}
@@ -484,37 +537,35 @@ function McqBody({ settings }: { settings: Record<string, unknown> }) {
           );
         })}
       </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button
           type="button"
-          onClick={() => setChecked(true)}
-          disabled={selected === null || checked}
+          onClick={onCheck}
+          disabled={selected === null || checked || pending}
           style={{
             padding: "6px 12px",
             fontSize: 12,
             border: "none",
             borderRadius: 3,
             background:
-              selected === null || checked
+              selected === null || checked || pending
                 ? "var(--wf-fill)"
                 : "var(--wf-ink)",
             color:
-              selected === null || checked
+              selected === null || checked || pending
                 ? "var(--wf-mute)"
                 : "white",
-            cursor: selected === null || checked ? "default" : "pointer",
+            cursor:
+              selected === null || checked || pending ? "default" : "pointer",
             fontWeight: 600,
           }}
         >
-          Check answer
+          {pending ? "Checking…" : "Check answer"}
         </button>
         {checked && (
           <button
             type="button"
-            onClick={() => {
-              setSelected(null);
-              setChecked(false);
-            }}
+            onClick={onReset}
             style={{
               padding: "6px 12px",
               fontSize: 12,
@@ -528,31 +579,83 @@ function McqBody({ settings }: { settings: Record<string, unknown> }) {
             Try again
           </button>
         )}
-        {checked && (
+        {feedback && (
           <span
             style={{
               fontSize: 12,
-              color:
-                selected === correctIdx
-                  ? "var(--wf-good)"
-                  : "var(--wf-accent)",
+              color: feedback.correct ? "var(--wf-good)" : "var(--wf-accent)",
               fontWeight: 600,
             }}
           >
-            {selected === correctIdx ? "✓ Correct" : "Not quite — try again"}
+            {feedback.correct ? "✓ Correct" : "Not quite — try again"}
+          </span>
+        )}
+        {feedback?.correct && feedback.points > 0 && (
+          <span
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 2,
+              background: "var(--wf-good)",
+              color: "white",
+              letterSpacing: "0.06em",
+              fontWeight: 700,
+            }}
+          >
+            +{feedback.points} XP
+          </span>
+        )}
+        {feedback?.bonusPoints && feedback.bonusPoints > 0 ? (
+          <span
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 2,
+              background: "var(--wf-accent)",
+              color: "white",
+              letterSpacing: "0.06em",
+              fontWeight: 700,
+            }}
+          >
+            +{feedback.bonusPoints} STREAK
+          </span>
+        ) : null}
+        {feedback?.streak?.milestone && (
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--wf-accent)",
+              fontWeight: 600,
+            }}
+          >
+            🔥 {feedback.streak.milestone}-day streak!
+          </span>
+        )}
+        {feedback?.badgeAwarded && (
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--wf-accent)",
+              fontWeight: 600,
+            }}
+          >
+            🏅 {feedback.badgeAwarded}
           </span>
         )}
       </div>
-      <div
-        style={{
-          marginTop: 12,
-          fontSize: 10,
-          color: "var(--wf-mute)",
-          fontStyle: "italic",
-        }}
-      >
-        Self-check only — XP attempt persistence ships next.
-      </div>
+      {submitError && (
+        <div
+          style={{
+            marginTop: 10,
+            fontSize: 11,
+            color: "var(--wf-accent)",
+          }}
+        >
+          {submitError}
+        </div>
+      )}
     </div>
   );
 }
