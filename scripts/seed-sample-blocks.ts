@@ -17,7 +17,7 @@ const LESSON_SLUG = "multiplying-fractions";
 const MARKER_LABEL = "seed:sample-block-v1";
 
 type Seed = {
-  type: "SLIDES" | "PDF" | "SECTION" | "POLL" | "DISCUSSION";
+  type: "SLIDES" | "PDF" | "SECTION" | "POLL" | "DISCUSSION" | "AI_QUIZ";
   // Prisma's Json input rejects loose Record<string, unknown> because
   // values could be undefined/functions. InputJsonObject keeps us
   // honest while staying flexible per-type.
@@ -73,6 +73,56 @@ const SAMPLES: Seed[] = [
       label: MARKER_LABEL,
       prompt:
         "Share one place where you still need a model or a worked example. What kind of help would unstick you?",
+    },
+  },
+  {
+    type: "AI_QUIZ",
+    settings: {
+      label: MARKER_LABEL,
+      topic: "Practice multiplying fractions by whole numbers",
+      count: 3,
+      // Pre-generated via demo fallback so the reader shows real
+      // questions without the teacher having to click Generate first.
+      // Teacher can re-generate from the inspector to refresh.
+      generated: {
+        questions: [
+          {
+            stem: "What is ⅓ × 6?",
+            difficulty: 2,
+            hint: "Think of 6 split into thirds.",
+            answers: [
+              { key: "A", text: "1", correct: false },
+              { key: "B", text: "2", correct: true },
+              { key: "C", text: "3", correct: false },
+              { key: "D", text: "6", correct: false },
+            ],
+          },
+          {
+            stem: "Mia ate ¼ of a pizza with 8 slices. How many slices did she eat?",
+            difficulty: 2,
+            hint: "Find one quarter of 8.",
+            answers: [
+              { key: "A", text: "1 slice", correct: false },
+              { key: "B", text: "2 slices", correct: true },
+              { key: "C", text: "4 slices", correct: false },
+              { key: "D", text: "8 slices", correct: false },
+            ],
+          },
+          {
+            stem: "Which expression equals ⅖ × 10?",
+            difficulty: 3,
+            hint: "Multiply 2 × 10 first, then divide by 5.",
+            answers: [
+              { key: "A", text: "2 × 10 ÷ 5 = 4", correct: true },
+              { key: "B", text: "2 × 5 ÷ 10 = 1", correct: false },
+              { key: "C", text: "5 × 10 ÷ 2 = 25", correct: false },
+              { key: "D", text: "10 ÷ 2 ÷ 5 = 1", correct: false },
+            ],
+          },
+        ],
+        generatedAt: new Date("2026-05-17T13:00:00Z").toISOString(),
+        mode: "demo",
+      },
     },
   },
 ];

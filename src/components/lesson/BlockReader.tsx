@@ -99,6 +99,8 @@ function renderBody(block: BlockReaderProps) {
       return <PollBody blockId={block.id} settings={block.settings} />;
     case "DISCUSSION":
       return <DiscussionBody blockId={block.id} settings={block.settings} />;
+    case "AI_QUIZ":
+      return <AiQuizBody settings={block.settings} />;
     default:
       return (
         <div
@@ -1043,6 +1045,243 @@ function PollBody({
           }}
         >
           {localError}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── AI_QUIZ ──────────────────────────────────────────────── */
+
+type AiQuizQuestion = {
+  stem: string;
+  difficulty: number;
+  answers: Array<{ key: string; text: string; correct: boolean }>;
+  hint?: string | null;
+};
+
+function AiQuizBody({ settings }: { settings: Record<string, unknown> }) {
+  const generated = settings.generated as
+    | {
+        questions: AiQuizQuestion[];
+        generatedAt: string;
+        mode?: string;
+      }
+    | undefined;
+
+  if (!generated || !Array.isArray(generated.questions) || generated.questions.length === 0) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't generated questions for this quiz yet." />
+    );
+  }
+
+  return (
+    <div>
+      <div
+        className="wf-mono"
+        style={{
+          fontSize: 9,
+          color: "var(--wf-ai)",
+          letterSpacing: "0.06em",
+          marginBottom: 12,
+        }}
+      >
+        AI-GENERATED · {generated.questions.length} QUESTION
+        {generated.questions.length === 1 ? "" : "S"} · SELF-CHECK
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {generated.questions.map((q, i) => (
+          <AiQuizQuestion key={i} index={i} question={q} />
+        ))}
+      </div>
+      <div
+        style={{
+          marginTop: 14,
+          fontSize: 10,
+          color: "var(--wf-mute)",
+          fontStyle: "italic",
+        }}
+      >
+        Self-check only — XP persistence ships in a follow-up.
+      </div>
+    </div>
+  );
+}
+
+function AiQuizQuestion({
+  index,
+  question,
+}: {
+  index: number;
+  question: AiQuizQuestion;
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const correctKey = question.answers.find((a) => a.correct)?.key ?? "";
+
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--wf-body)",
+          lineHeight: 1.5,
+          marginBottom: 10,
+        }}
+      >
+        <span
+          className="wf-mono"
+          style={{ color: "var(--wf-mute)", marginRight: 6 }}
+        >
+          Q{index + 1}.
+        </span>
+        {question.stem}
+      </div>
+      <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
+        {question.answers.map((a) => {
+          const isMine = selected === a.key;
+          const isCorrect = checked && a.key === correctKey;
+          const isWrong = checked && isMine && a.key !== correctKey;
+          return (
+            <button
+              key={a.key}
+              type="button"
+              onClick={() => {
+                if (checked) return;
+                setSelected(a.key);
+              }}
+              disabled={checked}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 10px",
+                fontSize: 12,
+                textAlign: "left",
+                border: isCorrect
+                  ? "1.5px solid var(--wf-good)"
+                  : isWrong
+                    ? "1.5px solid var(--wf-accent)"
+                    : isMine
+                      ? "1.5px solid var(--wf-ink)"
+                      : "1px solid var(--wf-hairline)",
+                background: isCorrect
+                  ? "rgba(34,176,90,0.08)"
+                  : isWrong
+                    ? "var(--wf-accent-soft)"
+                    : "white",
+                borderRadius: 3,
+                cursor: checked ? "default" : "pointer",
+                color: "var(--wf-ink)",
+                fontFamily: "inherit",
+              }}
+            >
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  border: "1.5px solid currentColor",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 8,
+                  fontWeight: 700,
+                }}
+              >
+                {a.key}
+              </span>
+              <span style={{ flex: 1 }}>{a.text}</span>
+              {isCorrect && <Icon name="check" size={11} color="var(--wf-good)" />}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={() => setChecked(true)}
+          disabled={!selected || checked}
+          style={{
+            padding: "5px 10px",
+            fontSize: 11,
+            border: "none",
+            borderRadius: 3,
+            background:
+              !selected || checked ? "var(--wf-fill)" : "var(--wf-ink)",
+            color: !selected || checked ? "var(--wf-mute)" : "white",
+            cursor: !selected || checked ? "default" : "pointer",
+            fontWeight: 600,
+          }}
+        >
+          Check
+        </button>
+        {checked && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelected(null);
+              setChecked(false);
+              setShowHint(false);
+            }}
+            style={{
+              padding: "5px 10px",
+              fontSize: 11,
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              cursor: "pointer",
+              color: "var(--wf-body)",
+            }}
+          >
+            Try again
+          </button>
+        )}
+        {question.hint && !checked && (
+          <button
+            type="button"
+            onClick={() => setShowHint((s) => !s)}
+            style={{
+              padding: "5px 10px",
+              fontSize: 11,
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              cursor: "pointer",
+              color: "var(--wf-ai)",
+              fontWeight: 600,
+            }}
+          >
+            {showHint ? "Hide hint" : "💡 Hint"}
+          </button>
+        )}
+        {checked && (
+          <span
+            style={{
+              fontSize: 11,
+              color: selected === correctKey ? "var(--wf-good)" : "var(--wf-accent)",
+              fontWeight: 600,
+            }}
+          >
+            {selected === correctKey ? "✓ Correct" : `Correct answer: ${correctKey}`}
+          </span>
+        )}
+      </div>
+      {showHint && question.hint && (
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            color: "var(--wf-body)",
+            background: "var(--wf-ai-soft, rgba(124,58,237,0.06))",
+            padding: "6px 8px",
+            borderLeft: "2px solid var(--wf-ai)",
+            borderRadius: 2,
+            lineHeight: 1.4,
+          }}
+        >
+          {question.hint}
         </div>
       )}
     </div>

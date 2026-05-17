@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { router, teacherProcedure } from "../trpc";
 import {
@@ -25,6 +26,7 @@ import {
 } from "@/lib/ai/prompts/questionGenerator";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
+import { zodToJsonSchema } from "@/lib/ai/zodToJsonSchema";
 
 const slugify = (s: string) =>
   s
@@ -296,6 +298,150 @@ export const generatorRouter = router({
       };
     }),
 
+  /**
+   * Generate N questions for an AI_QUIZ block and persist them into
+   * Block.settings.generated (an inline cache so every student sees
+   * the same set without us paying tokens per visit). Ownership check
+   * resolves the block → lesson → unit → course → authorId chain.
+   * Teacher hits "Generate" again to refresh.
+   */
+  generateAiQuiz: teacherProcedure
+    .input(
+      z.object({
+        blockId: z.string(),
+        count: z.number().int().min(1).max(10).default(5),
+        /** Optional teacher-supplied topic; falls back to the lesson title. */
+        topic: z.string().trim().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkAIQuota({ actorId: ctx.user.id });
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: {
+          id: true,
+          type: true,
+          settings: true,
+          lesson: {
+            select: {
+              id: true,
+              title: true,
+              unit: {
+                select: {
+                  course: { select: { authorId: true, title: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "AI_QUIZ") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not an AI_QUIZ",
+        });
+      }
+      if (
+        ctx.user.role !== "ADMIN" &&
+        block.lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const lessonTitle = (
+        input.topic && input.topic.length > 0
+          ? input.topic
+          : block.lesson.title
+      ).trim();
+      const courseTitle = block.lesson.unit.course.title;
+      const t0 = Date.now();
+
+      let generated: GeneratedQuestion[];
+      if (isClaudeEnabled()) {
+        const client = getClaude()!;
+        const schema = zodToJsonSchema(QuestionBatchSchema);
+        const res = await client.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 3072,
+          system: QUESTION_GENERATOR_SYSTEM_PROMPT,
+          messages: [
+            {
+              role: "user",
+              content: buildQuestionGenPrompt({
+                lessonTitle,
+                courseTitle,
+                existingStems: [],
+                count: input.count,
+              }),
+            },
+          ],
+          output_config: { format: { type: "json_schema", schema } },
+        });
+        const text = res.content
+          .map((b) => (b.type === "text" ? b.text ?? "" : ""))
+          .join("")
+          .trim()
+          .replace(/^```(?:json)?\s*/i, "")
+          .replace(/\s*```$/i, "");
+        const parsed = QuestionBatchSchema.safeParse(JSON.parse(text));
+        if (!parsed.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `AI returned invalid questions: ${parsed.error.message}`,
+          });
+        }
+        generated = parsed.data.questions.filter(
+          (q) => q.answers.filter((a) => a.correct).length === 1
+        );
+        if (generated.length === 0) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "AI didn't return any well-formed questions.",
+          });
+        }
+      } else {
+        generated = buildDemoQuestions({ lessonTitle, count: input.count });
+      }
+
+      const previousSettings = (block.settings ?? {}) as Record<string, unknown>;
+      const nextSettings: Record<string, unknown> = {
+        ...previousSettings,
+        // Preserve teacher's intent for re-renders.
+        topic: input.topic ?? previousSettings.topic ?? "",
+        count: input.count,
+        generated: {
+          questions: generated,
+          generatedAt: new Date().toISOString(),
+          mode: isClaudeEnabled() ? "claude" : "demo",
+        },
+      };
+      await ctx.db.block.update({
+        where: { id: block.id },
+        data: { settings: nextSettings as Prisma.InputJsonValue },
+      });
+
+      await audit({
+        actorId: ctx.user.id,
+        kind: "ai.generate_questions",
+        payload: {
+          blockId: block.id,
+          requested: input.count,
+          added: generated.length,
+          mode: isClaudeEnabled() ? "claude" : "demo",
+          elapsedMs: Date.now() - t0,
+          scope: "ai_quiz_block",
+        },
+        lessonId: block.lesson.id,
+      });
+
+      return {
+        questions: generated,
+        generatedAt: new Date().toISOString(),
+        elapsedMs: Date.now() - t0,
+      };
+    }),
+
   /** Persist an outline as a real Course + Units + (stub) Lessons. */
   saveAsCourse: teacherProcedure
     .input(
@@ -420,50 +566,3 @@ function extractUnitFromResponse(
   return parsed.data;
 }
 
-/**
- * Hand-rolled Zod → JSON Schema converter that produces the subset
- * Anthropic structured outputs accepts (no minLength/maxLength etc).
- * Kept small to avoid pulling in a heavy dep just for this.
- */
-function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
-  if (schema instanceof z.ZodObject) {
-    const shape = schema.shape as Record<string, z.ZodTypeAny>;
-    const properties: Record<string, unknown> = {};
-    const required: string[] = [];
-    for (const [key, value] of Object.entries(shape)) {
-      properties[key] = zodToJsonSchema(value);
-      if (!(value instanceof z.ZodOptional)) {
-        required.push(key);
-      }
-    }
-    return {
-      type: "object",
-      properties,
-      required,
-      additionalProperties: false,
-    };
-  }
-  if (schema instanceof z.ZodArray) {
-    return {
-      type: "array",
-      items: zodToJsonSchema(schema.element as z.ZodTypeAny),
-    };
-  }
-  if (schema instanceof z.ZodString) {
-    const out: Record<string, unknown> = { type: "string" };
-    if (schema.description) out.description = schema.description;
-    return out;
-  }
-  if (schema instanceof z.ZodNumber) {
-    const out: Record<string, unknown> = { type: "number" };
-    if (schema.description) out.description = schema.description;
-    return out;
-  }
-  if (schema instanceof z.ZodOptional) {
-    return zodToJsonSchema(schema.unwrap() as z.ZodTypeAny);
-  }
-  if (schema instanceof z.ZodDefault) {
-    return zodToJsonSchema(schema.removeDefault() as z.ZodTypeAny);
-  }
-  return { type: "string" };
-}

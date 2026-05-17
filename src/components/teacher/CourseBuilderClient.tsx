@@ -1453,6 +1453,16 @@ function describeBlockSettings(block: LessonBlock): string | null {
         typeof s.prompt === "string" ? s.prompt.trim() : "";
       return prompt ? "with prompt" : "open thread";
     }
+    case "AI_QUIZ": {
+      const generated = s.generated as
+        | { questions?: unknown[] }
+        | undefined;
+      const qCount = Array.isArray(generated?.questions)
+        ? generated.questions.length
+        : 0;
+      if (qCount > 0) return `${qCount} generated`;
+      return "needs generation";
+    }
     default:
       return null;
   }

@@ -45,6 +45,19 @@ export type BlockSettingsShape = {
   subtitle?: string;
   // DISCUSSION
   prompt?: string;
+  // AI_QUIZ
+  topic?: string;
+  count?: number;
+  generated?: {
+    questions: Array<{
+      stem: string;
+      difficulty: number;
+      answers: Array<{ key: string; text: string; correct: boolean }>;
+      hint?: string | null;
+    }>;
+    generatedAt: string;
+    mode?: string;
+  };
   // unknown / future
   [k: string]: unknown;
 };
@@ -184,7 +197,7 @@ export function BlockInspector({
         hint={`Shown to students. Blank = use the default (${meta.label}).`}
       />
 
-      {renderTypeFields(block.type, draft, update)}
+      {renderTypeFields(block.type, block.id, draft, update, onSaved)}
 
       <TextAreaField
         label="TEACHER NOTES"
@@ -242,11 +255,16 @@ export function BlockInspector({
  */
 function renderTypeFields(
   type: BlockType,
+  blockId: string,
   draft: BlockSettingsShape,
   update: <K extends keyof BlockSettingsShape>(
     key: K,
     value: BlockSettingsShape[K]
-  ) => void
+  ) => void,
+  // Only AI_QUIZ needs to bubble fresh settings up to the parent
+  // mid-edit (after a generate). Other types stay on the universal
+  // Save flow.
+  onSaved: (settings: BlockSettingsShape) => void
 ) {
   switch (type) {
     case "VIDEO":
@@ -265,6 +283,15 @@ function renderTypeFields(
       return <PollFields draft={draft} update={update} />;
     case "DISCUSSION":
       return <DiscussionFields draft={draft} update={update} />;
+    case "AI_QUIZ":
+      return (
+        <AiQuizFields
+          blockId={blockId}
+          draft={draft}
+          update={update}
+          onSaved={onSaved}
+        />
+      );
     default:
       return (
         <div
@@ -702,6 +729,191 @@ function PollFields({
           + Add option ({options.length}/6)
         </button>
       </div>
+    </>
+  );
+}
+
+function AiQuizFields({
+  blockId,
+  draft,
+  update,
+  onSaved,
+}: {
+  blockId: string;
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+  // Bubble the freshly-generated questions up to the parent so the
+  // course-builder canvas re-reads the block's settings without a
+  // full inspector re-mount.
+  onSaved: (settings: BlockSettingsShape) => void;
+}) {
+  const topic = typeof draft.topic === "string" ? draft.topic : "";
+  const count =
+    typeof draft.count === "number" && draft.count >= 1 && draft.count <= 10
+      ? draft.count
+      : 5;
+  const generated = draft.generated;
+  const [status, setStatus] = useState<
+    { kind: "ok" | "error"; msg: string } | null
+  >(null);
+
+  const generate = trpc.generator.generateAiQuiz.useMutation({
+    onSuccess: (res) => {
+      // Mirror the new generated block server-side so the local draft
+      // reflects what just saved, and surface to parent for canvas
+      // re-render.
+      const fresh: BlockSettingsShape = {
+        ...draft,
+        topic,
+        count,
+        generated: {
+          questions: res.questions.map((q) => ({
+            stem: q.stem,
+            difficulty: q.difficulty,
+            answers: q.answers,
+            hint: q.hint ?? null,
+          })),
+          generatedAt: res.generatedAt,
+        },
+      };
+      update("generated", fresh.generated);
+      onSaved(fresh);
+      setStatus({
+        kind: "ok",
+        msg: `Generated ${res.questions.length} questions in ${(res.elapsedMs / 1_000).toFixed(1)}s.`,
+      });
+      setTimeout(() => setStatus(null), 4_000);
+    },
+    onError: (err) =>
+      setStatus({
+        kind: "error",
+        msg: err.message ?? "Generation failed. Try again.",
+      }),
+  });
+
+  return (
+    <>
+      <TextAreaField
+        label="TOPIC (OPTIONAL)"
+        value={topic}
+        onChange={(v) => update("topic", v)}
+        placeholder="Defaults to the lesson title. Override to scope the questions."
+        rows={2}
+        maxLength={500}
+      />
+      <div style={{ marginBottom: 12 }}>
+        <div
+          className="wf-mono"
+          style={{
+            fontSize: 10,
+            color: "var(--wf-mute)",
+            marginBottom: 4,
+            letterSpacing: "0.06em",
+          }}
+        >
+          QUESTION COUNT · 1 – 10
+        </div>
+        <input
+          type="number"
+          min={1}
+          max={10}
+          value={count}
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10);
+            if (Number.isFinite(n) && n >= 1 && n <= 10) update("count", n);
+          }}
+          style={{
+            width: 80,
+            padding: "5px 7px",
+            fontSize: 11,
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            background: "white",
+            fontFamily: "inherit",
+          }}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => generate.mutate({ blockId, count, topic: topic || undefined })}
+        disabled={generate.isPending}
+        style={{
+          padding: "8px 12px",
+          border: "1px solid var(--wf-ai)",
+          background: generate.isPending ? "var(--wf-fillsoft)" : "white",
+          color: "var(--wf-ai)",
+          fontSize: 12,
+          fontWeight: 600,
+          borderRadius: 3,
+          cursor: generate.isPending ? "default" : "pointer",
+          marginBottom: 10,
+        }}
+      >
+        {generate.isPending
+          ? "Generating…"
+          : generated
+            ? "Regenerate questions"
+            : "Generate questions ✨"}
+      </button>
+      {status && (
+        <div
+          style={{
+            fontSize: 11,
+            padding: "6px 8px",
+            background:
+              status.kind === "ok"
+                ? "rgba(34,176,90,0.08)"
+                : "var(--wf-accent-soft)",
+            color:
+              status.kind === "ok" ? "var(--wf-good)" : "var(--wf-accent)",
+            borderRadius: 3,
+            marginBottom: 10,
+          }}
+        >
+          {status.msg}
+        </div>
+      )}
+      {generated && (
+        <div
+          style={{
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            padding: 10,
+            background: "var(--wf-fillsoft)",
+          }}
+        >
+          <div
+            className="wf-mono"
+            style={{
+              fontSize: 9,
+              color: "var(--wf-mute)",
+              letterSpacing: "0.06em",
+              marginBottom: 6,
+            }}
+          >
+            {generated.questions.length} QUESTIONS · GENERATED{" "}
+            {new Date(generated.generatedAt).toLocaleTimeString()}
+            {generated.mode ? ` · ${generated.mode}` : ""}
+          </div>
+          {generated.questions.map((q, i) => (
+            <div
+              key={i}
+              style={{
+                fontSize: 11,
+                color: "var(--wf-body)",
+                marginBottom: 4,
+                lineHeight: 1.4,
+              }}
+            >
+              <span style={{ color: "var(--wf-mute)" }}>{i + 1}.</span>{" "}
+              {q.stem}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
