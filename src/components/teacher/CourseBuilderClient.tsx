@@ -1427,6 +1427,20 @@ function describeBlockSettings(block: LessonBlock): string | null {
       ).length;
       return `${opts.length} opts · ${correct} ✓`;
     }
+    case "SLIDES":
+    case "PDF": {
+      const url = typeof s.url === "string" ? s.url.trim() : "";
+      if (!url) return null;
+      try {
+        return new URL(url).hostname.replace(/^www\./, "");
+      } catch {
+        return "linked";
+      }
+    }
+    case "SECTION": {
+      const title = typeof s.title === "string" ? s.title.trim() : "";
+      return title || null;
+    }
     default:
       return null;
   }

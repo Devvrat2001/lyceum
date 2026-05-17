@@ -89,6 +89,12 @@ function renderBody(block: BlockReaderProps) {
       return <ReadingBody settings={block.settings} />;
     case "MCQ":
       return <McqBody blockId={block.id} settings={block.settings} />;
+    case "SLIDES":
+      return <SlidesBody settings={block.settings} />;
+    case "PDF":
+      return <PdfBody settings={block.settings} />;
+    case "SECTION":
+      return <SectionBody settings={block.settings} />;
     default:
       return (
         <div
@@ -655,6 +661,243 @@ function McqBody({
         >
           {submitError}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ── SLIDES ───────────────────────────────────────────────── */
+
+function SlidesBody({ settings }: { settings: Record<string, unknown> }) {
+  const rawUrl =
+    typeof settings.url === "string" ? settings.url.trim() : "";
+  const caption =
+    typeof settings.caption === "string" ? settings.caption.trim() : "";
+
+  if (!rawUrl) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't added a slides URL yet." />
+    );
+  }
+
+  const embed = toSlidesEmbed(rawUrl);
+  return (
+    <div>
+      {embed ? (
+        <div
+          style={{
+            position: "relative",
+            paddingTop: "56.25%", // 16:9 — Google Slides default ratio
+            background: "var(--wf-fill)",
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 4,
+            overflow: "hidden",
+          }}
+        >
+          <iframe
+            src={embed}
+            title="Slides"
+            loading="lazy"
+            allowFullScreen
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              border: "none",
+            }}
+          />
+        </div>
+      ) : (
+        <a
+          href={rawUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            color: "var(--wf-ink)",
+            textDecoration: "none",
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            padding: "8px 12px",
+            fontSize: 13,
+          }}
+        >
+          Open slides ↗
+        </a>
+      )}
+      {caption && (
+        <div
+          style={{
+            marginTop: 10,
+            fontSize: 12,
+            color: "var(--wf-body)",
+            lineHeight: 1.5,
+          }}
+        >
+          {caption}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Normalize known slide-host URLs to their embed form. Google Slides
+ * /edit URLs need to flip to /embed; /pubembed URLs are already
+ * embeddable. Unknown hosts return the URL as-is — caller will iframe
+ * it optimistically. Returns null only when the URL doesn't parse.
+ */
+function toSlidesEmbed(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    if (
+      u.hostname === "docs.google.com" &&
+      u.pathname.startsWith("/presentation/")
+    ) {
+      // /pubembed and /embed are already embeddable.
+      if (
+        u.pathname.endsWith("/embed") ||
+        u.pathname.endsWith("/pubembed") ||
+        u.pathname.endsWith("/pub")
+      ) {
+        return raw;
+      }
+      const match = u.pathname.match(/\/presentation\/d\/([^/]+)/);
+      if (match) {
+        return `https://docs.google.com/presentation/d/${match[1]}/embed`;
+      }
+    }
+    // Other hosts: assume teacher pasted an embed-capable URL.
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+/* ── PDF ──────────────────────────────────────────────────── */
+
+function PdfBody({ settings }: { settings: Record<string, unknown> }) {
+  const rawUrl =
+    typeof settings.url === "string" ? settings.url.trim() : "";
+  const caption =
+    typeof settings.caption === "string" ? settings.caption.trim() : "";
+
+  if (!rawUrl) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't added a PDF URL yet." />
+    );
+  }
+
+  // Parse to catch malformed URLs; we render the iframe optimistically
+  // because many hosts allow PDF embedding even cross-origin, and
+  // always surface a fallback open-in-new-tab link.
+  let valid = false;
+  try {
+    new URL(rawUrl);
+    valid = true;
+  } catch {
+    valid = false;
+  }
+
+  return (
+    <div>
+      {valid && (
+        <div
+          style={{
+            position: "relative",
+            paddingTop: "75%", // 4:3 — closer to PDF page aspect
+            background: "var(--wf-fill)",
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 4,
+            overflow: "hidden",
+            marginBottom: 10,
+          }}
+        >
+          <iframe
+            src={rawUrl}
+            title="PDF"
+            loading="lazy"
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              border: "none",
+            }}
+          />
+        </div>
+      )}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
+          fontSize: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <a
+          href={rawUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: "var(--wf-ink)",
+            fontWeight: 600,
+            textDecoration: "underline",
+          }}
+        >
+          Open PDF in new tab ↗
+        </a>
+        {caption && (
+          <span style={{ color: "var(--wf-body)" }}>· {caption}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── SECTION ──────────────────────────────────────────────── */
+
+function SectionBody({ settings }: { settings: Record<string, unknown> }) {
+  const title =
+    typeof settings.title === "string" ? settings.title.trim() : "";
+  const subtitle =
+    typeof settings.subtitle === "string" ? settings.subtitle.trim() : "";
+
+  if (!title) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't named this section yet." />
+    );
+  }
+
+  return (
+    <div>
+      <h3
+        className="wf-serif"
+        style={{
+          fontSize: 22,
+          fontWeight: 700,
+          margin: 0,
+          color: "var(--wf-ink)",
+          lineHeight: 1.25,
+        }}
+      >
+        {title}
+      </h3>
+      {subtitle && (
+        <p
+          style={{
+            margin: "6px 0 0",
+            fontSize: 13,
+            color: "var(--wf-mute)",
+            lineHeight: 1.5,
+          }}
+        >
+          {subtitle}
+        </p>
       )}
     </div>
   );

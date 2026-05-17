@@ -32,7 +32,7 @@ export type BlockSettingsShape = {
   // universal
   label?: string;
   notes?: string;
-  // VIDEO
+  // VIDEO, SLIDES, PDF (all use a single share/embed URL + optional caption)
   url?: string;
   caption?: string;
   // READING
@@ -40,6 +40,9 @@ export type BlockSettingsShape = {
   // MCQ
   stem?: string;
   options?: McqOption[];
+  // SECTION (structural divider — title is the visible heading, subtitle is optional)
+  title?: string;
+  subtitle?: string;
   // unknown / future
   [k: string]: unknown;
 };
@@ -250,6 +253,12 @@ function renderTypeFields(
       return <ReadingFields draft={draft} update={update} />;
     case "MCQ":
       return <McqFields draft={draft} update={update} />;
+    case "SLIDES":
+      return <SlidesFields draft={draft} update={update} />;
+    case "PDF":
+      return <PdfFields draft={draft} update={update} />;
+    case "SECTION":
+      return <SectionFields draft={draft} update={update} />;
     default:
       return (
         <div
@@ -475,6 +484,101 @@ function McqFields({
           + Add option ({options.length}/6)
         </button>
       </div>
+    </>
+  );
+}
+
+function SlidesFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  return (
+    <>
+      <TextField
+        label="SLIDES URL"
+        value={typeof draft.url === "string" ? draft.url : ""}
+        onChange={(v) => update("url", v)}
+        placeholder="https://docs.google.com/presentation/d/…"
+        maxLength={500}
+        hint="Google Slides /edit or /pubembed links work — the reader normalizes them."
+      />
+      <TextField
+        label="CAPTION (OPTIONAL)"
+        value={typeof draft.caption === "string" ? draft.caption : ""}
+        onChange={(v) => update("caption", v)}
+        placeholder="One-line description shown under the deck"
+        maxLength={200}
+      />
+    </>
+  );
+}
+
+function PdfFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  return (
+    <>
+      <TextField
+        label="PDF URL"
+        value={typeof draft.url === "string" ? draft.url : ""}
+        onChange={(v) => update("url", v)}
+        placeholder="https://… (direct .pdf link)"
+        maxLength={500}
+        hint="Some hosts block cross-origin embeds — the reader falls back to a download link."
+      />
+      <TextField
+        label="CAPTION (OPTIONAL)"
+        value={typeof draft.caption === "string" ? draft.caption : ""}
+        onChange={(v) => update("caption", v)}
+        placeholder="One-line description shown under the PDF"
+        maxLength={200}
+      />
+    </>
+  );
+}
+
+function SectionFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  // SECTION is a pure presentational divider — title is the visible
+  // heading, subtitle is an optional intro line. Useful for grouping a
+  // long lesson into thematic sections without nesting structure.
+  return (
+    <>
+      <TextField
+        label="SECTION TITLE"
+        value={typeof draft.title === "string" ? draft.title : ""}
+        onChange={(v) => update("title", v)}
+        placeholder="Part 1 — Setting up"
+        maxLength={120}
+      />
+      <TextField
+        label="SUBTITLE (OPTIONAL)"
+        value={typeof draft.subtitle === "string" ? draft.subtitle : ""}
+        onChange={(v) => update("subtitle", v)}
+        placeholder="One-line description of what this section covers"
+        maxLength={200}
+      />
     </>
   );
 }
