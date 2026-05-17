@@ -1463,6 +1463,11 @@ function describeBlockSettings(block: LessonBlock): string | null {
       if (qCount > 0) return `${qCount} generated`;
       return "needs generation";
     }
+    case "DRAG_MATCH": {
+      const pairs = Array.isArray(s.pairs) ? s.pairs : [];
+      if (pairs.length === 0) return null;
+      return `${pairs.length} pair${pairs.length === 1 ? "" : "s"}`;
+    }
     default:
       return null;
   }

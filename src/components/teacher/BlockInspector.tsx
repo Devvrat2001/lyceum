@@ -58,6 +58,8 @@ export type BlockSettingsShape = {
     generatedAt: string;
     mode?: string;
   };
+  // DRAG_MATCH
+  pairs?: Array<{ left: string; right: string }>;
   // unknown / future
   [k: string]: unknown;
 };
@@ -292,6 +294,8 @@ function renderTypeFields(
           onSaved={onSaved}
         />
       );
+    case "DRAG_MATCH":
+      return <DragMatchFields draft={draft} update={update} />;
     default:
       return (
         <div
@@ -914,6 +918,171 @@ function AiQuizFields({
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+function DragMatchFields({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+}) {
+  const pairs: Array<{ left: string; right: string }> = Array.isArray(
+    draft.pairs
+  )
+    ? (draft.pairs as Array<{ left?: unknown; right?: unknown }>)
+        .filter(
+          (p): p is { left: string; right: string } =>
+            !!p &&
+            typeof p.left === "string" &&
+            typeof p.right === "string"
+        )
+    : [];
+
+  const setPairs = (next: Array<{ left: string; right: string }>) =>
+    update("pairs", next);
+
+  const addPair = () => {
+    if (pairs.length >= 8) return;
+    setPairs([...pairs, { left: "", right: "" }]);
+  };
+  const removePair = (idx: number) => {
+    if (pairs.length <= 2) return;
+    setPairs(pairs.filter((_, i) => i !== idx));
+  };
+  const setLeft = (idx: number, left: string) =>
+    setPairs(pairs.map((p, i) => (i === idx ? { ...p, left } : p)));
+  const setRight = (idx: number, right: string) =>
+    setPairs(pairs.map((p, i) => (i === idx ? { ...p, right } : p)));
+
+  return (
+    <>
+      <TextAreaField
+        label="MATCHING PROMPT (OPTIONAL)"
+        value={typeof draft.prompt === "string" ? draft.prompt : ""}
+        onChange={(v) => update("prompt", v)}
+        placeholder="Match each fraction to its decimal equivalent."
+        rows={2}
+        maxLength={500}
+      />
+      <div style={{ marginBottom: 12 }}>
+        <div
+          className="wf-mono"
+          style={{
+            fontSize: 10,
+            color: "var(--wf-mute)",
+            marginBottom: 6,
+            letterSpacing: "0.06em",
+          }}
+        >
+          PAIRS · 2 – 8 · LEFT ↔ RIGHT
+        </div>
+        {pairs.length === 0 ? (
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--wf-mute)",
+              padding: "8px 0",
+            }}
+          >
+            No pairs yet — add at least two.
+          </div>
+        ) : (
+          pairs.map((p, i) => (
+            <div
+              key={i}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto 1fr auto",
+                gap: 6,
+                alignItems: "center",
+                marginBottom: 4,
+              }}
+            >
+              <input
+                type="text"
+                value={p.left}
+                onChange={(e) => setLeft(i, e.target.value)}
+                placeholder={`Left ${i + 1}`}
+                maxLength={120}
+                style={{
+                  padding: "5px 7px",
+                  fontSize: 11,
+                  border: "1px solid var(--wf-hairline)",
+                  borderRadius: 3,
+                  background: "white",
+                  fontFamily: "inherit",
+                  minWidth: 0,
+                }}
+              />
+              <span style={{ color: "var(--wf-mute)", fontSize: 11 }}>↔</span>
+              <input
+                type="text"
+                value={p.right}
+                onChange={(e) => setRight(i, e.target.value)}
+                placeholder={`Right ${i + 1}`}
+                maxLength={120}
+                style={{
+                  padding: "5px 7px",
+                  fontSize: 11,
+                  border: "1px solid var(--wf-hairline)",
+                  borderRadius: 3,
+                  background: "white",
+                  fontFamily: "inherit",
+                  minWidth: 0,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => removePair(i)}
+                disabled={pairs.length <= 2}
+                aria-label={`Remove pair ${i + 1}`}
+                title={
+                  pairs.length <= 2 ? "Need at least 2 pairs" : "Remove pair"
+                }
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color:
+                    pairs.length <= 2
+                      ? "var(--wf-hairline)"
+                      : "var(--wf-mute)",
+                  cursor: pairs.length <= 2 ? "not-allowed" : "pointer",
+                  fontSize: 13,
+                  lineHeight: 1,
+                  padding: "0 4px",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))
+        )}
+        <button
+          type="button"
+          onClick={addPair}
+          disabled={pairs.length >= 8}
+          style={{
+            marginTop: 6,
+            padding: "4px 8px",
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            background: "white",
+            fontSize: 10,
+            fontWeight: 600,
+            color:
+              pairs.length >= 8 ? "var(--wf-mute)" : "var(--wf-body)",
+            cursor: pairs.length >= 8 ? "not-allowed" : "pointer",
+          }}
+        >
+          + Add pair ({pairs.length}/8)
+        </button>
+      </div>
     </>
   );
 }

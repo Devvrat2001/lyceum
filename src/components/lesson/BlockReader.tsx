@@ -1,6 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { Avatar, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { findBlockMeta, type BlockType } from "@/lib/blocks";
 import { trpc } from "@/lib/trpc/react";
@@ -101,6 +110,8 @@ function renderBody(block: BlockReaderProps) {
       return <DiscussionBody blockId={block.id} settings={block.settings} />;
     case "AI_QUIZ":
       return <AiQuizBody settings={block.settings} />;
+    case "DRAG_MATCH":
+      return <DragMatchBody blockId={block.id} settings={block.settings} />;
     default:
       return (
         <div
@@ -1049,6 +1060,447 @@ function PollBody({
       )}
     </div>
   );
+}
+
+/* ── DRAG_MATCH ───────────────────────────────────────────── */
+
+type DragMatchPair = { left: string; right: string };
+
+function DragMatchBody({
+  blockId,
+  settings,
+}: {
+  blockId: string;
+  settings: Record<string, unknown>;
+}) {
+  const prompt =
+    typeof settings.prompt === "string" ? settings.prompt.trim() : "";
+  const rawPairs: DragMatchPair[] = Array.isArray(settings.pairs)
+    ? (settings.pairs as Array<{ left?: unknown; right?: unknown }>)
+        .filter(
+          (p): p is DragMatchPair =>
+            !!p &&
+            typeof p.left === "string" &&
+            typeof p.right === "string" &&
+            p.left.trim() !== "" &&
+            p.right.trim() !== ""
+        )
+    : [];
+
+  // Stable shuffle of right-side items so the pool isn't pre-aligned.
+  // Seeded by blockId so re-renders within a session don't re-shuffle
+  // (would feel jittery to the student).
+  const shuffledRightIndices = useMemo(
+    () => seededShuffle(rawPairs.map((_, i) => i), blockId),
+    // blockId fixes the seed; rawPairs.length covers teacher edits
+    // adding/removing pairs without re-shuffling on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [blockId, rawPairs.length]
+  );
+
+  // placements[leftIdx] = rightIdx (or null when slot is empty).
+  const [placements, setPlacements] = useState<Record<number, number | null>>(
+    () => Object.fromEntries(rawPairs.map((_, i) => [i, null]))
+  );
+  const [checked, setChecked] = useState(false);
+
+  const sensors = useSensors(
+    // Match the course-builder activation distance so a click doesn't
+    // arm the drag mid-tap on touch devices.
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  if (rawPairs.length < 2) {
+    return (
+      <EmptyBlockHint message="Your teacher hasn't finished setting up the matching pairs yet." />
+    );
+  }
+
+  const usedRightIndices = new Set(
+    Object.values(placements).filter((v): v is number => v !== null)
+  );
+  const poolIndices = shuffledRightIndices.filter(
+    (i) => !usedRightIndices.has(i)
+  );
+  const allFilled =
+    Object.values(placements).every((v) => v !== null) &&
+    poolIndices.length === 0;
+
+  const onDragEnd = (event: DragEndEvent) => {
+    if (checked) return; // freeze on check; Reset re-enables
+    const { active, over } = event;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    // Decode active: "pool-N" or "placed-N" (N = rightIdx)
+    const match = activeId.match(/^(?:pool|placed)-(\d+)$/);
+    if (!match) return;
+    const rightIdx = parseInt(match[1], 10);
+    if (Number.isNaN(rightIdx)) return;
+
+    setPlacements((prev) => {
+      const next = { ...prev };
+
+      // Remove this rightIdx from any slot it currently occupies.
+      for (const k of Object.keys(next)) {
+        if (next[Number(k)] === rightIdx) next[Number(k)] = null;
+      }
+
+      // Drop targets: "slot-N" or "pool"
+      if (overId === "pool") {
+        // Already removed from slots above; nothing else to do.
+        return next;
+      }
+      const slotMatch = overId.match(/^slot-(\d+)$/);
+      if (!slotMatch) return prev;
+      const slotIdx = parseInt(slotMatch[1], 10);
+      if (Number.isNaN(slotIdx) || slotIdx >= rawPairs.length) return prev;
+
+      // If the slot is occupied by another rightIdx, that one bounces
+      // back to the pool (i.e. just clear its placement — usedRightIndices
+      // recomputes from `next` on next render so it'll appear in the pool).
+      next[slotIdx] = rightIdx;
+      return next;
+    });
+  };
+
+  const onReset = () => {
+    setPlacements(Object.fromEntries(rawPairs.map((_, i) => [i, null])));
+    setChecked(false);
+  };
+
+  const correctCount = checked
+    ? rawPairs.reduce((n, _, i) => {
+        const placed = placements[i];
+        return placed !== null && rawPairs[placed].right === rawPairs[i].right
+          ? n + 1
+          : n;
+      }, 0)
+    : 0;
+
+  return (
+    <div>
+      {prompt && (
+        <div
+          style={{
+            fontSize: 13,
+            color: "var(--wf-body)",
+            lineHeight: 1.5,
+            marginBottom: 12,
+          }}
+        >
+          {prompt}
+        </div>
+      )}
+      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+        {/* Pool */}
+        <DragMatchPool poolIndices={poolIndices} pairs={rawPairs} />
+
+        {/* Slots */}
+        <div
+          style={{
+            display: "grid",
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          {rawPairs.map((pair, slotIdx) => {
+            const placedRightIdx = placements[slotIdx];
+            const placedPair =
+              placedRightIdx !== null ? rawPairs[placedRightIdx] : null;
+            const isCorrect =
+              checked &&
+              placedPair !== null &&
+              placedPair.right === pair.right;
+            const isWrong =
+              checked && placedPair !== null && placedPair.right !== pair.right;
+            return (
+              <div
+                key={slotIdx}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto 1fr",
+                  gap: 10,
+                  alignItems: "center",
+                }}
+              >
+                {/* Left side (anchored) */}
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid var(--wf-hairline)",
+                    borderRadius: 4,
+                    fontSize: 13,
+                    background: "var(--wf-fillsoft)",
+                  }}
+                >
+                  {pair.left}
+                </div>
+                <span
+                  style={{
+                    color: isCorrect
+                      ? "var(--wf-good)"
+                      : isWrong
+                        ? "var(--wf-accent)"
+                        : "var(--wf-mute)",
+                    fontSize: 14,
+                    textAlign: "center",
+                  }}
+                >
+                  {isCorrect ? "✓" : isWrong ? "✗" : "↔"}
+                </span>
+                {/* Right slot (drop target + draggable when filled) */}
+                <DragMatchSlot
+                  slotIdx={slotIdx}
+                  placedRightIdx={placedRightIdx}
+                  pairs={rawPairs}
+                  isCorrect={isCorrect}
+                  isWrong={isWrong}
+                  disabled={checked}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </DndContext>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={() => setChecked(true)}
+          disabled={!allFilled || checked}
+          style={{
+            padding: "6px 12px",
+            fontSize: 12,
+            border: "none",
+            borderRadius: 3,
+            background:
+              !allFilled || checked ? "var(--wf-fill)" : "var(--wf-ink)",
+            color: !allFilled || checked ? "var(--wf-mute)" : "white",
+            cursor: !allFilled || checked ? "default" : "pointer",
+            fontWeight: 600,
+          }}
+        >
+          Check matches
+        </button>
+        {checked && (
+          <button
+            type="button"
+            onClick={onReset}
+            style={{
+              padding: "6px 12px",
+              fontSize: 12,
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              cursor: "pointer",
+              color: "var(--wf-body)",
+            }}
+          >
+            Reset
+          </button>
+        )}
+        {checked && (
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color:
+                correctCount === rawPairs.length
+                  ? "var(--wf-good)"
+                  : "var(--wf-accent)",
+            }}
+          >
+            {correctCount === rawPairs.length
+              ? "✓ All matched!"
+              : `${correctCount} / ${rawPairs.length} correct`}
+          </span>
+        )}
+      </div>
+      <div
+        style={{
+          marginTop: 10,
+          fontSize: 10,
+          color: "var(--wf-mute)",
+          fontStyle: "italic",
+        }}
+      >
+        Self-check only — XP persistence ships in a follow-up.
+      </div>
+    </div>
+  );
+}
+
+function DragMatchPool({
+  poolIndices,
+  pairs,
+}: {
+  poolIndices: number[];
+  pairs: DragMatchPair[];
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: "pool" });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        minHeight: 56,
+        padding: 8,
+        marginBottom: 12,
+        border: isOver
+          ? "1.5px dashed var(--wf-accent)"
+          : "1px dashed var(--wf-hairline)",
+        background: isOver ? "var(--wf-accent-soft)" : "var(--wf-fill)",
+        borderRadius: 4,
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6,
+        alignItems: "center",
+      }}
+    >
+      {poolIndices.length === 0 ? (
+        <span
+          className="wf-mono"
+          style={{
+            fontSize: 10,
+            color: "var(--wf-mute)",
+            letterSpacing: "0.06em",
+          }}
+        >
+          ALL PLACED — DRAG A SLOT ITEM HERE TO RETURN IT
+        </span>
+      ) : (
+        poolIndices.map((rightIdx) => (
+          <DragMatchChip
+            key={rightIdx}
+            id={`pool-${rightIdx}`}
+            label={pairs[rightIdx].right}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
+function DragMatchSlot({
+  slotIdx,
+  placedRightIdx,
+  pairs,
+  isCorrect,
+  isWrong,
+  disabled,
+}: {
+  slotIdx: number;
+  placedRightIdx: number | null;
+  pairs: DragMatchPair[];
+  isCorrect: boolean;
+  isWrong: boolean;
+  disabled: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `slot-${slotIdx}`,
+    disabled,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        minHeight: 38,
+        padding: 4,
+        border: isCorrect
+          ? "1.5px solid var(--wf-good)"
+          : isWrong
+            ? "1.5px solid var(--wf-accent)"
+            : isOver
+              ? "1.5px dashed var(--wf-accent)"
+              : "1px dashed var(--wf-hairline)",
+        background: isCorrect
+          ? "rgba(34,176,90,0.06)"
+          : isWrong
+            ? "var(--wf-accent-soft)"
+            : isOver
+              ? "var(--wf-fillsoft)"
+              : "white",
+        borderRadius: 4,
+        display: "flex",
+        alignItems: "center",
+      }}
+    >
+      {placedRightIdx !== null ? (
+        <DragMatchChip
+          id={`placed-${placedRightIdx}`}
+          label={pairs[placedRightIdx].right}
+          inline
+        />
+      ) : (
+        <span
+          className="wf-mono"
+          style={{
+            fontSize: 10,
+            color: "var(--wf-mute)",
+            letterSpacing: "0.06em",
+            padding: "0 6px",
+          }}
+        >
+          DROP HERE
+        </span>
+      )}
+    </div>
+  );
+}
+
+function DragMatchChip({
+  id,
+  label,
+  inline,
+}: {
+  id: string;
+  label: string;
+  inline?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({ id });
+  const style: React.CSSProperties = {
+    transform: transform
+      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+      : undefined,
+    padding: "6px 10px",
+    border: "1px solid var(--wf-ink)",
+    background: "white",
+    borderRadius: 3,
+    fontSize: 12,
+    cursor: isDragging ? "grabbing" : "grab",
+    userSelect: "none",
+    opacity: isDragging ? 0.6 : 1,
+    boxShadow: isDragging ? "0 4px 8px rgba(0,0,0,0.12)" : undefined,
+    touchAction: "none",
+    ...(inline ? { flex: 1, textAlign: "left" } : {}),
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+      {label}
+    </div>
+  );
+}
+
+/** Deterministic shuffle keyed by a string — same input always returns same order. */
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  const out = arr.slice();
+  let s = 0;
+  for (let i = 0; i < seed.length; i++) s = (s * 31 + seed.charCodeAt(i)) >>> 0;
+  // Mulberry32 with the seed for a tiny stable PRNG.
+  const next = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+  };
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
 /* ── AI_QUIZ ──────────────────────────────────────────────── */

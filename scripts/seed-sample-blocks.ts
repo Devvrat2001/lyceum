@@ -17,7 +17,14 @@ const LESSON_SLUG = "multiplying-fractions";
 const MARKER_LABEL = "seed:sample-block-v1";
 
 type Seed = {
-  type: "SLIDES" | "PDF" | "SECTION" | "POLL" | "DISCUSSION" | "AI_QUIZ";
+  type:
+    | "SLIDES"
+    | "PDF"
+    | "SECTION"
+    | "POLL"
+    | "DISCUSSION"
+    | "AI_QUIZ"
+    | "DRAG_MATCH";
   // Prisma's Json input rejects loose Record<string, unknown> because
   // values could be undefined/functions. InputJsonObject keeps us
   // honest while staying flexible per-type.
@@ -123,6 +130,19 @@ const SAMPLES: Seed[] = [
         generatedAt: new Date("2026-05-17T13:00:00Z").toISOString(),
         mode: "demo",
       },
+    },
+  },
+  {
+    type: "DRAG_MATCH",
+    settings: {
+      label: MARKER_LABEL,
+      prompt: "Match each fraction expression to its result.",
+      pairs: [
+        { left: "½ × 4", right: "2" },
+        { left: "⅓ × 9", right: "3" },
+        { left: "¼ × 12", right: "3" },
+        { left: "⅕ × 10", right: "2" },
+      ],
     },
   },
 ];
