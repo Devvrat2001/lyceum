@@ -51,6 +51,9 @@ export default async function CourseBuilderPage({
                 id: b.id,
                 type: b.type,
                 order: b.order,
+                // settings is a Prisma.JsonValue; we narrow on the
+                // client (CourseBuilderClient.BlockSettings).
+                settings: (b.settings ?? {}) as Record<string, unknown>,
               })),
             })),
           })),

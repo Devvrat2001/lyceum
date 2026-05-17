@@ -28,12 +28,27 @@ import {
 } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 import { AddBlockPopover } from "@/components/teacher/AddBlockPopover";
+import { BlockInspector } from "@/components/teacher/BlockInspector";
 import { findBlockMeta, type BlockType } from "@/lib/blocks";
+
+/**
+ * Per-block settings shape we render in the inspector. The server-side
+ * column is `Json` so future block-type-specific fields land here too;
+ * v1 just stores `{ label, notes }`. Unknown extra keys are preserved
+ * round-trip (we spread before save) so adding fields later is
+ * non-breaking.
+ */
+export type BlockSettings = {
+  label?: string;
+  notes?: string;
+  [k: string]: unknown;
+};
 
 type LessonBlock = {
   id: string;
   type: BlockType;
   order: number;
+  settings: BlockSettings;
 };
 
 type Lesson = {
@@ -116,6 +131,9 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
   // roll this back on error.
   const [units, setUnits] = useState<Unit[]>(course.units);
   const [reorderError, setReorderError] = useState<string | null>(null);
+  // ID of the currently selected block (drives the right-pane
+  // inspector). null = show the default course-level inspector.
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [settings, setSettings] = useState<Record<string, boolean>>({
     "Adaptive difficulty": true,
     "Show hints": true,
@@ -209,7 +227,39 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       });
     };
 
+  // Locate the currently selected block (if any) in local state so
+  // the inspector renders against the freshest data. Walking the
+  // tree is fine at the cardinalities we expect.
+  const selectedBlockCtx = (() => {
+    if (!selectedBlockId) return null;
+    for (const u of units) {
+      for (const l of u.lessons) {
+        const b = l.blocks.find((x) => x.id === selectedBlockId);
+        if (b) return { unitId: u.id, lessonId: l.id, block: b };
+      }
+    }
+    return null;
+  })();
+
+  const handleBlockSettingsSaved = (
+    blockId: string,
+    settings: BlockSettings
+  ) => {
+    setUnits((prev) =>
+      prev.map((u) => ({
+        ...u,
+        lessons: u.lessons.map((l) => ({
+          ...l,
+          blocks: l.blocks.map((b) =>
+            b.id === blockId ? { ...b, settings } : b
+          ),
+        })),
+      }))
+    );
+  };
+
   const handleBlockDelete = (lessonId: string, blockId: string) => {
+    if (selectedBlockId === blockId) setSelectedBlockId(null);
     // Optimistic remove; if the mutation errors, the onError handler
     // surfaces the message but we leave the optimistic state alone —
     // user can retry the delete (or refresh) without us snapping the
@@ -517,6 +567,8 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
                     onBlockAdded={handleBlockAdded}
                     onBlockDelete={handleBlockDelete}
                     onBlockDragEnd={handleBlockDragEnd}
+                    selectedBlockId={selectedBlockId}
+                    onBlockSelect={setSelectedBlockId}
                     sensors={sensors}
                   />
                 ))}
@@ -548,7 +600,8 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
           </div>
         </div>
 
-        {/* Inspector */}
+        {/* Inspector — block-scoped when a block is selected, course-
+            scoped otherwise. */}
         <aside
           style={{
             borderLeft: "1px solid var(--wf-hairline)",
@@ -556,19 +609,88 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
             overflow: "auto",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: 10,
-            }}
-          >
-            <Eyebrow>Inspector</Eyebrow>
-            <Annot>Course · {course.status}</Annot>
-          </div>
-          <h3 style={{ fontSize: 14, margin: "4px 0 14px" }}>
-            {course.title}
-          </h3>
+          {selectedBlockCtx ? (
+            <BlockInspector
+              block={selectedBlockCtx.block}
+              onSaved={(settings) =>
+                handleBlockSettingsSaved(selectedBlockCtx.block.id, settings)
+              }
+              onDeselect={() => setSelectedBlockId(null)}
+            />
+          ) : (
+            <CourseInspector
+              course={course}
+              totalLessons={totalLessons}
+              totalDuration={totalDuration}
+              settings={settings}
+              setSettings={setSettings}
+              allLessons={allLessons}
+              genLessonId={genLessonId}
+              setGenLessonId={setGenLessonId}
+              genCount={genCount}
+              setGenCount={setGenCount}
+              genFeedback={genFeedback}
+              generateQuestions={generateQuestions}
+            />
+          )}
+        </aside>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Course-level inspector: lifted out of MarketplaceBuilderClient's
+ * render so the block inspector can take over the pane cleanly when
+ * a block is selected. Pure presentation — every piece of state it
+ * needs is passed in.
+ */
+function CourseInspector({
+  course,
+  totalLessons,
+  totalDuration,
+  settings,
+  setSettings,
+  allLessons,
+  genLessonId,
+  setGenLessonId,
+  genCount,
+  setGenCount,
+  genFeedback,
+  generateQuestions,
+}: {
+  course: CourseProps;
+  totalLessons: number;
+  totalDuration: number;
+  settings: Record<string, boolean>;
+  setSettings: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  allLessons: { id: string; label: string }[];
+  genLessonId: string;
+  setGenLessonId: (v: string) => void;
+  genCount: number;
+  setGenCount: (v: number) => void;
+  genFeedback: string | null;
+  generateQuestions: {
+    isPending: boolean;
+    isError: boolean;
+    mutate: (input: { lessonId: string; count: number }) => void;
+  };
+}) {
+  return (
+    <>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 10,
+        }}
+      >
+        <Eyebrow>Inspector</Eyebrow>
+        <Annot>Course · {course.status}</Annot>
+      </div>
+      <h3 style={{ fontSize: 14, margin: "4px 0 14px" }}>
+        {course.title}
+      </h3>
 
           <Field label="STATS">
             <div
@@ -782,8 +904,6 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
               Apply suggestion
             </Btn>
           </div>
-        </aside>
-      </div>
     </>
   );
 }
@@ -830,6 +950,8 @@ function SortableUnit({
   onBlockAdded,
   onBlockDelete,
   onBlockDragEnd,
+  selectedBlockId,
+  onBlockSelect,
   sensors,
 }: {
   unit: Unit;
@@ -840,6 +962,8 @@ function SortableUnit({
   onBlockAdded: (lessonId: string, block: LessonBlock) => void;
   onBlockDelete: (lessonId: string, blockId: string) => void;
   onBlockDragEnd: (lessonId: string) => (e: DragEndEvent) => void;
+  selectedBlockId: string | null;
+  onBlockSelect: (blockId: string | null) => void;
   sensors: ReturnType<typeof useSensors>;
 }) {
   const {
@@ -955,6 +1079,8 @@ function SortableUnit({
                     onBlockAdded={(block) => onBlockAdded(l.id, block)}
                     onBlockDelete={(blockId) => onBlockDelete(l.id, blockId)}
                     onBlockDragEnd={onBlockDragEnd(l.id)}
+                    selectedBlockId={selectedBlockId}
+                    onBlockSelect={onBlockSelect}
                     sensors={sensors}
                   />
                 ))}
@@ -986,12 +1112,16 @@ function SortableLesson({
   onBlockAdded,
   onBlockDelete,
   onBlockDragEnd,
+  selectedBlockId,
+  onBlockSelect,
   sensors,
 }: {
   lesson: Lesson;
   onBlockAdded: (block: LessonBlock) => void;
   onBlockDelete: (blockId: string) => void;
   onBlockDragEnd: (e: DragEndEvent) => void;
+  selectedBlockId: string | null;
+  onBlockSelect: (blockId: string | null) => void;
   sensors: ReturnType<typeof useSensors>;
 }) {
   const {
@@ -1086,6 +1216,10 @@ function SortableLesson({
                 <SortableBlock
                   key={b.id}
                   block={b}
+                  isSelected={selectedBlockId === b.id}
+                  onSelect={() =>
+                    onBlockSelect(selectedBlockId === b.id ? null : b.id)
+                  }
                   onDelete={() => onBlockDelete(b.id)}
                 />
               ))}
@@ -1099,12 +1233,21 @@ function SortableLesson({
 
 function SortableBlock({
   block,
+  isSelected,
+  onSelect,
   onDelete,
 }: {
   block: LessonBlock;
+  isSelected: boolean;
+  onSelect: () => void;
   onDelete: () => void;
 }) {
   const meta = findBlockMeta(block.type);
+  const customLabel =
+    typeof block.settings.label === "string" && block.settings.label.trim()
+      ? block.settings.label.trim()
+      : null;
+  const displayLabel = customLabel ?? meta.label;
   const {
     attributes,
     listeners,
@@ -1122,7 +1265,12 @@ function SortableBlock({
     alignItems: "center",
     gap: 8,
     padding: "4px 8px",
-    border: "1px solid var(--wf-hairline)",
+    border: isSelected
+      ? "1px solid var(--wf-accent)"
+      : "1px solid var(--wf-hairline)",
+    boxShadow: isSelected
+      ? "0 0 0 2px var(--wf-accent-soft)"
+      : undefined,
     borderRadius: 2,
     background: "var(--wf-fillsoft)",
     fontSize: 11,
@@ -1133,7 +1281,7 @@ function SortableBlock({
       <span
         {...attributes}
         {...listeners}
-        aria-label={`Reorder ${meta.label} block`}
+        aria-label={`Reorder ${displayLabel} block`}
         style={{
           display: "inline-flex",
           cursor: "grab",
@@ -1142,20 +1290,57 @@ function SortableBlock({
       >
         <Icon name="drag" size={10} color="var(--wf-mute)" />
       </span>
-      <Icon
-        name={meta.icon as "play"}
-        size={11}
-        color={meta.ai ? "var(--wf-ai)" : "var(--wf-body)"}
-      />
-      <span
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={isSelected}
+        title="Open inspector"
         style={{
           flex: 1,
-          color: meta.ai ? "var(--wf-ai)" : "var(--wf-ink)",
-          fontWeight: 500,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: 0,
+          border: "none",
+          background: "transparent",
+          textAlign: "left",
+          cursor: "pointer",
+          color: "inherit",
+          font: "inherit",
         }}
       >
-        {meta.label}
-      </span>
+        <Icon
+          name={meta.icon as "play"}
+          size={11}
+          color={meta.ai ? "var(--wf-ai)" : "var(--wf-body)"}
+        />
+        <span
+          style={{
+            flex: 1,
+            color: meta.ai ? "var(--wf-ai)" : "var(--wf-ink)",
+            fontWeight: 500,
+            minWidth: 0,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {displayLabel}
+          {customLabel && (
+            <span
+              className="wf-mono"
+              style={{
+                marginLeft: 6,
+                fontSize: 9,
+                color: "var(--wf-mute)",
+                letterSpacing: "0.04em",
+              }}
+            >
+              · {meta.label}
+            </span>
+          )}
+        </span>
+      </button>
       {meta.ai && (
         <span
           className="wf-mono"
@@ -1174,7 +1359,7 @@ function SortableBlock({
           e.stopPropagation();
           onDelete();
         }}
-        aria-label={`Delete ${meta.label} block`}
+        aria-label={`Delete ${displayLabel} block`}
         title="Delete block"
         style={{
           border: "none",

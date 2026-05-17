@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
   router,
@@ -121,7 +122,7 @@ export const teacherRouter = router({
                   durationMin: true,
                   blocks: {
                     orderBy: { order: "asc" },
-                    select: { id: true, type: true, order: true },
+                    select: { id: true, type: true, order: true, settings: true },
                   },
                 },
               },
@@ -582,7 +583,7 @@ export const teacherRouter = router({
           order: nextOrder,
           settings: {},
         },
-        select: { id: true, type: true, order: true },
+        select: { id: true, type: true, order: true, settings: true },
       });
       return { ok: true as const, block };
     }),
@@ -643,6 +644,53 @@ export const teacherRouter = router({
         )
       );
       return { ok: true as const, count: input.blockIds.length };
+    }),
+
+  /**
+   * Replace a block's `settings` JSON. Used by the builder's block
+   * inspector to edit per-block configuration (label, notes, and
+   * eventually type-specific fields like video URL or quiz prompts).
+   *
+   * Settings is fully replaced, not merged — callers send the
+   * complete new shape. This keeps the mutation predictable and
+   * lets clients implement their own optimistic-update strategy
+   * without us having to think about partial-update semantics on
+   * a JSON column.
+   *
+   * The Zod schema deliberately accepts an open record — block-type
+   * specific validation belongs in the inspector forms that ship
+   * the values, not here.
+   */
+  updateBlock: teacherProcedure
+    .input(
+      z.object({
+        blockId: z.string(),
+        settings: z.record(z.string(), z.unknown()),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: {
+          id: true,
+          lesson: {
+            select: { unit: { select: { course: { select: { authorId: true } } } } },
+          },
+        },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        block.lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const updated = await ctx.db.block.update({
+        where: { id: input.blockId },
+        data: { settings: input.settings as Prisma.InputJsonValue },
+        select: { id: true, settings: true },
+      });
+      return { ok: true as const, block: updated };
     }),
 
   /**

@@ -25,15 +25,29 @@ export function AddBlockPopover({
   lessonId: string;
   /** Receives the freshly-created block so the caller can append it
    *  to its local list (and let the count badge derive from list
-   *  length). */
-  onAdded?: (block: { id: string; type: BlockType; order: number }) => void;
+   *  length). Settings is always `{}` for a new block — the
+   *  inspector populates it after the user clicks the row. */
+  onAdded?: (block: {
+    id: string;
+    type: BlockType;
+    order: number;
+    settings: Record<string, unknown>;
+  }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const addBlock = trpc.teacher.addBlock.useMutation({
     onSuccess: (r) => {
-      onAdded?.(r.block);
+      // The server returns settings as Prisma.JsonValue; narrow to
+      // the Record shape the caller expects (settings is always
+      // {} on creation).
+      onAdded?.({
+        id: r.block.id,
+        type: r.block.type,
+        order: r.block.order,
+        settings: (r.block.settings ?? {}) as Record<string, unknown>,
+      });
       setOpen(false);
     },
     onError: (e) => setError(e.message),
