@@ -110,15 +110,29 @@ export const lessonRouter = router({
     }),
 
   /**
-   * Submit a Block-based MCQ attempt. Block.settings.options is a
-   * positional array (no per-option `key`), so we identify the choice
-   * by index. Same XP/streak/badge pipeline as `attempt`.
+   * Submit a Block-based MCQ-style attempt. Supports three block
+   * types with the same XP / streak / badge pipeline:
+   *
+   *  - MCQ        — single-question block, `subIndex` absent
+   *  - AI_QUIZ    — N-question deck, `subIndex` is the question
+   *                 position within `settings.generated.questions`
+   *  - QUIZ       — N-question deck, `subIndex` is the question
+   *                 position within `settings.questions`
+   *
+   * Returns the chosen-by-the-server correct index so the client can
+   * highlight the right answer. For multi-question blocks the
+   * `chosenKey` column encodes both positions as `"subIdx:choiceIdx"`
+   * (the column is also used by lettered Question MCQ Attempts; we
+   * already accept the overloading).
    */
   attemptBlock: protectedProcedure
     .input(
       z.object({
         blockId: z.string(),
         chosenIndex: z.number().int().min(0).max(9),
+        // Present for AI_QUIZ / QUIZ multi-question decks; absent for
+        // single-question MCQ blocks.
+        subIndex: z.number().int().min(0).max(19).optional(),
         hintsUsed: z.number().int().min(0).max(3).default(0),
         timeMs: z.number().int().nonnegative().default(0),
       })
@@ -128,50 +142,106 @@ export const lessonRouter = router({
         where: { id: input.blockId },
       });
       if (!block) throw new TRPCError({ code: "NOT_FOUND" });
-      if (block.type !== "MCQ") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Block is not an MCQ",
-        });
-      }
 
       const settings = (block.settings ?? {}) as Record<string, unknown>;
-      const rawOptions = Array.isArray(settings.options) ? settings.options : [];
-      const options = rawOptions.filter(
-        (o): o is { text: string; correct: boolean } =>
-          o !== null &&
-          typeof o === "object" &&
-          typeof (o as { text?: unknown }).text === "string" &&
-          typeof (o as { correct?: unknown }).correct === "boolean"
-      );
 
-      if (options.length < 2) {
+      // Resolve the answer list + source label per block type.
+      let answers: Array<{ correct: boolean }>;
+      let source: string;
+
+      if (block.type === "MCQ") {
+        if (input.subIndex !== undefined) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "MCQ blocks don't take a subIndex",
+          });
+        }
+        const rawOptions = Array.isArray(settings.options)
+          ? settings.options
+          : [];
+        answers = rawOptions.filter(
+          (o): o is { text: string; correct: boolean } =>
+            o !== null &&
+            typeof o === "object" &&
+            typeof (o as { text?: unknown }).text === "string" &&
+            typeof (o as { correct?: unknown }).correct === "boolean"
+        );
+        source = "block_mcq_correct";
+      } else if (block.type === "AI_QUIZ" || block.type === "QUIZ") {
+        if (input.subIndex === undefined) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `${block.type} blocks require a subIndex`,
+          });
+        }
+        // AI_QUIZ stores questions under settings.generated.questions;
+        // QUIZ stores them at settings.questions directly.
+        const questions = (
+          block.type === "AI_QUIZ"
+            ? ((settings.generated as Record<string, unknown> | undefined)
+                ?.questions as unknown[] | undefined)
+            : (settings.questions as unknown[] | undefined)
+        ) ?? [];
+        const question = questions[input.subIndex];
+        if (
+          !question ||
+          typeof question !== "object" ||
+          !Array.isArray((question as { answers?: unknown }).answers)
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Question not found at subIndex",
+          });
+        }
+        const rawAnswers = (question as { answers: unknown[] }).answers;
+        answers = rawAnswers.filter(
+          (a): a is { correct: boolean } =>
+            a !== null &&
+            typeof a === "object" &&
+            typeof (a as { correct?: unknown }).correct === "boolean"
+        );
+        source =
+          block.type === "AI_QUIZ"
+            ? "block_ai_quiz_correct"
+            : "block_quiz_correct";
+      } else {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Block is not yet a valid MCQ (needs ≥2 options)",
+          message: `Block type ${block.type} is not MCQ-style`,
         });
       }
-      if (input.chosenIndex >= options.length) {
+
+      if (answers.length < 2) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Question is not yet a valid MCQ (needs ≥2 options)",
+        });
+      }
+      if (input.chosenIndex >= answers.length) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Chosen option out of range",
         });
       }
 
-      const chosen = options[input.chosenIndex];
-      const correct = chosen.correct;
-      const correctIndex = options.findIndex((o) => o.correct);
+      const correct = answers[input.chosenIndex].correct;
+      const correctIndex = answers.findIndex((a) => a.correct);
       const points = correct ? xpForCorrect(input.hintsUsed) : 0;
+
+      // For multi-question blocks encode both positions; for MCQ keep
+      // the legacy single-number string so existing analytics still
+      // works.
+      const chosenKey =
+        input.subIndex !== undefined
+          ? `${input.subIndex}:${input.chosenIndex}`
+          : String(input.chosenIndex);
 
       await ctx.db.attempt.create({
         data: {
           userId: ctx.user.id,
           lessonId: block.lessonId,
           blockId: block.id,
-          // We store the index as a string so the existing `chosenKey`
-          // column can hold either lettered keys (Question MCQs) or
-          // numeric indices (Block MCQs) without a schema change.
-          chosenKey: String(input.chosenIndex),
+          chosenKey,
           correct,
           hintsUsed: input.hintsUsed,
           timeMs: input.timeMs,
@@ -184,7 +254,7 @@ export const lessonRouter = router({
               ctx.db,
               ctx.user.id,
               points,
-              "block_mcq_correct",
+              source,
               block.id
             )
           : null;
@@ -196,6 +266,200 @@ export const lessonRouter = router({
         correctIndex,
         streak: award?.streak ?? null,
         badgeAwarded: award?.badgeAwarded ?? null,
+      };
+    }),
+
+  /**
+   * Submit a DRAG_MATCH block's pairings. Server validates against
+   * the canonical pairs in `settings.pairs` and awards XP based on
+   * what fraction was correctly placed:
+   *  - 100% correct → full XP
+   *  - ≥70% correct → half XP (rounded up, min XP_FLOOR)
+   *  - <70% correct → 0 XP (still records the Attempt for analytics)
+   */
+  completeDragMatch: protectedProcedure
+    .input(
+      z.object({
+        blockId: z.string(),
+        // For each slot index, the index of the right-item the student
+        // dropped into it. null = slot left empty.
+        placements: z.array(z.number().int().nullable()).min(2).max(8),
+        timeMs: z.number().int().nonnegative().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "DRAG_MATCH") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not a DRAG_MATCH",
+        });
+      }
+
+      const settings = (block.settings ?? {}) as Record<string, unknown>;
+      const rawPairs = Array.isArray(settings.pairs) ? settings.pairs : [];
+      const pairs = rawPairs.filter(
+        (p): p is { left: string; right: string } =>
+          p !== null &&
+          typeof p === "object" &&
+          typeof (p as { left?: unknown }).left === "string" &&
+          typeof (p as { right?: unknown }).right === "string"
+      );
+      if (pairs.length < 2) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block has no pairs to match",
+        });
+      }
+      if (input.placements.length !== pairs.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Placements length must match pair count",
+        });
+      }
+
+      // A placement is correct when the rightIdx dropped into slot i
+      // points at a right-string matching pairs[i].right. (Identical
+      // right-strings across pairs count as interchangeable.)
+      let correctCount = 0;
+      for (let i = 0; i < pairs.length; i++) {
+        const rightIdx = input.placements[i];
+        if (
+          rightIdx !== null &&
+          rightIdx >= 0 &&
+          rightIdx < pairs.length &&
+          pairs[rightIdx].right === pairs[i].right
+        ) {
+          correctCount += 1;
+        }
+      }
+
+      const pct = correctCount / pairs.length;
+      const correct = pct === 1;
+      const points =
+        pct === 1
+          ? XP_PER_CORRECT
+          : pct >= 0.7
+            ? Math.max(XP_FLOOR, Math.ceil(XP_PER_CORRECT / 2))
+            : 0;
+
+      await ctx.db.attempt.create({
+        data: {
+          userId: ctx.user.id,
+          lessonId: block.lessonId,
+          blockId: block.id,
+          // Encoded as "drag:correctCount/total" so analytics can read
+          // the score back without re-validating against settings.
+          chosenKey: `drag:${correctCount}/${pairs.length}`,
+          correct,
+          hintsUsed: 0,
+          timeMs: input.timeMs,
+        },
+      });
+
+      const award =
+        points > 0
+          ? await awardCorrectAttempt(
+              ctx.db,
+              ctx.user.id,
+              points,
+              "block_drag_match_complete",
+              block.id
+            )
+          : null;
+
+      return {
+        correct,
+        correctCount,
+        totalPairs: pairs.length,
+        points,
+        bonusPoints: award?.bonusPoints ?? 0,
+        streak: award?.streak ?? null,
+        badgeAwarded: award?.badgeAwarded ?? null,
+      };
+    }),
+
+  /**
+   * Submit a BRANCHING block's completion when the student reaches
+   * any terminal node. Server validates the node exists and has zero
+   * choices. Always counts as `correct: true` (in CYOA, completion
+   * IS the achievement). Awards full XP; no idempotency check in v1 —
+   * student can earn XP per terminal reached if there are multiple
+   * paths, which matches the exploratory intent.
+   */
+  completeBranching: protectedProcedure
+    .input(
+      z.object({
+        blockId: z.string(),
+        terminalNodeId: z.string(),
+        timeMs: z.number().int().nonnegative().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "BRANCHING") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not a BRANCHING",
+        });
+      }
+
+      const settings = (block.settings ?? {}) as Record<string, unknown>;
+      const rawNodes = Array.isArray(settings.nodes) ? settings.nodes : [];
+      const node = rawNodes.find(
+        (n): n is { id: string; choices: unknown[] } =>
+          n !== null &&
+          typeof n === "object" &&
+          (n as { id?: unknown }).id === input.terminalNodeId
+      );
+      if (!node) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Terminal node not found",
+        });
+      }
+      if (!Array.isArray(node.choices) || node.choices.length !== 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Node is not terminal",
+        });
+      }
+
+      const points = XP_PER_CORRECT;
+
+      await ctx.db.attempt.create({
+        data: {
+          userId: ctx.user.id,
+          lessonId: block.lessonId,
+          blockId: block.id,
+          chosenKey: `branch:${input.terminalNodeId}`,
+          correct: true,
+          hintsUsed: 0,
+          timeMs: input.timeMs,
+        },
+      });
+
+      const award = await awardCorrectAttempt(
+        ctx.db,
+        ctx.user.id,
+        points,
+        "block_branching_complete",
+        block.id
+      );
+
+      return {
+        correct: true,
+        points,
+        bonusPoints: award.bonusPoints,
+        terminalNodeId: input.terminalNodeId,
+        streak: award.streak,
+        badgeAwarded: award.badgeAwarded,
       };
     }),
 

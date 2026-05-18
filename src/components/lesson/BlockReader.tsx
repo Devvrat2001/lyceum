@@ -109,19 +109,19 @@ function renderBody(block: BlockReaderProps) {
     case "DISCUSSION":
       return <DiscussionBody blockId={block.id} settings={block.settings} />;
     case "AI_QUIZ":
-      return <AiQuizBody settings={block.settings} />;
+      return <AiQuizBody blockId={block.id} settings={block.settings} />;
     case "DRAG_MATCH":
       return <DragMatchBody blockId={block.id} settings={block.settings} />;
     case "LIVE":
       return <LiveBody settings={block.settings} />;
     case "QUIZ":
-      return <QuizBody settings={block.settings} />;
+      return <QuizBody blockId={block.id} settings={block.settings} />;
     case "SIMULATION":
       return <SimulationBody settings={block.settings} />;
     case "SPEAK":
       return <SpeakBody settings={block.settings} />;
     case "BRANCHING":
-      return <BranchingBody settings={block.settings} />;
+      return <BranchingBody blockId={block.id} settings={block.settings} />;
     default:
       return (
         <div
@@ -1276,7 +1276,13 @@ type BranchingNode = {
   choices: Array<{ label: string; to: string }>;
 };
 
-function BranchingBody({ settings }: { settings: Record<string, unknown> }) {
+function BranchingBody({
+  blockId,
+  settings,
+}: {
+  blockId: string;
+  settings: Record<string, unknown>;
+}) {
   const rawNodes: BranchingNode[] = Array.isArray(settings.nodes)
     ? (settings.nodes as unknown[]).filter(
         (n): n is BranchingNode =>
@@ -1304,6 +1310,50 @@ function BranchingBody({ settings }: { settings: Record<string, unknown> }) {
   const [path, setPath] = useState<string[]>(
     startId ? [startId] : []
   );
+
+  // Track terminals we've already completed in this page-load so a
+  // student bouncing back to the same terminal via restart-and-walk
+  // doesn't double-fire the mutation. New terminals (alt paths) DO
+  // re-fire — exploratory XP rewards alt-route discovery.
+  const [completedTerminals, setCompletedTerminals] = useState<
+    Set<string>
+  >(new Set());
+  const [terminalFeedback, setTerminalFeedback] = useState<{
+    nodeId: string;
+    points: number;
+    bonusPoints: number;
+    streak: { current: number; milestone: number | null } | null;
+    badgeAwarded: string | null;
+  } | null>(null);
+
+  const complete = trpc.lesson.completeBranching.useMutation({
+    onSuccess: (res) => {
+      setTerminalFeedback({
+        nodeId: res.terminalNodeId,
+        points: res.points,
+        bonusPoints: res.bonusPoints,
+        streak: res.streak,
+        badgeAwarded: res.badgeAwarded,
+      });
+    },
+    // Silent on error — terminal still renders fine; we just don't
+    // award XP. The lesson page isn't blocked.
+  });
+
+  // Fire on terminal entry. Must live above the early returns so the
+  // hook call order stays consistent across renders.
+  useEffect(() => {
+    const cur = currentId ? byId.get(currentId) : null;
+    if (!cur || cur.choices.length !== 0) return;
+    if (completedTerminals.has(cur.id)) return;
+    setCompletedTerminals((prev) => new Set(prev).add(cur.id));
+    complete.mutate({ blockId, terminalNodeId: cur.id });
+    // We intentionally exclude `complete` and `completedTerminals`
+    // from deps — both change on success / state-update and would
+    // cause spurious re-fires. We re-fire only when currentId changes
+    // to a not-yet-completed terminal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId]);
 
   if (rawNodes.length === 0 || !startId) {
     return (
@@ -1418,16 +1468,71 @@ function BranchingBody({ settings }: { settings: Record<string, unknown> }) {
       {isTerminal ? (
         <div>
           <div
-            className="wf-mono"
             style={{
-              fontSize: 10,
-              color: "var(--wf-good)",
-              letterSpacing: "0.06em",
-              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
               marginBottom: 8,
+              flexWrap: "wrap",
             }}
           >
-            ● END
+            <span
+              className="wf-mono"
+              style={{
+                fontSize: 10,
+                color: "var(--wf-good)",
+                letterSpacing: "0.06em",
+                fontWeight: 700,
+              }}
+            >
+              ● END
+            </span>
+            {terminalFeedback?.nodeId === node.id &&
+              terminalFeedback.points > 0 && (
+                <span
+                  className="wf-mono"
+                  style={{
+                    fontSize: 10,
+                    padding: "2px 6px",
+                    borderRadius: 2,
+                    background: "var(--wf-good)",
+                    color: "white",
+                    letterSpacing: "0.06em",
+                    fontWeight: 700,
+                  }}
+                >
+                  +{terminalFeedback.points} XP
+                </span>
+              )}
+            {terminalFeedback?.nodeId === node.id &&
+              terminalFeedback.bonusPoints > 0 && (
+                <span
+                  className="wf-mono"
+                  style={{
+                    fontSize: 10,
+                    padding: "2px 6px",
+                    borderRadius: 2,
+                    background: "var(--wf-accent)",
+                    color: "white",
+                    letterSpacing: "0.06em",
+                    fontWeight: 700,
+                  }}
+                >
+                  +{terminalFeedback.bonusPoints} STREAK
+                </span>
+              )}
+            {terminalFeedback?.nodeId === node.id &&
+              terminalFeedback.streak?.milestone && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "var(--wf-accent)",
+                    fontWeight: 600,
+                  }}
+                >
+                  🔥 {terminalFeedback.streak.milestone}-day streak!
+                </span>
+              )}
           </div>
           {!isStart && (
             <button
@@ -1964,7 +2069,13 @@ function SimulationBody({ settings }: { settings: Record<string, unknown> }) {
 
 /* ── QUIZ ─────────────────────────────────────────────────── */
 
-function QuizBody({ settings }: { settings: Record<string, unknown> }) {
+function QuizBody({
+  blockId,
+  settings,
+}: {
+  blockId: string;
+  settings: Record<string, unknown>;
+}) {
   const questions = (
     Array.isArray(settings.questions) ? settings.questions : []
   ) as QuizQuestion[];
@@ -2003,18 +2114,14 @@ function QuizBody({ settings }: { settings: Record<string, unknown> }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {valid.map((q, i) => (
-          <QuizQuestionCard key={i} index={i} question={q} />
+          <QuizQuestionCard
+            key={i}
+            blockId={blockId}
+            subIndex={i}
+            index={i}
+            question={q}
+          />
         ))}
-      </div>
-      <div
-        style={{
-          marginTop: 14,
-          fontSize: 10,
-          color: "var(--wf-mute)",
-          fontStyle: "italic",
-        }}
-      >
-        Self-check only — XP persistence ships in a follow-up.
       </div>
     </div>
   );
@@ -2060,7 +2167,33 @@ function DragMatchBody({
   const [placements, setPlacements] = useState<Record<number, number | null>>(
     () => Object.fromEntries(rawPairs.map((_, i) => [i, null]))
   );
-  const [checked, setChecked] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    correct: boolean;
+    correctCount: number;
+    totalPairs: number;
+    points: number;
+    bonusPoints: number;
+    streak: { current: number; milestone: number | null } | null;
+    badgeAwarded: string | null;
+  } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const complete = trpc.lesson.completeDragMatch.useMutation({
+    onSuccess: (res) => {
+      setFeedback(res);
+      setSubmitError(null);
+    },
+    onError: (err) => {
+      setSubmitError(
+        err.data?.code === "UNAUTHORIZED"
+          ? "Sign in to save your matches."
+          : err.message ?? "Couldn't submit your matches. Try again."
+      );
+    },
+  });
+
+  const checked = feedback !== null;
+  const pending = complete.isPending;
 
   const sensors = useSensors(
     // Match the course-builder activation distance so a click doesn't
@@ -2125,17 +2258,21 @@ function DragMatchBody({
 
   const onReset = () => {
     setPlacements(Object.fromEntries(rawPairs.map((_, i) => [i, null])));
-    setChecked(false);
+    setFeedback(null);
+    setSubmitError(null);
   };
 
-  const correctCount = checked
-    ? rawPairs.reduce((n, _, i) => {
-        const placed = placements[i];
-        return placed !== null && rawPairs[placed].right === rawPairs[i].right
-          ? n + 1
-          : n;
-      }, 0)
-    : 0;
+  const onCheck = () => {
+    if (!allFilled || pending || checked) return;
+    setSubmitError(null);
+    // Server expects a flat array of (number | null) indexed by slot.
+    const placementsArr = rawPairs.map((_, i) => placements[i] ?? null);
+    complete.mutate({ blockId, placements: placementsArr });
+  };
+
+  // Server-authoritative once feedback arrives; before that we just
+  // show neutral colors regardless of placement.
+  const correctCount = feedback?.correctCount ?? 0;
 
   return (
     <div>
@@ -2226,21 +2363,27 @@ function DragMatchBody({
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button
           type="button"
-          onClick={() => setChecked(true)}
-          disabled={!allFilled || checked}
+          onClick={onCheck}
+          disabled={!allFilled || checked || pending}
           style={{
             padding: "6px 12px",
             fontSize: 12,
             border: "none",
             borderRadius: 3,
             background:
-              !allFilled || checked ? "var(--wf-fill)" : "var(--wf-ink)",
-            color: !allFilled || checked ? "var(--wf-mute)" : "white",
-            cursor: !allFilled || checked ? "default" : "pointer",
+              !allFilled || checked || pending
+                ? "var(--wf-fill)"
+                : "var(--wf-ink)",
+            color:
+              !allFilled || checked || pending
+                ? "var(--wf-mute)"
+                : "white",
+            cursor:
+              !allFilled || checked || pending ? "default" : "pointer",
             fontWeight: 600,
           }}
         >
-          Check matches
+          {pending ? "Checking…" : "Check matches"}
         </button>
         {checked && (
           <button
@@ -2259,33 +2402,76 @@ function DragMatchBody({
             Reset
           </button>
         )}
-        {checked && (
+        {feedback && (
           <span
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color:
-                correctCount === rawPairs.length
-                  ? "var(--wf-good)"
-                  : "var(--wf-accent)",
+              color: feedback.correct
+                ? "var(--wf-good)"
+                : "var(--wf-accent)",
             }}
           >
-            {correctCount === rawPairs.length
+            {feedback.correct
               ? "✓ All matched!"
-              : `${correctCount} / ${rawPairs.length} correct`}
+              : `${feedback.correctCount} / ${feedback.totalPairs} correct`}
+          </span>
+        )}
+        {feedback && feedback.points > 0 && (
+          <span
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 2,
+              background: "var(--wf-good)",
+              color: "white",
+              letterSpacing: "0.06em",
+              fontWeight: 700,
+            }}
+          >
+            +{feedback.points} XP
+          </span>
+        )}
+        {feedback?.bonusPoints && feedback.bonusPoints > 0 ? (
+          <span
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 2,
+              background: "var(--wf-accent)",
+              color: "white",
+              letterSpacing: "0.06em",
+              fontWeight: 700,
+            }}
+          >
+            +{feedback.bonusPoints} STREAK
+          </span>
+        ) : null}
+        {feedback?.streak?.milestone && (
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--wf-accent)",
+              fontWeight: 600,
+            }}
+          >
+            🔥 {feedback.streak.milestone}-day streak!
           </span>
         )}
       </div>
-      <div
-        style={{
-          marginTop: 10,
-          fontSize: 10,
-          color: "var(--wf-mute)",
-          fontStyle: "italic",
-        }}
-      >
-        Self-check only — XP persistence ships in a follow-up.
-      </div>
+      {submitError && (
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            color: "var(--wf-accent)",
+          }}
+        >
+          {submitError}
+        </div>
+      )}
     </div>
   );
 }
@@ -2470,7 +2656,13 @@ type QuizQuestion = {
   hint?: string | null;
 };
 
-function AiQuizBody({ settings }: { settings: Record<string, unknown> }) {
+function AiQuizBody({
+  blockId,
+  settings,
+}: {
+  blockId: string;
+  settings: Record<string, unknown>;
+}) {
   const generated = settings.generated as
     | {
         questions: QuizQuestion[];
@@ -2501,34 +2693,90 @@ function AiQuizBody({ settings }: { settings: Record<string, unknown> }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {generated.questions.map((q, i) => (
-          <QuizQuestionCard key={i} index={i} question={q} />
+          <QuizQuestionCard
+            key={i}
+            blockId={blockId}
+            subIndex={i}
+            index={i}
+            question={q}
+          />
         ))}
-      </div>
-      <div
-        style={{
-          marginTop: 14,
-          fontSize: 10,
-          color: "var(--wf-mute)",
-          fontStyle: "italic",
-        }}
-      >
-        Self-check only — XP persistence ships in a follow-up.
       </div>
     </div>
   );
 }
 
+type QuizCardFeedback = {
+  correct: boolean;
+  points: number;
+  bonusPoints: number;
+  correctIndex: number;
+  streak: { current: number; milestone: number | null } | null;
+  badgeAwarded: string | null;
+};
+
 function QuizQuestionCard({
+  blockId,
+  subIndex,
   index,
   question,
 }: {
+  blockId: string;
+  subIndex: number;
   index: number;
   question: QuizQuestion;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
-  const [checked, setChecked] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const correctKey = question.answers.find((a) => a.correct)?.key ?? "";
+  const [feedback, setFeedback] = useState<QuizCardFeedback | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const attempt = trpc.lesson.attemptBlock.useMutation({
+    onSuccess: (res) => {
+      setFeedback(res);
+      setSubmitError(null);
+    },
+    onError: (err) => {
+      setSubmitError(
+        err.data?.code === "UNAUTHORIZED"
+          ? "Sign in to save your answer."
+          : err.message ?? "Couldn't submit your answer. Try again."
+      );
+    },
+  });
+
+  // Map between server's positional `correctIndex` and the question's
+  // lettered `key` (A/B/C/D) used for display. Server is authoritative
+  // for correctness once the response arrives; before that we don't
+  // colour anything.
+  const checked = feedback !== null;
+  const pending = attempt.isPending;
+  const correctKey =
+    feedback !== null
+      ? question.answers[feedback.correctIndex]?.key ?? ""
+      : "";
+  const chosenIndex =
+    selected !== null
+      ? question.answers.findIndex((a) => a.key === selected)
+      : -1;
+
+  const onCheck = () => {
+    if (selected === null || chosenIndex < 0 || pending) return;
+    setSubmitError(null);
+    attempt.mutate({
+      blockId,
+      subIndex,
+      chosenIndex,
+      hintsUsed: showHint ? 1 : 0,
+    });
+  };
+
+  const onReset = () => {
+    setSelected(null);
+    setFeedback(null);
+    setShowHint(false);
+    setSubmitError(null);
+  };
 
   return (
     <div>
@@ -2558,10 +2806,10 @@ function QuizQuestionCard({
               key={a.key}
               type="button"
               onClick={() => {
-                if (checked) return;
+                if (checked || pending) return;
                 setSelected(a.key);
               }}
-              disabled={checked}
+              disabled={checked || pending}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -2611,30 +2859,32 @@ function QuizQuestionCard({
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button
           type="button"
-          onClick={() => setChecked(true)}
-          disabled={!selected || checked}
+          onClick={onCheck}
+          disabled={!selected || checked || pending}
           style={{
             padding: "5px 10px",
             fontSize: 11,
             border: "none",
             borderRadius: 3,
             background:
-              !selected || checked ? "var(--wf-fill)" : "var(--wf-ink)",
-            color: !selected || checked ? "var(--wf-mute)" : "white",
-            cursor: !selected || checked ? "default" : "pointer",
+              !selected || checked || pending
+                ? "var(--wf-fill)"
+                : "var(--wf-ink)",
+            color:
+              !selected || checked || pending
+                ? "var(--wf-mute)"
+                : "white",
+            cursor:
+              !selected || checked || pending ? "default" : "pointer",
             fontWeight: 600,
           }}
         >
-          Check
+          {pending ? "Checking…" : "Check"}
         </button>
         {checked && (
           <button
             type="button"
-            onClick={() => {
-              setSelected(null);
-              setChecked(false);
-              setShowHint(false);
-            }}
+            onClick={onReset}
             style={{
               padding: "5px 10px",
               fontSize: 11,
@@ -2666,18 +2916,74 @@ function QuizQuestionCard({
             {showHint ? "Hide hint" : "💡 Hint"}
           </button>
         )}
-        {checked && (
+        {feedback && (
           <span
             style={{
               fontSize: 11,
-              color: selected === correctKey ? "var(--wf-good)" : "var(--wf-accent)",
+              color: feedback.correct ? "var(--wf-good)" : "var(--wf-accent)",
               fontWeight: 600,
             }}
           >
-            {selected === correctKey ? "✓ Correct" : `Correct answer: ${correctKey}`}
+            {feedback.correct
+              ? "✓ Correct"
+              : `Correct answer: ${correctKey || "—"}`}
+          </span>
+        )}
+        {feedback?.correct && feedback.points > 0 && (
+          <span
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 2,
+              background: "var(--wf-good)",
+              color: "white",
+              letterSpacing: "0.06em",
+              fontWeight: 700,
+            }}
+          >
+            +{feedback.points} XP
+          </span>
+        )}
+        {feedback?.bonusPoints && feedback.bonusPoints > 0 ? (
+          <span
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 2,
+              background: "var(--wf-accent)",
+              color: "white",
+              letterSpacing: "0.06em",
+              fontWeight: 700,
+            }}
+          >
+            +{feedback.bonusPoints} STREAK
+          </span>
+        ) : null}
+        {feedback?.streak?.milestone && (
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--wf-accent)",
+              fontWeight: 600,
+            }}
+          >
+            🔥 {feedback.streak.milestone}-day streak!
           </span>
         )}
       </div>
+      {submitError && (
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            color: "var(--wf-accent)",
+          }}
+        >
+          {submitError}
+        </div>
+      )}
       {showHint && question.hint && (
         <div
           style={{
