@@ -16,6 +16,8 @@ type Order = {
   id: string;
   createdAt: string;
   paidAt: string | null;
+  refundedAt: string | null;
+  status: "PENDING" | "PAID" | "REFUNDED" | "FAILED";
   netCents: number;
   grossCents: number;
   courseTitle: string;
@@ -38,13 +40,32 @@ function fmtDate(iso: string) {
 
 export function EarningsClient({
   initialAccount,
-  orders,
+  orders: initialOrders,
 }: {
   initialAccount: Account | null;
   orders: Order[];
 }) {
   const [account, setAccount] = useState<Account | null>(initialAccount);
   const [error, setError] = useState<string | null>(null);
+  // Local mirror so a refund flips the row state without a page reload.
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+
+  const refundOrder = trpc.payment.refundOrder.useMutation({
+    onSuccess: ({ orderId }) => {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                status: "REFUNDED" as const,
+                refundedAt: new Date().toISOString(),
+              }
+            : o
+        )
+      );
+    },
+    onError: (e) => setError(e.message),
+  });
 
   const startOnboarding = trpc.payment.startConnectOnboarding.useMutation({
     onSuccess: ({ url, provider, accountId }) => {
@@ -194,7 +215,7 @@ export function EarningsClient({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "100px 1fr 140px 100px 90px",
+              gridTemplateColumns: "100px 1fr 140px 100px 90px 110px",
               gap: 0,
             }}
           >
@@ -203,8 +224,19 @@ export function EarningsClient({
             <CellHeader>Gross / Fee</CellHeader>
             <CellHeader align="right">Net</CellHeader>
             <CellHeader align="right">Source</CellHeader>
+            <CellHeader align="right">Action</CellHeader>
             {orders.map((o) => (
-              <Row key={o.id} order={o} />
+              <Row
+                key={o.id}
+                order={o}
+                onRefund={(orderId, reason) =>
+                  refundOrder.mutate({ orderId, reason })
+                }
+                refundPending={
+                  refundOrder.isPending &&
+                  refundOrder.variables?.orderId === o.id
+                }
+              />
             ))}
           </div>
         )}
@@ -237,20 +269,55 @@ function CellHeader({
   );
 }
 
-function Row({ order }: { order: Order }) {
+function Row({
+  order,
+  onRefund,
+  refundPending,
+}: {
+  order: Order;
+  onRefund: (orderId: string, reason: string | undefined) => void;
+  refundPending: boolean;
+}) {
+  const isRefunded = order.status === "REFUNDED";
+  // Muted styling on refunded rows so they read as ghost entries vs
+  // live revenue.
+  const mutedColor = isRefunded ? "var(--wf-mute)" : "var(--wf-ink)";
+  const textDecoration = isRefunded ? "line-through" : undefined;
+
+  const onClickRefund = () => {
+    const confirmed = window.confirm(
+      `Refund ${fmtPrice(order.grossCents)} to ${order.buyerName}? Their enrollment will be removed.`
+    );
+    if (!confirmed) return;
+    onRefund(order.id, undefined);
+  };
+
   return (
     <>
       <Cell>
-        {order.paidAt ? fmtDate(order.paidAt) : "—"}
+        <span style={{ color: mutedColor }}>
+          {order.paidAt ? fmtDate(order.paidAt) : "—"}
+        </span>
       </Cell>
       <Cell>
-        <div style={{ fontSize: 12, fontWeight: 600 }}>{order.courseTitle}</div>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: mutedColor,
+            textDecoration,
+          }}
+        >
+          {order.courseTitle}
+        </div>
         <div style={{ fontSize: 10, color: "var(--wf-mute)", marginTop: 2 }}>
           {order.buyerName}
         </div>
       </Cell>
       <Cell>
-        <div style={{ fontSize: 12 }}>{fmtPrice(order.grossCents)}</div>
+        <div style={{ fontSize: 12, color: mutedColor, textDecoration }}>
+          {fmtPrice(order.grossCents)}
+        </div>
         <div style={{ fontSize: 10, color: "var(--wf-mute)", marginTop: 2 }}>
           fee {fmtPrice(order.grossCents - order.netCents)}
         </div>
@@ -258,7 +325,12 @@ function Row({ order }: { order: Order }) {
       <Cell align="right">
         <span
           className="wf-serif"
-          style={{ fontSize: 14, fontWeight: 700, color: "var(--wf-good)" }}
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: isRefunded ? "var(--wf-mute)" : "var(--wf-good)",
+            textDecoration,
+          }}
         >
           {fmtPrice(order.netCents)}
         </span>
@@ -270,7 +342,9 @@ function Row({ order }: { order: Order }) {
             fontSize: 9,
             color:
               order.provider === "stripe"
-                ? "var(--wf-good)"
+                ? isRefunded
+                  ? "var(--wf-mute)"
+                  : "var(--wf-good)"
                 : "var(--wf-mute)",
             letterSpacing: "0.06em",
             textTransform: "uppercase",
@@ -278,6 +352,54 @@ function Row({ order }: { order: Order }) {
         >
           {order.provider}
         </span>
+      </Cell>
+      <Cell align="right">
+        {isRefunded ? (
+          <span
+            className="wf-mono"
+            style={{
+              fontSize: 9,
+              color: "var(--wf-accent)",
+              letterSpacing: "0.06em",
+              fontWeight: 700,
+            }}
+          >
+            ● REFUNDED
+            {order.refundedAt ? (
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 9,
+                  color: "var(--wf-mute)",
+                  fontWeight: 400,
+                  marginTop: 2,
+                }}
+              >
+                {fmtDate(order.refundedAt)}
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onClickRefund}
+            disabled={refundPending}
+            style={{
+              padding: "4px 10px",
+              fontSize: 10,
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "white",
+              cursor: refundPending ? "default" : "pointer",
+              color: "var(--wf-accent)",
+              fontWeight: 600,
+              fontFamily: "inherit",
+            }}
+            title="Refund this order in full and remove the enrollment"
+          >
+            {refundPending ? "…" : "Refund"}
+          </button>
+        )}
       </Cell>
     </>
   );

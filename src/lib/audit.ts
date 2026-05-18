@@ -12,7 +12,8 @@ export type AuditKind =
   | "ai.suggest_fix"
   | "ai.send_nudge"
   | "auth.signup"
-  | "course.publish";
+  | "course.publish"
+  | "payment.refund_initiated";
 
 type AuditInput = {
   actorId?: string | null;

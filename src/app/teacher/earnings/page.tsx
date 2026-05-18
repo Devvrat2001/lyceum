@@ -67,9 +67,10 @@ export default async function TeacherEarningsPage() {
               marginTop: 8,
             }}
           >
-            Stripe Connect is wired end-to-end above. Coming soon: monthly
-            automatic payouts to your bank, 1099 export, and the buyer-side
-            invoice email. Refunds + dispute handling = Phase 4.
+            Stripe Connect is wired end-to-end above. Refunds work in demo
+            mode (real-Stripe refunds land with the Tier 2.2 smoke test).
+            Coming soon: monthly automatic payouts to your bank, 1099 export,
+            and the buyer-side invoice email.
           </div>
         </Card>
       </div>

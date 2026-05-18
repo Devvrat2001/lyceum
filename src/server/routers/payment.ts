@@ -262,8 +262,11 @@ export const paymentRouter = router({
         1
       );
 
-      const [lifetimeAgg, mtdAgg, paidOrders, account] = await Promise.all([
+      const [lifetimeAgg, mtdAgg, visibleOrders, account] = await Promise.all([
         ctx.db.order.aggregate({
+          // Lifetime + MTD aggregates exclude refunded orders so the
+          // teacher's KPIs reflect "money that's actually theirs", not
+          // gross-of-refunds.
           where: { teacherId, status: "PAID" },
           _sum: { netCents: true, grossCents: true, feeCents: true },
           _count: { _all: true },
@@ -273,8 +276,11 @@ export const paymentRouter = router({
           _sum: { netCents: true },
         }),
         ctx.db.order.findMany({
-          where: { teacherId, status: "PAID" },
-          orderBy: { paidAt: "desc" },
+          // List shows both PAID and REFUNDED so the teacher can see
+          // what they refunded recently. PENDING / FAILED stay out;
+          // they're transient and noisy.
+          where: { teacherId, status: { in: ["PAID", "REFUNDED"] } },
+          orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
           take: limit,
           include: {
             course: { select: { title: true, slug: true } },
@@ -292,10 +298,12 @@ export const paymentRouter = router({
           count: lifetimeAgg._count._all,
         },
         mtdNetCents: mtdAgg._sum.netCents ?? 0,
-        orders: paidOrders.map((o) => ({
+        orders: visibleOrders.map((o) => ({
           id: o.id,
           createdAt: o.createdAt.toISOString(),
           paidAt: o.paidAt?.toISOString() ?? null,
+          refundedAt: o.refundedAt?.toISOString() ?? null,
+          status: o.status,
           netCents: o.netCents,
           grossCents: o.grossCents,
           courseTitle: o.course.title,
@@ -312,6 +320,100 @@ export const paymentRouter = router({
               provider: account.provider,
             }
           : null,
+      };
+    }),
+
+  /**
+   * Teacher-initiated refund of one of their own PAID orders.
+   *
+   * Demo mode: flips Order to REFUNDED + deletes the Enrollment in
+   * one transaction + writes an audit row. Idempotent: re-refunding
+   * an already-REFUNDED order returns ok without re-firing the side
+   * effects.
+   *
+   * Real Stripe mode: not yet wired — calls into the Stripe SDK
+   * (`stripe.refunds.create({charge})`) need the charge id, which we
+   * reach via session → payment_intent → latest_charge. That ships
+   * with the Tier 2.2 real-Stripe smoke. For now the mutation throws
+   * a clear "real-Stripe refunds are pending wiring" error when
+   * STRIPE_SECRET_KEY is set, so we don't pretend to refund.
+   *
+   * The webhook handler on `charge.refunded` flips the same Order
+   * row from the Stripe-dashboard direction; that path is already
+   * live so refunds initiated outside the app still work.
+   */
+  refundOrder: teacherProcedure
+    .input(
+      z.object({
+        orderId: z.string(),
+        reason: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const order = await ctx.db.order.findUnique({
+        where: { id: input.orderId },
+      });
+      if (!order) throw new TRPCError({ code: "NOT_FOUND" });
+      if (order.teacherId !== ctx.user.id && ctx.user.role !== "ADMIN") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      if (order.status === "REFUNDED") {
+        return {
+          ok: true as const,
+          alreadyRefunded: true as const,
+          orderId: order.id,
+          status: "REFUNDED" as const,
+        };
+      }
+      if (order.status !== "PAID") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Can only refund PAID orders (this one is ${order.status})`,
+        });
+      }
+
+      if (isStripeEnabled() && order.provider === "stripe") {
+        // Real-Stripe refund path lands with Tier 2.2 smoke test.
+        // Throw rather than silently demo-refund so we don't lose
+        // money in the gap.
+        throw new TRPCError({
+          code: "NOT_IMPLEMENTED" as never,
+          message:
+            "Real-Stripe refunds are pending wiring. Issue from the Stripe Dashboard until v2.",
+        });
+      }
+
+      // Demo refund: flip status + drop the enrollment atomically.
+      await ctx.db.$transaction([
+        ctx.db.order.update({
+          where: { id: order.id },
+          data: { status: "REFUNDED", refundedAt: new Date() },
+        }),
+        ctx.db.enrollment.deleteMany({
+          where: { userId: order.userId, courseId: order.courseId },
+        }),
+      ]);
+
+      await audit({
+        actorId: ctx.user.id,
+        kind: "payment.refund_initiated",
+        payload: {
+          orderId: order.id,
+          courseId: order.courseId,
+          buyerUserId: order.userId,
+          grossCents: order.grossCents,
+          provider: order.provider,
+          mode: "demo",
+          reason: input.reason ?? null,
+        },
+        courseId: order.courseId,
+      });
+
+      return {
+        ok: true as const,
+        alreadyRefunded: false as const,
+        orderId: order.id,
+        status: "REFUNDED" as const,
       };
     }),
 
