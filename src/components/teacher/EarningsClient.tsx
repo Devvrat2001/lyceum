@@ -179,6 +179,8 @@ export function EarningsClient({
         )}
       </Card>
 
+      <AnnualExportCard />
+
       <Card p={0}>
         <div
           style={{
@@ -242,6 +244,80 @@ export function EarningsClient({
         )}
       </Card>
     </div>
+  );
+}
+
+function AnnualExportCard() {
+  const now = new Date();
+  const currentYear = now.getUTCFullYear();
+  // 4 years of options is enough for tax filings (most teachers want
+  // last year, occasionally an amended return for the year before).
+  const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+  // Default to LAST year — that's the most common need (tax filing in
+  // Jan/Feb for prior calendar year). Switch to current year manually
+  // for in-progress totals.
+  const [year, setYear] = useState<number>(currentYear - 1);
+
+  const href = `/api/teacher/1099?year=${year}`;
+
+  return (
+    <Card p={16}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <Icon name="download" size={18} color="var(--wf-body)" />
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <Eyebrow>Annual earnings export</Eyebrow>
+          <div
+            style={{ fontSize: 13, marginTop: 2, color: "var(--wf-body)" }}
+          >
+            One row per PAID order in {year}, plus totals. Take it to your
+            accountant — the platform doesn&apos;t issue 1099-NEC forms
+            (Stripe Connect handles 1099-K independently).
+          </div>
+        </div>
+        <select
+          value={year}
+          onChange={(e) => setYear(parseInt(e.target.value, 10))}
+          style={{
+            padding: "5px 8px",
+            fontSize: 12,
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 3,
+            background: "white",
+            fontFamily: "inherit",
+          }}
+        >
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+        <a
+          href={href}
+          download
+          style={{
+            padding: "6px 14px",
+            fontSize: 12,
+            fontWeight: 600,
+            background: "var(--wf-ink)",
+            color: "white",
+            border: "none",
+            borderRadius: 3,
+            textDecoration: "none",
+            cursor: "pointer",
+          }}
+        >
+          Download CSV
+        </a>
+      </div>
+    </Card>
   );
 }
 

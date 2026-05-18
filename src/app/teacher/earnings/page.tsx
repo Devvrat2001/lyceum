@@ -69,8 +69,9 @@ export default async function TeacherEarningsPage() {
           >
             Stripe Connect is wired end-to-end above. Refunds work in demo
             mode (real-Stripe refunds land with the Tier 2.2 smoke test).
-            Coming soon: monthly automatic payouts to your bank, 1099 export,
-            and the buyer-side invoice email.
+            Annual earnings CSV is ready in the export card above. Still
+            ahead: monthly automatic payouts to your bank and the
+            buyer-side invoice email.
           </div>
         </Card>
       </div>
