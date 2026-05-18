@@ -83,6 +83,10 @@ model User {
   stripeAccount  StripeAccount?
   blockVotes     BlockVote[]
   blockComments  BlockComment[]
+  // Phase 4 — parent role: a PARENT user's links to their STUDENT
+  // kids, and a STUDENT user's reverse link back to their parents.
+  childLinks     ParentChild[] @relation("ParentLinks")
+  parentLinks    ParentChild[] @relation("ChildLinks")
 
   @@index([role])
 }
@@ -535,6 +539,24 @@ enum OrderStatus {
   PAID
   REFUNDED
   FAILED
+}
+
+/// Parent ↔ student link (Phase 4). Each row links a PARENT user
+/// to a STUDENT user they're responsible for. Admin-managed in v1
+/// (Tier 2.3 forward plan); self-service linking via invite token
+/// is a future enhancement.
+///
+/// Role enforcement is at the app layer — the admin mutation
+/// validates parent.role=PARENT and child.role=STUDENT before
+/// inserting. (Prisma can't model enum-valued FKs.)
+model ParentChild {
+  parentId  String
+  parent    User     @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+  childId   String
+  child     User     @relation("ChildLinks", fields: [childId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@id([parentId, childId])
+  @@index([childId])
 }
 
 /// Idempotency log for incoming Stripe webhook events. The webhook

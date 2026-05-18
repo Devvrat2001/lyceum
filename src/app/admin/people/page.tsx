@@ -9,6 +9,7 @@ import {
 } from "@/components/wf/primitives";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { ParentLinksManager } from "@/components/admin/ParentLinksManager";
 
 const ROLE_LABEL: Record<string, string> = {
   STUDENT: "Student",
@@ -40,7 +41,13 @@ export default async function AdminPeoplePage({
     orderBy: [{ role: "asc" }, { email: "asc" }],
     include: {
       class: { select: { name: true } },
-      _count: { select: { enrollments: true, authoredCourses: true } },
+      _count: {
+        select: {
+          enrollments: true,
+          authoredCourses: true,
+          childLinks: true,
+        },
+      },
     },
   });
 
@@ -151,6 +158,7 @@ export default async function AdminPeoplePage({
                     i < users.length - 1
                       ? "1px solid var(--wf-hairline)"
                       : "none",
+                  flexWrap: "wrap",
                 }}
               >
                 <Avatar
@@ -195,8 +203,13 @@ export default async function AdminPeoplePage({
                     ? `${u._count.enrollments} courses`
                     : u.role === "TEACHER"
                     ? `${u._count.authoredCourses} courses`
+                    : u.role === "PARENT"
+                    ? `${u._count.childLinks} ${u._count.childLinks === 1 ? "child" : "children"}`
                     : "—"}
                 </span>
+                {u.role === "PARENT" && (
+                  <ParentLinksManager parentId={u.id} />
+                )}
               </div>
             ))
           )}

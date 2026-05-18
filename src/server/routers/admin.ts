@@ -1,6 +1,145 @@
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, adminProcedure } from "../trpc";
 
 export const adminRouter = router({
+  /**
+   * List a given PARENT user's linked STUDENT children. Used by the
+   * admin people page's per-parent expander panel.
+   *
+   * Admin-only — parent self-service viewing of their own kids
+   * happens via `parent.children` on the /parent dashboard (Phase 4
+   * follow-up commit).
+   */
+  parentLinks: adminProcedure
+    .input(z.object({ parentId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const parent = await ctx.db.user.findUnique({
+        where: { id: input.parentId },
+        select: { id: true, role: true },
+      });
+      if (!parent) throw new TRPCError({ code: "NOT_FOUND" });
+      if (parent.role !== "PARENT") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "User is not a PARENT",
+        });
+      }
+      const links = await ctx.db.parentChild.findMany({
+        where: { parentId: parent.id },
+        orderBy: { createdAt: "asc" },
+        include: {
+          child: {
+            select: {
+              id: true,
+              name: true,
+              firstName: true,
+              email: true,
+              avatarUrl: true,
+              _count: { select: { enrollments: true } },
+            },
+          },
+        },
+      });
+      return links.map((l) => ({
+        childId: l.childId,
+        createdAt: l.createdAt.toISOString(),
+        name: l.child.firstName ?? l.child.name ?? "Student",
+        email: l.child.email,
+        avatarUrl: l.child.avatarUrl,
+        enrollmentCount: l.child._count.enrollments,
+      }));
+    }),
+
+  /**
+   * Link a PARENT to a STUDENT child. Both must exist; both must be
+   * in the admin's institution (or admins-of-everything case where
+   * the admin has no institutionId — they can link anyone).
+   * Idempotent: linking the same pair twice is a no-op.
+   */
+  linkParentToChild: adminProcedure
+    .input(
+      z.object({
+        parentId: z.string(),
+        childEmail: z.string().email(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [parent, child, me] = await Promise.all([
+        ctx.db.user.findUnique({
+          where: { id: input.parentId },
+          select: { id: true, role: true, institutionId: true },
+        }),
+        ctx.db.user.findUnique({
+          where: { email: input.childEmail.toLowerCase() },
+          select: { id: true, role: true, institutionId: true },
+        }),
+        ctx.db.user.findUnique({
+          where: { id: ctx.user.id },
+          select: { institutionId: true },
+        }),
+      ]);
+      if (!parent) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Parent not found",
+        });
+      }
+      if (parent.role !== "PARENT") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Selected user is not a PARENT",
+        });
+      }
+      if (!child) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `No student found with email ${input.childEmail}`,
+        });
+      }
+      if (child.role !== "STUDENT") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `User ${input.childEmail} is a ${child.role}, not a STUDENT`,
+        });
+      }
+      if (
+        me?.institutionId &&
+        (parent.institutionId !== me.institutionId ||
+          child.institutionId !== me.institutionId)
+      ) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Both users must be in your institution",
+        });
+      }
+
+      await ctx.db.parentChild.upsert({
+        where: {
+          parentId_childId: { parentId: parent.id, childId: child.id },
+        },
+        create: { parentId: parent.id, childId: child.id },
+        // No-op update so the row stays idempotent without ts errors.
+        update: {},
+      });
+      return { ok: true as const, childId: child.id };
+    }),
+
+  /**
+   * Remove a parent ↔ child link. Idempotent: removing a non-existent
+   * link returns ok without error.
+   */
+  unlinkParentFromChild: adminProcedure
+    .input(
+      z.object({ parentId: z.string(), childId: z.string() })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.parentChild.deleteMany({
+        where: { parentId: input.parentId, childId: input.childId },
+      });
+      return { ok: true as const };
+    }),
+
   /** Whole-dashboard payload for the institution admin. */
   overview: adminProcedure.query(async ({ ctx }) => {
     // Locate the admin's institution (or first one if unset)
