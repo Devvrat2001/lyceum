@@ -10,8 +10,9 @@ const { auth } = NextAuth(authConfig);
  * Role-gated middleware.
  *
  * - /student/*  →  any signed-in STUDENT or ADMIN
- * - /teacher/* →  any signed-in TEACHER or ADMIN
- * - /admin/*   →  any signed-in ADMIN only
+ * - /teacher/*  →  any signed-in TEACHER or ADMIN
+ * - /admin/*    →  any signed-in ADMIN only
+ * - /parent/*   →  any signed-in PARENT or ADMIN
  *
  * Public: /, /login, /course/*, /api/* (auth handlers etc.)
  */
@@ -23,7 +24,8 @@ export default auth((req) => {
   const requiresAuth =
     pathname.startsWith("/student") ||
     pathname.startsWith("/teacher") ||
-    pathname.startsWith("/admin");
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/parent");
 
   if (!requiresAuth) return NextResponse.next();
 
@@ -38,7 +40,9 @@ export default auth((req) => {
       (role === "STUDENT" || role === "ADMIN")) ||
     (pathname.startsWith("/teacher") &&
       (role === "TEACHER" || role === "ADMIN")) ||
-    (pathname.startsWith("/admin") && role === "ADMIN");
+    (pathname.startsWith("/admin") && role === "ADMIN") ||
+    (pathname.startsWith("/parent") &&
+      (role === "PARENT" || role === "ADMIN"));
 
   if (!allowed) {
     const url = new URL("/login", req.nextUrl);
