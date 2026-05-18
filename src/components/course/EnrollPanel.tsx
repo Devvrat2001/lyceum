@@ -125,21 +125,50 @@ export function EnrollPanel({
 
   return (
     <div>
-      <div
-        className="wf-serif"
-        style={{ fontSize: 32, fontWeight: 700, lineHeight: 1 }}
-      >
-        {fmtPrice(priceCents)}
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          color: "var(--wf-mute)",
-          marginBottom: 14,
-        }}
-      >
-        {isEnrolled ? "In your library" : upgradeNote ?? ""}
-      </div>
+      {isEnrolled ? (
+        // Already-owned header: no price (the student doesn't need to
+        // see what they paid), no upgrade note. Just a clean "in your
+        // library" eyebrow + headline so the panel reads as a
+        // continue-learning surface, not a buy surface.
+        <div style={{ marginBottom: 14 }}>
+          <div
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              color: "var(--wf-good)",
+              letterSpacing: "0.08em",
+              fontWeight: 700,
+              marginBottom: 6,
+            }}
+          >
+            ✓ IN YOUR LIBRARY
+          </div>
+          <div
+            className="wf-serif"
+            style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}
+          >
+            Pick up where you left off
+          </div>
+        </div>
+      ) : (
+        <>
+          <div
+            className="wf-serif"
+            style={{ fontSize: 32, fontWeight: 700, lineHeight: 1 }}
+          >
+            {fmtPrice(priceCents)}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--wf-mute)",
+              marginBottom: 14,
+            }}
+          >
+            {upgradeNote ?? ""}
+          </div>
+        </>
+      )}
 
       {isEnrolled ? (
         <>
