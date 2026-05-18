@@ -537,6 +537,21 @@ enum OrderStatus {
   FAILED
 }
 
+/// Idempotency log for incoming Stripe webhook events. The webhook
+/// handler inserts a row keyed on Stripe's `event.id` BEFORE doing
+/// any side effects; the unique constraint makes re-deliveries
+/// short-circuit with HTTP 200 instead of re-processing. Doubles as
+/// an audit trail — every webhook the platform has ever received
+/// has a row here, ordered by receivedAt.
+model StripeEvent {
+  id         String   @id @default(cuid())
+  /// Stripe's `event.id` (evt_…). Unique → dedup at insert time.
+  eventId    String   @unique
+  type       String
+  receivedAt DateTime @default(now())
+  @@index([type, receivedAt])
+}
+
 /// Per-teacher Stripe Connect Express account. Created when a teacher
 /// starts onboarding. The actual KYC dance happens on Stripe's hosted
 /// pages; we just store the account id + whether it's payouts-enabled.

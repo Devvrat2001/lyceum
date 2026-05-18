@@ -24,7 +24,7 @@ type StripeLike = {
   };
 };
 
-type StripeEvent =
+type StripeEvent = { id: string } & (
   | {
       type: "checkout.session.completed";
       data: {
@@ -54,7 +54,8 @@ type StripeEvent =
         };
       };
     }
-  | { type: string; data: { object: Record<string, unknown> } };
+  | { type: string; data: { object: Record<string, unknown> } }
+);
 
 export async function POST(req: Request) {
   const secret = env.STRIPE_WEBHOOK_SECRET;
@@ -81,6 +82,31 @@ export async function POST(req: Request) {
       `Webhook signature verify failed: ${err instanceof Error ? err.message : err}`,
       { status: 400 }
     );
+  }
+
+  // Event-level dedup: try to insert this event's id BEFORE any side
+  // effects. The unique constraint on StripeEvent.eventId makes a
+  // replay a single index lookup + a failed insert, then a clean
+  // HTTP 200. Race-safe because the insert is atomic — concurrent
+  // deliveries lose to the first one. Also gives ops a full audit
+  // trail of every event Stripe has ever delivered to us.
+  try {
+    await db.stripeEvent.create({
+      data: { eventId: event.id, type: event.type },
+    });
+  } catch (err) {
+    // P2002 = unique constraint violation = we've seen this eventId
+    // before. Any other DB error is unexpected; log + bail with 500
+    // so Stripe retries (transient infra issue).
+    const isDupe =
+      err !== null &&
+      typeof err === "object" &&
+      (err as { code?: string }).code === "P2002";
+    if (isDupe) {
+      return new Response("ok (already processed)", { status: 200 });
+    }
+    console.error("[stripe.webhook] dedup insert failed", err);
+    return new Response("internal error", { status: 500 });
   }
 
   try {
