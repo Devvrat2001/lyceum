@@ -387,6 +387,12 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
         <span
           className="wf-mono"
           style={{ fontSize: 11, color: "var(--wf-mute)" }}
+          // `toLocaleString()` formats with the runtime's locale +
+          // timezone, which differ between the SSR (Node) pass and the
+          // browser — a guaranteed hydration mismatch. This text node
+          // is allowed to differ; suppress the warning rather than
+          // fight it (React's documented escape hatch for timestamps).
+          suppressHydrationWarning
         >
           ● Last saved {new Date(course.updatedAt).toLocaleString()}
         </span>
@@ -518,6 +524,11 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
             </Card>
           ) : (
             <DndContext
+              // Explicit, stable id — without one @dnd-kit derives its
+              // internal aria-describedby ids from a counter that
+              // drifts between the SSR and client passes (hydration
+              // mismatch). Deterministic ids keep server === client.
+              id="dnd-units"
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={handleUnitDragEnd}
@@ -1040,6 +1051,7 @@ function SortableUnit({
             </div>
           ) : (
             <DndContext
+              id={`dnd-lessons-${unit.id}`}
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={onLessonDragEnd}
@@ -1204,6 +1216,7 @@ function SortableLesson({
           }}
         >
           <DndContext
+            id={`dnd-blocks-${lesson.id}`}
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={onBlockDragEnd}

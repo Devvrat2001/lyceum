@@ -53,17 +53,24 @@ test("teacher builder renders the BlockLibrary left rail with templates + insert
   ]);
 
   // ── BlockLibrary rail asserts. ──
+  // Scope every assertion to <main>. The builder page renders the
+  // "BLOCK LIBRARY" / "STARTERS" / "Insert into" text in two DOM
+  // nodes — one visible copy inside <main>, one hidden copy outside
+  // it — so an unscoped getByText() matches both and trips Playwright
+  // strict mode. getByRole("main") excludes hidden subtrees, pinning
+  // each assertion to the one visible rail.
+  const main = page.getByRole("main");
   // Library has a "BLOCK LIBRARY" eyebrow at the top.
-  await expect(page.getByText(/^BLOCK LIBRARY$/)).toBeVisible({
+  await expect(main.getByText(/^BLOCK LIBRARY$/)).toBeVisible({
     timeout: 15_000,
   });
   // STARTERS group header for the templated rows.
-  await expect(page.getByText(/^STARTERS$/)).toBeVisible();
+  await expect(main.getByText(/^STARTERS$/)).toBeVisible();
   // At least one known template label renders ("4-option MCQ" is the
   // canonical first entry — won't disappear unless someone reorders
   // BLOCK_TEMPLATES, which would also break vitest).
   await expect(
-    page.getByRole("button", { name: /4-option MCQ/i })
+    main.getByRole("button", { name: /4-option MCQ/i })
   ).toBeVisible();
 
   // The "insert into → …" chip should resolve to the first seeded
@@ -71,5 +78,5 @@ test("teacher builder renders the BlockLibrary left rail with templates + insert
   // on mount. We don't assert a specific lesson title (varies by seed)
   // — just that the actionable "Insert into" copy renders rather than
   // the empty-state hint.
-  await expect(page.getByText(/Insert into\s+→/i)).toBeVisible();
+  await expect(main.getByText(/Insert into\s+→/i)).toBeVisible();
 });
