@@ -11,7 +11,16 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { Avatar, Card, Eyebrow, Icon } from "@/components/wf/primitives";
-import { findBlockMeta, type BlockType } from "@/lib/blocks";
+import {
+  findBlockMeta,
+  settingsFor,
+  type BlockType,
+  type BranchingNode,
+  type DragMatchPair,
+  type McqOption,
+  type QuizQuestion,
+  type SettingsFor,
+} from "@/lib/blocks";
 import { trpc } from "@/lib/trpc/react";
 
 /**
@@ -91,37 +100,79 @@ export function BlockReader({ block }: { block: BlockReaderProps }) {
 }
 
 function renderBody(block: BlockReaderProps) {
+  // settingsFor narrows the raw JSON column into the per-type Settings
+  // shape declared in @/lib/blocks. Each body component then accepts a
+  // strongly-typed prop; cross-type field mismatches (e.g. MCQ's
+  // McqOption[] vs POLL's string[] on the shared `options` name) are
+  // caught at compile time here, not at first render.
   switch (block.type) {
     case "VIDEO":
-      return <VideoBody settings={block.settings} />;
+      return <VideoBody settings={settingsFor("VIDEO", block.settings)} />;
     case "READING":
-      return <ReadingBody settings={block.settings} />;
+      return <ReadingBody settings={settingsFor("READING", block.settings)} />;
     case "MCQ":
-      return <McqBody blockId={block.id} settings={block.settings} />;
+      return (
+        <McqBody
+          blockId={block.id}
+          settings={settingsFor("MCQ", block.settings)}
+        />
+      );
     case "SLIDES":
-      return <SlidesBody settings={block.settings} />;
+      return <SlidesBody settings={settingsFor("SLIDES", block.settings)} />;
     case "PDF":
-      return <PdfBody settings={block.settings} />;
+      return <PdfBody settings={settingsFor("PDF", block.settings)} />;
     case "SECTION":
-      return <SectionBody settings={block.settings} />;
+      return <SectionBody settings={settingsFor("SECTION", block.settings)} />;
     case "POLL":
-      return <PollBody blockId={block.id} settings={block.settings} />;
+      return (
+        <PollBody
+          blockId={block.id}
+          settings={settingsFor("POLL", block.settings)}
+        />
+      );
     case "DISCUSSION":
-      return <DiscussionBody blockId={block.id} settings={block.settings} />;
+      return (
+        <DiscussionBody
+          blockId={block.id}
+          settings={settingsFor("DISCUSSION", block.settings)}
+        />
+      );
     case "AI_QUIZ":
-      return <AiQuizBody blockId={block.id} settings={block.settings} />;
+      return (
+        <AiQuizBody
+          blockId={block.id}
+          settings={settingsFor("AI_QUIZ", block.settings)}
+        />
+      );
     case "DRAG_MATCH":
-      return <DragMatchBody blockId={block.id} settings={block.settings} />;
+      return (
+        <DragMatchBody
+          blockId={block.id}
+          settings={settingsFor("DRAG_MATCH", block.settings)}
+        />
+      );
     case "LIVE":
-      return <LiveBody settings={block.settings} />;
+      return <LiveBody settings={settingsFor("LIVE", block.settings)} />;
     case "QUIZ":
-      return <QuizBody blockId={block.id} settings={block.settings} />;
+      return (
+        <QuizBody
+          blockId={block.id}
+          settings={settingsFor("QUIZ", block.settings)}
+        />
+      );
     case "SIMULATION":
-      return <SimulationBody settings={block.settings} />;
+      return (
+        <SimulationBody settings={settingsFor("SIMULATION", block.settings)} />
+      );
     case "SPEAK":
-      return <SpeakBody settings={block.settings} />;
+      return <SpeakBody settings={settingsFor("SPEAK", block.settings)} />;
     case "BRANCHING":
-      return <BranchingBody blockId={block.id} settings={block.settings} />;
+      return (
+        <BranchingBody
+          blockId={block.id}
+          settings={settingsFor("BRANCHING", block.settings)}
+        />
+      );
     default:
       return (
         <div
@@ -175,6 +226,17 @@ function VideoBody({ settings }: { settings: Record<string, unknown> }) {
             title="Video"
             loading="lazy"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            // Sandbox the player so a compromised host can't navigate
+            // our parent window or escape into top-level. Tokens give
+            // the player just what it needs:
+            //   - scripts/same-origin: player JS + host cookies
+            //   - popups/popups-to-escape-sandbox: "Watch on YouTube"
+            //     opens cleanly in a new tab without inheriting the
+            //     sandbox
+            //   - presentation: HTML5 fullscreen API
+            // Notably NOT granted: allow-top-navigation, allow-forms,
+            // allow-modals.
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation"
             allowFullScreen
             style={{
               position: "absolute",
@@ -415,8 +477,6 @@ function applyInline(text: string): React.ReactNode {
 
 /* ── MCQ ─────────────────────────────────────────────────── */
 
-type McqOption = { text: string; correct: boolean };
-
 type McqFeedback = {
   correct: boolean;
   points: number;
@@ -431,18 +491,19 @@ function McqBody({
   settings,
 }: {
   blockId: string;
-  settings: Record<string, unknown>;
+  settings: SettingsFor<"MCQ">;
 }) {
-  const stem = typeof settings.stem === "string" ? settings.stem : "";
-  const opts: McqOption[] = Array.isArray(settings.options)
-    ? (settings.options as McqOption[]).filter(
-        (o): o is McqOption =>
-          o !== null &&
-          typeof o === "object" &&
-          typeof o.text === "string" &&
-          typeof o.correct === "boolean"
-      )
-    : [];
+  const stem = settings.stem ?? "";
+  // settings.options is McqOption[] | undefined at the type level; the
+  // .filter is still a runtime guard against teacher-edited JSON
+  // landing with bad entries.
+  const opts: McqOption[] = (settings.options ?? []).filter(
+    (o): o is McqOption =>
+      o !== null &&
+      typeof o === "object" &&
+      typeof o.text === "string" &&
+      typeof o.correct === "boolean"
+  );
 
   const [selected, setSelected] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<McqFeedback | null>(null);
@@ -725,6 +786,12 @@ function SlidesBody({ settings }: { settings: Record<string, unknown> }) {
             src={embed}
             title="Slides"
             loading="lazy"
+            // Google Slides + PowerPoint Online both render their
+            // chrome inside the frame and need scripts + same-origin
+            // cookies. Forms covers the "save a copy" / publish UI.
+            // Popups-to-escape-sandbox lets the "Open in Slides"
+            // link-out land on the real product page unsandboxed.
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
             allowFullScreen
             style={{
               position: "absolute",
@@ -847,6 +914,12 @@ function PdfBody({ settings }: { settings: Record<string, unknown> }) {
             src={rawUrl}
             title="PDF"
             loading="lazy"
+            // The browser's built-in PDF viewer runs JS inside the
+            // iframe (page thumbnails, text-select, search) and may
+            // read its own cookies; downloads is what wires the
+            // viewer's "save" button. No popups — a PDF should never
+            // open a new tab.
+            sandbox="allow-scripts allow-same-origin allow-downloads"
             style={{
               position: "absolute",
               inset: 0,
@@ -893,14 +966,21 @@ function PollBody({
   settings,
 }: {
   blockId: string;
-  settings: Record<string, unknown>;
+  settings: SettingsFor<"POLL">;
 }) {
-  const stem = typeof settings.stem === "string" ? settings.stem : "";
-  const opts: string[] = Array.isArray(settings.options)
-    ? (settings.options as unknown[]).filter(
-        (o): o is string => typeof o === "string"
-      )
-    : [];
+  // POLL's `stem` historically lived on the same JSON column as MCQ's
+  // — preserved for back-compat. Newer polls use `prompt`.
+  const stem =
+    (settings as { stem?: unknown }).stem &&
+    typeof (settings as { stem?: unknown }).stem === "string"
+      ? ((settings as { stem: string }).stem)
+      : (settings.prompt ?? "");
+  // POLL options are plain strings (unlike MCQ's McqOption[]) — the
+  // discriminated catalog in @/lib/blocks makes the difference
+  // compile-time visible. Runtime filter still gates against bad JSON.
+  const opts: string[] = (settings.options ?? []).filter(
+    (o): o is string => typeof o === "string"
+  );
 
   // Initial tallies + the viewer's current vote (null for anon /
   // hasn't voted). Re-fetched on focus so the bars stay fresh-ish
@@ -1269,31 +1349,24 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
 
 /* ── BRANCHING ────────────────────────────────────────────── */
 
-type BranchingNode = {
-  id: string;
-  title: string;
-  body: string;
-  choices: Array<{ label: string; to: string }>;
-};
-
 function BranchingBody({
   blockId,
   settings,
 }: {
   blockId: string;
-  settings: Record<string, unknown>;
+  settings: SettingsFor<"BRANCHING">;
 }) {
-  const rawNodes: BranchingNode[] = Array.isArray(settings.nodes)
-    ? (settings.nodes as unknown[]).filter(
-        (n): n is BranchingNode =>
-          !!n &&
-          typeof n === "object" &&
-          typeof (n as { id?: unknown }).id === "string" &&
-          typeof (n as { title?: unknown }).title === "string" &&
-          typeof (n as { body?: unknown }).body === "string" &&
-          Array.isArray((n as { choices?: unknown }).choices)
-      )
-    : [];
+  // settings.nodes is BranchingNode[] | undefined; runtime filter is
+  // defensive against malformed JSON edited outside the inspector.
+  const rawNodes: BranchingNode[] = (settings.nodes ?? []).filter(
+    (n): n is BranchingNode =>
+      !!n &&
+      typeof n === "object" &&
+      typeof n.id === "string" &&
+      typeof n.title === "string" &&
+      typeof n.body === "string" &&
+      Array.isArray(n.choices)
+  );
 
   // Build a lookup once per render. The graph is small (≤8 nodes) so
   // even rebuilding every render is negligible.
@@ -2004,6 +2077,16 @@ function SimulationBody({ settings }: { settings: Record<string, unknown> }) {
             title="Simulation"
             loading="lazy"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            // SIMULATION is the most-permissive iframe surface —
+            // teacher-supplied URLs include PhET, Desmos, GeoGebra,
+            // arbitrary HTML widgets. Grants the union of what those
+            // hosts need: scripts/same-origin for runtime + cookies,
+            // forms for data entry, popups+escape for "Open in new
+            // tab" affordances, presentation for fullscreen, downloads
+            // for "export data" UIs. Still NOT granted:
+            // allow-top-navigation (the sim can't pull the parent
+            // window away from /student/lesson/...).
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-downloads"
             allowFullScreen
             style={{
               position: "absolute",
@@ -2074,11 +2157,9 @@ function QuizBody({
   settings,
 }: {
   blockId: string;
-  settings: Record<string, unknown>;
+  settings: SettingsFor<"QUIZ">;
 }) {
-  const questions = (
-    Array.isArray(settings.questions) ? settings.questions : []
-  ) as QuizQuestion[];
+  const questions: QuizQuestion[] = settings.questions ?? [];
 
   // Validate each question has the expected shape — defensive in case
   // teacher saves a malformed JSON (shouldn't happen via inspector but
@@ -2129,28 +2210,27 @@ function QuizBody({
 
 /* ── DRAG_MATCH ───────────────────────────────────────────── */
 
-type DragMatchPair = { left: string; right: string };
-
 function DragMatchBody({
   blockId,
   settings,
 }: {
   blockId: string;
-  settings: Record<string, unknown>;
+  settings: SettingsFor<"DRAG_MATCH">;
 }) {
-  const prompt =
-    typeof settings.prompt === "string" ? settings.prompt.trim() : "";
-  const rawPairs: DragMatchPair[] = Array.isArray(settings.pairs)
-    ? (settings.pairs as Array<{ left?: unknown; right?: unknown }>)
-        .filter(
-          (p): p is DragMatchPair =>
-            !!p &&
-            typeof p.left === "string" &&
-            typeof p.right === "string" &&
-            p.left.trim() !== "" &&
-            p.right.trim() !== ""
-        )
-    : [];
+  // DRAG_MATCH stores a `prompt` for the activity caption even though
+  // it's not on `DragMatchSettings` — read defensively for legacy
+  // JSON. (Move into DragMatchSettings if the inspector ever adopts a
+  // prompt editor.)
+  const promptRaw = (settings as { prompt?: unknown }).prompt;
+  const prompt = typeof promptRaw === "string" ? promptRaw.trim() : "";
+  const rawPairs: DragMatchPair[] = (settings.pairs ?? []).filter(
+    (p): p is DragMatchPair =>
+      !!p &&
+      typeof p.left === "string" &&
+      typeof p.right === "string" &&
+      p.left.trim() !== "" &&
+      p.right.trim() !== ""
+  );
 
   // Stable shuffle of right-side items so the pool isn't pre-aligned.
   // Seeded by blockId so re-renders within a session don't re-shuffle
@@ -2649,29 +2729,20 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
 
 /* ── AI_QUIZ ──────────────────────────────────────────────── */
 
-type QuizQuestion = {
-  stem: string;
-  difficulty: number;
-  answers: Array<{ key: string; text: string; correct: boolean }>;
-  hint?: string | null;
-};
-
 function AiQuizBody({
   blockId,
   settings,
 }: {
   blockId: string;
-  settings: Record<string, unknown>;
+  settings: SettingsFor<"AI_QUIZ">;
 }) {
-  const generated = settings.generated as
-    | {
-        questions: QuizQuestion[];
-        generatedAt: string;
-        mode?: string;
-      }
-    | undefined;
+  const generated = settings.generated;
 
-  if (!generated || !Array.isArray(generated.questions) || generated.questions.length === 0) {
+  if (
+    !generated ||
+    !Array.isArray(generated.questions) ||
+    generated.questions.length === 0
+  ) {
     return (
       <EmptyBlockHint message="Your teacher hasn't generated questions for this quiz yet." />
     );

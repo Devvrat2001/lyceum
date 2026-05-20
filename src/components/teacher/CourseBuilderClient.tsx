@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   PointerSensor,
@@ -29,6 +30,7 @@ import {
 import { trpc } from "@/lib/trpc/react";
 import { AddBlockPopover } from "@/components/teacher/AddBlockPopover";
 import { BlockInspector } from "@/components/teacher/BlockInspector";
+import { BlockLibrary } from "@/components/teacher/BlockLibrary";
 import { findBlockMeta, type BlockType } from "@/lib/blocks";
 
 /**
@@ -79,46 +81,9 @@ type CourseProps = {
   units: Unit[];
 };
 
-type BlockItem = { ic: string; l: string; ai?: boolean };
-type BlockGroup = { g: string; items: BlockItem[] };
-
-const BLOCKS: BlockGroup[] = [
-  {
-    g: "Content",
-    items: [
-      { ic: "play", l: "Video" },
-      { ic: "book", l: "Reading" },
-      { ic: "grid", l: "Slides" },
-      { ic: "download", l: "PDF / file" },
-    ],
-  },
-  {
-    g: "Practice",
-    items: [
-      { ic: "star", l: "Quiz" },
-      { ic: "check", l: "Multiple choice" },
-      { ic: "mic", l: "Speak / record" },
-      { ic: "sparkles", l: "AI quiz", ai: true },
-    ],
-  },
-  {
-    g: "Interactive",
-    items: [
-      { ic: "bolt", l: "Simulation" },
-      { ic: "branch", l: "Branching scenario" },
-      { ic: "grid", l: "Drag & match" },
-      { ic: "chart", l: "Live poll" },
-    ],
-  },
-  {
-    g: "Structure",
-    items: [
-      { ic: "plus", l: "Section break" },
-      { ic: "chat", l: "Discussion thread" },
-      { ic: "user", l: "Live session" },
-    ],
-  },
-];
+// Block-catalog source-of-truth moved to @/lib/blocks (BLOCK_GROUPS) +
+// @/lib/blockTemplates (BLOCK_TEMPLATES). The left rail in this file
+// renders both via the BlockLibrary component.
 
 function fmtPrice(cents: number) {
   return cents === 0 ? "Free" : `$${(cents / 100).toFixed(0)}`;
@@ -134,6 +99,13 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
   // ID of the currently selected block (drives the right-pane
   // inspector). null = show the default course-level inspector.
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  // Lesson the BlockLibrary will insert into on click. Distinct from
+  // selectedBlockId — the inspector follows the latter, the library
+  // follows this. Defaults to the first lesson on mount so the
+  // library is actionable immediately.
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(
+    () => course.units[0]?.lessons[0]?.id ?? null
+  );
   const [settings, setSettings] = useState<Record<string, boolean>>({
     "Adaptive difficulty": true,
     "Show hints": true,
@@ -160,6 +132,20 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       setReorderError(`Failed to save lesson order: ${e.message}`);
       setUnits(course.units);
     },
+  });
+
+  // Publish / unpublish toggle behind the header CTA. A course is
+  // created as DRAFT (schema default), and every marketplace surface
+  // filters `status: "PUBLISHED"` — so until this fires, a teacher's
+  // course is invisible to students no matter how much content they
+  // author. On success we router.refresh() so the server component
+  // re-renders the status chip, CTA label, and inspector against the
+  // new status.
+  const router = useRouter();
+  const setCourseStatus = trpc.teacher.setCourseStatus.useMutation({
+    onSuccess: () => router.refresh(),
+    onError: (e) =>
+      setReorderError(`Failed to update course status: ${e.message}`),
   });
 
   // Append the freshly-created block to its lesson's local list.
@@ -236,6 +222,19 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       for (const l of u.lessons) {
         const b = l.blocks.find((x) => x.id === selectedBlockId);
         if (b) return { unitId: u.id, lessonId: l.id, block: b };
+      }
+    }
+    return null;
+  })();
+
+  // Display name for the library's "insert into" chip. Walks the same
+  // tree; cheap at our cardinalities and avoids passing the label
+  // through every lesson row.
+  const selectedLessonLabel = (() => {
+    if (!selectedLessonId) return null;
+    for (const u of units) {
+      for (const l of u.lessons) {
+        if (l.id === selectedLessonId) return `${u.title} · ${l.title}`;
       }
     }
     return null;
@@ -409,8 +408,23 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
             AI assist
           </Btn>
         </Link>
-        <Btn variant="primary" sm>
-          {course.status === "DRAFT" ? "Publish →" : "Update →"}
+        <Btn
+          variant={course.status === "DRAFT" ? "primary" : "ghost"}
+          sm
+          disabled={setCourseStatus.isPending}
+          onClick={() => {
+            setReorderError(null);
+            setCourseStatus.mutate({
+              courseId: course.id,
+              status: course.status === "DRAFT" ? "PUBLISHED" : "DRAFT",
+            });
+          }}
+        >
+          {setCourseStatus.isPending
+            ? "Saving…"
+            : course.status === "DRAFT"
+              ? "Publish →"
+              : "Unpublish"}
         </Btn>
       </header>
 
@@ -422,59 +436,15 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
           overflow: "hidden",
         }}
       >
-        {/* Block library */}
-        <aside
-          style={{
-            borderRight: "1px solid var(--wf-hairline)",
-            padding: "16px 14px",
-            overflow: "auto",
-            background: "var(--wf-fillsoft)",
-          }}
-        >
-          <Eyebrow style={{ marginBottom: 10 }}>Drag in blocks</Eyebrow>
-          <Annot style={{ marginBottom: 14 }}>
-            14 block types · drag onto canvas
-          </Annot>
-          {BLOCKS.map((grp) => (
-            <div key={grp.g} style={{ marginBottom: 16 }}>
-              <div
-                className="wf-mono"
-                style={{
-                  fontSize: 9,
-                  color: "var(--wf-mute)",
-                  letterSpacing: "0.08em",
-                  marginBottom: 6,
-                }}
-              >
-                {grp.g.toUpperCase()}
-              </div>
-              {grp.items.map((it) => (
-                <div
-                  key={it.l}
-                  className="wf-block-card"
-                  data-ai={Boolean(it.ai)}
-                  draggable
-                >
-                  <Icon name="drag" size={12} color="var(--wf-mute)" />
-                  <Icon name={it.ic as "play"} size={13} color="currentColor" />
-                  <span>{it.l}</span>
-                  {it.ai && (
-                    <span
-                      className="wf-mono"
-                      style={{
-                        fontSize: 8,
-                        color: "var(--wf-ai)",
-                        marginLeft: "auto",
-                      }}
-                    >
-                      AI
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          ))}
-        </aside>
+        {/* Block library — left rail. STARTERS (templated) + BLANK
+            BLOCKS (the 15-type catalog), with click-to-insert into the
+            currently-selected lesson. Selected-lesson state lives in
+            this component; lesson rows write it via `onLessonSelect`. */}
+        <BlockLibrary
+          selectedLessonId={selectedLessonId}
+          selectedLessonLabel={selectedLessonLabel}
+          onBlockAdded={handleBlockAdded}
+        />
 
         {/* Structure canvas */}
         <div
@@ -569,6 +539,8 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
                     onBlockDragEnd={handleBlockDragEnd}
                     selectedBlockId={selectedBlockId}
                     onBlockSelect={setSelectedBlockId}
+                    selectedLessonId={selectedLessonId}
+                    onLessonSelect={setSelectedLessonId}
                     sensors={sensors}
                   />
                 ))}
@@ -952,6 +924,8 @@ function SortableUnit({
   onBlockDragEnd,
   selectedBlockId,
   onBlockSelect,
+  selectedLessonId,
+  onLessonSelect,
   sensors,
 }: {
   unit: Unit;
@@ -964,6 +938,8 @@ function SortableUnit({
   onBlockDragEnd: (lessonId: string) => (e: DragEndEvent) => void;
   selectedBlockId: string | null;
   onBlockSelect: (blockId: string | null) => void;
+  selectedLessonId: string | null;
+  onLessonSelect: (lessonId: string) => void;
   sensors: ReturnType<typeof useSensors>;
 }) {
   const {
@@ -1081,6 +1057,8 @@ function SortableUnit({
                     onBlockDragEnd={onBlockDragEnd(l.id)}
                     selectedBlockId={selectedBlockId}
                     onBlockSelect={onBlockSelect}
+                    isSelectedForLibrary={selectedLessonId === l.id}
+                    onSelectForLibrary={() => onLessonSelect(l.id)}
                     sensors={sensors}
                   />
                 ))}
@@ -1114,6 +1092,8 @@ function SortableLesson({
   onBlockDragEnd,
   selectedBlockId,
   onBlockSelect,
+  isSelectedForLibrary,
+  onSelectForLibrary,
   sensors,
 }: {
   lesson: Lesson;
@@ -1122,6 +1102,9 @@ function SortableLesson({
   onBlockDragEnd: (e: DragEndEvent) => void;
   selectedBlockId: string | null;
   onBlockSelect: (blockId: string | null) => void;
+  /** True when the BlockLibrary will insert into this lesson on click. */
+  isSelectedForLibrary: boolean;
+  onSelectForLibrary: () => void;
   sensors: ReturnType<typeof useSensors>;
 }) {
   const {
@@ -1142,26 +1125,43 @@ function SortableLesson({
     marginBottom: 4,
   };
 
+  // Outlined accent border + soft fill when this lesson is the
+  // library's current insert target. Visually distinct from the
+  // selected-block (orange/accent-soft) treatment in the inspector.
   const rowStyle: React.CSSProperties = {
     display: "flex",
     alignItems: "center",
     gap: 10,
     padding: "8px 10px",
-    border: "1px solid var(--wf-hairline)",
+    border: `1px solid ${
+      isSelectedForLibrary ? "var(--wf-ink)" : "var(--wf-hairline)"
+    }`,
     borderRadius: 3,
-    background: "white",
+    background: isSelectedForLibrary ? "var(--wf-fillsoft)" : "white",
     fontSize: 12,
+    cursor: "pointer",
   };
 
   const count = lesson.blocks.length;
 
   return (
     <div ref={setNodeRef} style={wrapperStyle}>
-      <div style={rowStyle}>
+      <div
+        style={rowStyle}
+        // Click anywhere on the row sets this lesson as the library's
+        // insert target. Drag handle and AddBlockPopover already
+        // stopPropagation in their own handlers — they continue to work
+        // independently and don't double-fire the select.
+        onClick={onSelectForLibrary}
+        role="button"
+        aria-pressed={isSelectedForLibrary}
+        aria-label={`Set ${lesson.title} as library insert target`}
+      >
         <span
           {...attributes}
           {...listeners}
           aria-label={`Reorder lesson: ${lesson.title}`}
+          onClick={(e) => e.stopPropagation()}
           style={{
             display: "inline-flex",
             cursor: "grab",

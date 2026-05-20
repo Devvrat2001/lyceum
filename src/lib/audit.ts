@@ -13,6 +13,7 @@ export type AuditKind =
   | "ai.send_nudge"
   | "auth.signup"
   | "course.publish"
+  | "course.unpublish"
   | "payment.refund_initiated";
 
 type AuditInput = {

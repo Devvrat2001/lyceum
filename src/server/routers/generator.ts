@@ -22,6 +22,7 @@ import {
   QuestionBatchSchema,
   buildDemoQuestions,
   buildQuestionGenPrompt,
+  computeWeakSpots,
   type GeneratedQuestion,
 } from "@/lib/ai/prompts/questionGenerator";
 import { audit } from "@/lib/audit";
@@ -357,6 +358,38 @@ export const generatorRouter = router({
       const courseTitle = block.lesson.unit.course.title;
       const t0 = Date.now();
 
+      // Adaptive-regenerate signal (Tier 4.3): when the block has a
+      // previous batch with student attempts, pull per-question
+      // pass-rate stats and feed weak items into the prompt so the
+      // new batch targets the same concepts with different surface
+      // forms. Skip the lookup when there's no prior batch (first
+      // generate) — no attempts can exist yet.
+      const previousSettings = (block.settings ?? {}) as Record<string, unknown>;
+      const previousGenerated = previousSettings.generated as
+        | { questions?: Array<{ stem?: unknown }> }
+        | undefined;
+      const previousQuestions: Array<{ stem: string }> = Array.isArray(
+        previousGenerated?.questions
+      )
+        ? previousGenerated.questions.flatMap((q) =>
+            q && typeof (q as { stem?: unknown }).stem === "string"
+              ? [{ stem: (q as { stem: string }).stem }]
+              : []
+          )
+        : [];
+
+      let weakSpots: ReturnType<typeof computeWeakSpots> = [];
+      if (previousQuestions.length > 0) {
+        // Tier 1.2 chosenKey encoding for multi-question blocks is
+        // "subIdx:choiceIdx" — only those rows belong to the prior
+        // batch's questions.
+        const attempts = await ctx.db.attempt.findMany({
+          where: { blockId: block.id, chosenKey: { contains: ":" } },
+          select: { chosenKey: true, correct: true },
+        });
+        weakSpots = computeWeakSpots(previousQuestions, attempts);
+      }
+
       let generated: GeneratedQuestion[];
       if (isClaudeEnabled()) {
         const client = getClaude()!;
@@ -371,8 +404,9 @@ export const generatorRouter = router({
               content: buildQuestionGenPrompt({
                 lessonTitle,
                 courseTitle,
-                existingStems: [],
+                existingStems: previousQuestions.map((q) => q.stem),
                 count: input.count,
+                weakSpots,
               }),
             },
           ],
@@ -404,7 +438,6 @@ export const generatorRouter = router({
         generated = buildDemoQuestions({ lessonTitle, count: input.count });
       }
 
-      const previousSettings = (block.settings ?? {}) as Record<string, unknown>;
       const nextSettings: Record<string, unknown> = {
         ...previousSettings,
         // Preserve teacher's intent for re-renders.
@@ -431,6 +464,8 @@ export const generatorRouter = router({
           mode: isClaudeEnabled() ? "claude" : "demo",
           elapsedMs: Date.now() - t0,
           scope: "ai_quiz_block",
+          weakSpotsUsed: weakSpots.length,
+          adaptive: weakSpots.length > 0,
         },
         lessonId: block.lesson.id,
       });
@@ -439,6 +474,7 @@ export const generatorRouter = router({
         questions: generated,
         generatedAt: new Date().toISOString(),
         elapsedMs: Date.now() - t0,
+        weakSpotsUsed: weakSpots.length,
       };
     }),
 

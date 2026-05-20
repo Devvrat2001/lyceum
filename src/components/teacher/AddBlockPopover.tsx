@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/react";
 import { Icon } from "@/components/wf/primitives";
-import { BLOCK_GROUPS, type BlockType } from "@/lib/blocks";
+import { BLOCK_GROUPS, findBlockMeta, type BlockType } from "@/lib/blocks";
+import { BLOCK_TEMPLATES } from "@/lib/blockTemplates";
 
 /**
  * Click "+ block" on a lesson row → opens this popover → pick a type
@@ -104,17 +105,94 @@ export function AddBlockPopover({
               position: "absolute",
               top: "calc(100% + 4px)",
               right: 0,
-              minWidth: 200,
+              minWidth: 240,
               background: "white",
               border: "1px solid var(--wf-hairline)",
               borderRadius: 4,
               boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
               padding: 6,
               zIndex: 12,
-              maxHeight: 360,
+              maxHeight: 420,
               overflow: "auto",
             }}
           >
+            {/* Templates: pre-populated starter blocks. Click one and
+                the server seeds Block.settings with sensible defaults
+                (4-option MCQ, 5-pair matching, etc.) so teachers skip
+                the boilerplate-typing step. Resolved server-side from
+                the catalog in @/lib/blockTemplates. */}
+            <div style={{ marginBottom: 8 }}>
+              <div
+                className="wf-mono"
+                style={{
+                  fontSize: 9,
+                  color: "var(--wf-mute)",
+                  letterSpacing: "0.06em",
+                  padding: "4px 6px",
+                }}
+              >
+                STARTERS
+              </div>
+              {BLOCK_TEMPLATES.map((t) => {
+                const meta = findBlockMeta(t.type);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="menuitem"
+                    disabled={addBlock.isPending}
+                    onClick={() =>
+                      addBlock.mutate({
+                        lessonId,
+                        type: t.type,
+                        templateId: t.id,
+                      })
+                    }
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 8,
+                      width: "100%",
+                      padding: "6px 8px",
+                      border: "none",
+                      borderRadius: 3,
+                      background: "transparent",
+                      textAlign: "left",
+                      cursor: addBlock.isPending ? "wait" : "pointer",
+                      fontSize: 12,
+                      color: meta.ai ? "var(--wf-ai)" : "var(--wf-ink)",
+                    }}
+                  >
+                    <Icon
+                      name={meta.icon as "play"}
+                      size={12}
+                      color="currentColor"
+                      style={{ marginTop: 2, flexShrink: 0 }}
+                    />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500 }}>{t.label}</div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "var(--wf-mute)",
+                          marginTop: 1,
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {t.description}
+                      </div>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              style={{
+                margin: "4px 0",
+                borderTop: "1px solid var(--wf-hairline)",
+              }}
+            />
+            {/* Blank-block insert (legacy path) — settings stays {}. */}
             {BLOCK_GROUPS.map((grp) => (
               <div key={grp.group} style={{ marginBottom: 8 }}>
                 <div

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
 import { awardCorrectAttempt } from "../services/awardForAttempt";
+import { settingsFor } from "@/lib/blocks";
 
 /** Max poll options. Mirrors the inspector cap (2–6). */
 const MAX_POLL_OPTIONS = 9;
@@ -143,9 +144,12 @@ export const lessonRouter = router({
       });
       if (!block) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const settings = (block.settings ?? {}) as Record<string, unknown>;
-
-      // Resolve the answer list + source label per block type.
+      // Resolve the answer list + source label per block type. Each
+      // branch narrows `block.settings` via `settingsFor()` so the
+      // per-type shape is checked at compile time (POLL/MCQ/QUIZ all
+      // store an `options`-shaped field but with different element
+      // types — the discriminated catalog in @/lib/blocks keeps them
+      // apart).
       let answers: Array<{ correct: boolean }>;
       let source: string;
 
@@ -156,9 +160,8 @@ export const lessonRouter = router({
             message: "MCQ blocks don't take a subIndex",
           });
         }
-        const rawOptions = Array.isArray(settings.options)
-          ? settings.options
-          : [];
+        const settings = settingsFor("MCQ", block.settings);
+        const rawOptions = settings.options ?? [];
         answers = rawOptions.filter(
           (o): o is { text: string; correct: boolean } =>
             o !== null &&
@@ -176,13 +179,12 @@ export const lessonRouter = router({
         }
         // AI_QUIZ stores questions under settings.generated.questions;
         // QUIZ stores them at settings.questions directly.
-        const questions = (
+        const questions =
           block.type === "AI_QUIZ"
-            ? ((settings.generated as Record<string, unknown> | undefined)
-                ?.questions as unknown[] | undefined)
-            : (settings.questions as unknown[] | undefined)
-        ) ?? [];
-        const question = questions[input.subIndex];
+            ? (settingsFor("AI_QUIZ", block.settings).generated
+                ?.questions ?? [])
+            : (settingsFor("QUIZ", block.settings).questions ?? []);
+        const question = questions[input.subIndex] as unknown;
         if (
           !question ||
           typeof question !== "object" ||
@@ -299,8 +301,8 @@ export const lessonRouter = router({
         });
       }
 
-      const settings = (block.settings ?? {}) as Record<string, unknown>;
-      const rawPairs = Array.isArray(settings.pairs) ? settings.pairs : [];
+      const settings = settingsFor("DRAG_MATCH", block.settings);
+      const rawPairs = settings.pairs ?? [];
       const pairs = rawPairs.filter(
         (p): p is { left: string; right: string } =>
           p !== null &&
@@ -410,14 +412,13 @@ export const lessonRouter = router({
         });
       }
 
-      const settings = (block.settings ?? {}) as Record<string, unknown>;
-      const rawNodes = Array.isArray(settings.nodes) ? settings.nodes : [];
-      const node = rawNodes.find(
-        (n): n is { id: string; choices: unknown[] } =>
-          n !== null &&
-          typeof n === "object" &&
-          (n as { id?: unknown }).id === input.terminalNodeId
-      );
+      const settings = settingsFor("BRANCHING", block.settings);
+      const rawNodes = settings.nodes ?? [];
+      // BranchingNode is already typed via SettingsFor<"BRANCHING">, so
+      // no defensive shape predicate needed here — array elements are
+      // known to have {id, choices, ...}. If the JSON on disk is
+      // malformed we surface that as a NOT_FOUND below.
+      const node = rawNodes.find((n) => n.id === input.terminalNodeId);
       if (!node) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -483,12 +484,10 @@ export const lessonRouter = router({
           message: "Block is not a POLL",
         });
       }
-      const settings = (block.settings ?? {}) as Record<string, unknown>;
-      const options = Array.isArray(settings.options)
-        ? (settings.options as unknown[]).filter(
-            (o) => typeof o === "string"
-          )
-        : [];
+      const settings = settingsFor("POLL", block.settings);
+      const options = (settings.options ?? []).filter(
+        (o): o is string => typeof o === "string"
+      );
 
       const tallies = new Array(options.length).fill(0) as number[];
       const groups = await ctx.db.blockVote.groupBy({
@@ -550,12 +549,10 @@ export const lessonRouter = router({
           message: "Block is not a POLL",
         });
       }
-      const settings = (block.settings ?? {}) as Record<string, unknown>;
-      const options = Array.isArray(settings.options)
-        ? (settings.options as unknown[]).filter(
-            (o) => typeof o === "string"
-          )
-        : [];
+      const settings = settingsFor("POLL", block.settings);
+      const options = (settings.options ?? []).filter(
+        (o): o is string => typeof o === "string"
+      );
       if (options.length < 2) {
         throw new TRPCError({
           code: "BAD_REQUEST",

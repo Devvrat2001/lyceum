@@ -10,6 +10,7 @@ import {
 import { CLAUDE_MODEL, getClaude, isClaudeEnabled } from "@/lib/ai/claude";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
+import { findBlockTemplate } from "@/lib/blockTemplates";
 
 export const teacherRouter = router({
   /** Anyone can check follow state of a teacher (signed-in only). */
@@ -136,6 +137,58 @@ export const teacherRouter = router({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
       return course;
+    }),
+
+  /**
+   * Publish or unpublish a course — the ONLY thing that flips
+   * `Course.status` between DRAFT and PUBLISHED.
+   *
+   * This is the gate that makes a course reachable by students: every
+   * marketplace surface (`marketplace.featured` / `search` / `aiSearch`
+   * / `recommendedFor`, and the `teachers` list) filters
+   * `status: "PUBLISHED"`. A course is created as DRAFT (schema
+   * default; `generator.saveAsCourse` included), so until a teacher
+   * publishes it the course is invisible to students no matter how
+   * much unit/lesson/block content they author. Structural edits
+   * (reorderUnits / addBlock / updateBlock / …) persist on their own —
+   * this only toggles the visibility flag.
+   *
+   * Idempotent: re-sending the status a course already has is a no-op
+   * (no write, no audit row) and still returns ok.
+   */
+  setCourseStatus: teacherProcedure
+    .input(
+      z.object({
+        courseId: z.string(),
+        status: z.enum(["DRAFT", "PUBLISHED"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const course = await ctx.db.course.findUnique({
+        where: { id: input.courseId },
+        select: { id: true, authorId: true, status: true },
+      });
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "ADMIN" && course.authorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      if (course.status === input.status) {
+        return { ok: true as const, status: course.status, changed: false };
+      }
+      await ctx.db.course.update({
+        where: { id: course.id },
+        data: { status: input.status },
+      });
+      await audit({
+        actorId: ctx.user.id,
+        kind:
+          input.status === "PUBLISHED"
+            ? "course.publish"
+            : "course.unpublish",
+        courseId: course.id,
+        payload: { from: course.status, to: input.status },
+      });
+      return { ok: true as const, status: input.status, changed: true };
     }),
 
   /** Aggregated analytics for the signed-in teacher. */
@@ -557,6 +610,13 @@ export const teacherRouter = router({
           "DISCUSSION",
           "LIVE",
         ]),
+        /** Optional starter template id (see `lib/blockTemplates.ts`).
+         *  When set, server seeds Block.settings with the template's
+         *  payload + writes a default label. Must match `type` —
+         *  prevents client from sending a POLL template for an MCQ row
+         *  (which would silently store POLL-shaped settings on an MCQ
+         *  block and break the inspector). */
+        templateId: z.string().min(1).max(64).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -575,13 +635,42 @@ export const teacherRouter = router({
       ) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
+
+      // Resolve template (if provided) server-side — the catalog is the
+      // single source of truth, so clients can't smuggle arbitrary
+      // settings via this endpoint.
+      let settings: Prisma.InputJsonValue = {};
+      if (input.templateId) {
+        const template = findBlockTemplate(input.templateId);
+        if (!template) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Unknown template: ${input.templateId}`,
+          });
+        }
+        if (template.type !== input.type) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Template "${input.templateId}" is a ${template.type}, not ${input.type}`,
+          });
+        }
+        // Templates may include a default label; merge it into settings
+        // alongside the per-type fields so the inspector picks it up.
+        const baseSettings =
+          (template.settings ?? {}) as Record<string, unknown>;
+        settings = {
+          ...baseSettings,
+          ...(template.blockLabel ? { label: template.blockLabel } : {}),
+        } as Prisma.InputJsonValue;
+      }
+
       const nextOrder = (lesson.blocks[0]?.order ?? 0) + 1;
       const block = await ctx.db.block.create({
         data: {
           lessonId: input.lessonId,
           type: input.type,
           order: nextOrder,
-          settings: {},
+          settings,
         },
         select: { id: true, type: true, order: true, settings: true },
       });

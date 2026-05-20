@@ -57,13 +57,48 @@ Rules:
 7. Optional hints should point at the relevant concept without giving
    away the chosen letter.`;
 
+/** Pre-regeneration signal: a previous batch's question that students
+ *  collectively struggled with. The new batch should target the same
+ *  underlying concept with a different surface form. */
+export type WeakSpot = {
+  stem: string;
+  /** Fraction in [0,1]. */
+  pctCorrect: number;
+  /** Number of attempts used to compute pctCorrect. */
+  sampleSize: number;
+};
+
 export function buildQuestionGenPrompt(args: {
   lessonTitle: string;
   courseTitle: string;
   existingStems: string[];
   count: number;
+  /** When provided (adaptive regenerate path), the model is told to
+   *  target the same underlying concepts as these weak items. Skip
+   *  when no prior attempts exist. */
+  weakSpots?: WeakSpot[];
 }): string {
-  const { lessonTitle, courseTitle, existingStems, count } = args;
+  const { lessonTitle, courseTitle, existingStems, count, weakSpots } = args;
+  const weakSpotsBlock =
+    weakSpots && weakSpots.length > 0
+      ? `
+
+STUDENT PERFORMANCE — PREVIOUS BATCH:
+${weakSpots
+  .map(
+    (w) =>
+      `- "${w.stem}" — only ${Math.round(w.pctCorrect * 100)}% correct (n=${w.sampleSize})`
+  )
+  .join("\n")}
+
+Students collectively struggled with the items above. For the new batch:
+- Cover the same underlying concept as each weak item.
+- Use a DIFFERENT surface form (different wording, different numbers,
+  different real-world setup) so students can't just memorize answers.
+- Do not repeat the exact stems above.
+- Keep the difficulty within ±1 of the original weak item.`
+      : "";
+
   return `Course: ${courseTitle}
 Lesson: ${lessonTitle}
 
@@ -72,11 +107,67 @@ ${
   existingStems.length === 0
     ? "(none yet)"
     : existingStems.map((s, i) => `${i + 1}. ${s}`).join("\n")
-}
+}${weakSpotsBlock}
 
 Generate ${count} new multiple-choice questions that match the
 QuestionBatch schema. Distribute difficulty 2/3/4. One hint per
 question if helpful.`;
+}
+
+/** Minimum attempts on a question before we trust the % correct
+ *  signal enough to call it "weak". A 0/1 = 0% is just noise. */
+export const WEAK_SPOT_MIN_SAMPLE_SIZE = 3;
+/** Questions with pctCorrect strictly below this are flagged weak. */
+export const WEAK_SPOT_THRESHOLD = 0.6;
+
+/**
+ * Pure function: derive per-question weak-spot stats from the prior
+ * batch's questions + raw Attempt rows for this block.
+ *
+ * Inputs:
+ * - `previousQuestions` is `Block.settings.generated.questions` from
+ *   the prior generate (in order — index is the subIndex).
+ * - `attempts` is every `Attempt` row for this block with the Tier 1.2
+ *   `"subIdx:choiceIdx"` chosenKey encoding. Rows with malformed
+ *   chosenKey are skipped.
+ *
+ * Returns weak spots in the same order as previousQuestions, filtered
+ * by sampleSize ≥ MIN and pctCorrect < THRESHOLD. Empty array when no
+ * questions hit the bar.
+ */
+export function computeWeakSpots(
+  previousQuestions: Array<{ stem: string }>,
+  // chosenKey is nullable on Attempt for legacy reasons (Question-based
+  // attempts used the column differently). Skip null rows alongside
+  // malformed ones.
+  attempts: Array<{ chosenKey: string | null; correct: boolean }>
+): WeakSpot[] {
+  const bySubIdx = new Map<number, { total: number; correct: number }>();
+  for (const a of attempts) {
+    if (a.chosenKey === null) continue;
+    const colon = a.chosenKey.indexOf(":");
+    if (colon < 0) continue;
+    const subIdx = parseInt(a.chosenKey.slice(0, colon), 10);
+    if (!Number.isFinite(subIdx) || subIdx < 0) continue;
+    const slot = bySubIdx.get(subIdx) ?? { total: 0, correct: 0 };
+    slot.total += 1;
+    if (a.correct) slot.correct += 1;
+    bySubIdx.set(subIdx, slot);
+  }
+
+  const out: WeakSpot[] = [];
+  for (let i = 0; i < previousQuestions.length; i++) {
+    const stats = bySubIdx.get(i);
+    if (!stats || stats.total < WEAK_SPOT_MIN_SAMPLE_SIZE) continue;
+    const pctCorrect = stats.correct / stats.total;
+    if (pctCorrect >= WEAK_SPOT_THRESHOLD) continue;
+    out.push({
+      stem: previousQuestions[i].stem,
+      pctCorrect,
+      sampleSize: stats.total,
+    });
+  }
+  return out;
 }
 
 /** Demo fallback. Generates deterministic placeholder questions. */
