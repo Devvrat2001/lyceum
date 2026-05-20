@@ -9,6 +9,7 @@ import {
   ImageBox,
 } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
+import { auth } from "@/lib/auth";
 import { TRPCError } from "@trpc/server";
 import { CurriculumAccordion } from "@/components/course/CurriculumAccordion";
 import { EnrollPanel } from "@/components/course/EnrollPanel";
@@ -29,9 +30,10 @@ export default async function CourseDetailPage({
     throw err;
   }
 
-  const [reviews, myStatus] = await Promise.all([
+  const [reviews, myStatus, session] = await Promise.all([
     trpc.course.reviews({ courseId: course.id, limit: 4 }),
     trpc.course.myStatus({ courseId: course.id }),
+    auth(),
   ]);
 
   const totalLessons = course.units.reduce((a, u) => a + u.lessons.length, 0);
@@ -43,7 +45,7 @@ export default async function CourseDetailPage({
   const learn = (course.learnOutcomes as string[] | null) ?? [];
 
   return (
-    <MarketChrome>
+    <MarketChrome role={session?.user?.role ?? null}>
       <div
         style={{
           padding: "20px 28px 40px",

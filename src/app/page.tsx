@@ -10,6 +10,7 @@ import {
   ImageBox,
 } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
+import { auth } from "@/lib/auth";
 import { MarketplaceHeroSearch } from "@/components/marketplace/MarketplaceHeroSearch";
 import { PathEnrollButton } from "@/components/marketplace/PathEnrollButton";
 import { FollowButton } from "@/components/marketplace/FollowButton";
@@ -55,7 +56,7 @@ export default async function MarketplacePage({
   const price = sp.price;
 
   const trpc = await getServerCaller();
-  const [featured, paths, teachers, recommended, enrolledIdList] =
+  const [featured, paths, teachers, recommended, enrolledIdList, session] =
     await Promise.all([
       trpc.marketplace.featured({
         ...(activeTopic ? { topic: activeTopic.slug } : {}),
@@ -68,9 +69,16 @@ export default async function MarketplacePage({
       trpc.marketplace.teachers({ limit: 4 }),
       trpc.marketplace.recommendedFor(),
       trpc.course.myEnrolledIds(),
+      auth(),
     ]);
   // O(1) lookups while rendering cards. Empty Set for anon visitors.
   const enrolledIds = new Set(enrolledIdList);
+
+  // Viewer identity for the role-centric hero. Anonymous visitors and
+  // students both fall through to the default course-discovery hero;
+  // only TEACHER / ADMIN / PARENT get a dashboard-oriented variant.
+  const role = session?.user?.role ?? null;
+  const firstName = session?.user?.name?.trim().split(/\s+/)[0] || null;
 
   // Section header reflects the most specific dimension the user has
   // selected. Topic wins (it's the highest-level), then subject,
@@ -83,7 +91,7 @@ export default async function MarketplacePage({
   }${priceLabel ? ` · ${priceLabel}` : ""}`;
 
   return (
-    <MarketChrome>
+    <MarketChrome role={role}>
       <div
         style={{
           padding: "24px 28px 40px",
@@ -92,7 +100,12 @@ export default async function MarketplacePage({
           width: "100%",
         }}
       >
-        {/* Hero */}
+        {/* Hero — role-centric: signed-in TEACHER / ADMIN / PARENT get
+            a dashboard-oriented welcome; students and anonymous
+            visitors fall through to the default discovery hero. */}
+        {role === "TEACHER" || role === "ADMIN" || role === "PARENT" ? (
+          <RoleHero role={role} firstName={firstName} />
+        ) : (
         <section
           style={{
             display: "grid",
@@ -157,7 +170,7 @@ export default async function MarketplacePage({
                 marginBottom: 10,
               }}
             >
-              <Eyebrow>Recommended for Jordan</Eyebrow>
+              <Eyebrow>Recommended for {firstName ?? "you"}</Eyebrow>
               <Annot ai>Adaptive recs</Annot>
             </div>
             <div
@@ -225,6 +238,7 @@ export default async function MarketplacePage({
             </Link>
           </Card>
         </section>
+        )}
 
         {/* Filters */}
         <div
@@ -676,12 +690,132 @@ export default async function MarketplacePage({
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <Btn variant="ghost">See plans</Btn>
-            <Link href="/admin" style={{ textDecoration: "none" }}>
+            <Link href="/signup" style={{ textDecoration: "none" }}>
               <Btn variant="primary">Talk to us</Btn>
             </Link>
           </div>
         </Card>
       </div>
     </MarketChrome>
+  );
+}
+
+/**
+ * Role-specific homepage hero for signed-in TEACHER / ADMIN / PARENT
+ * viewers. Students and anonymous visitors get the default
+ * course-discovery hero rendered inline in MarketplacePage above.
+ *
+ * Every CTA points only at a route the role can open (see
+ * src/proxy.ts) — so the hero can never trip a ForbiddenForRole
+ * redirect the way the old one-size-fits-all "/student" / "/admin"
+ * links did.
+ */
+function RoleHero({
+  role,
+  firstName,
+}: {
+  role: "TEACHER" | "ADMIN" | "PARENT";
+  firstName: string | null;
+}) {
+  const config = {
+    TEACHER: {
+      eyebrow: "Teacher",
+      lead: "your teaching workspace",
+      blurb:
+        "Jump back into your courses, see how students are doing, or spin up a new course with AI.",
+      actions: [
+        {
+          label: "Go to your courses",
+          href: "/teacher",
+          variant: "primary" as const,
+          ai: false,
+        },
+        {
+          label: "Build a course with AI",
+          href: "/teacher/courses/new",
+          variant: "ai" as const,
+          ai: true,
+        },
+      ],
+    },
+    ADMIN: {
+      eyebrow: "Administrator",
+      lead: "your institution console",
+      blurb:
+        "Manage people and curriculum, organize classes, and track cohort analytics across your school.",
+      actions: [
+        {
+          label: "Open admin console",
+          href: "/admin",
+          variant: "primary" as const,
+          ai: false,
+        },
+      ],
+    },
+    PARENT: {
+      eyebrow: "Parent",
+      lead: "your family dashboard",
+      blurb:
+        "See each kid's courses, streaks, and recent practice — all in one place.",
+      actions: [
+        {
+          label: "See your kids' progress",
+          href: "/parent",
+          variant: "primary" as const,
+          ai: false,
+        },
+      ],
+    },
+  }[role];
+
+  return (
+    <section
+      style={{
+        padding: "20px 0 28px",
+        borderBottom: "1px solid var(--wf-hairline)",
+        marginBottom: 28,
+      }}
+    >
+      <Eyebrow>{config.eyebrow}</Eyebrow>
+      <h1
+        className="wf-h1"
+        style={{ fontSize: 42, margin: "8px 0 14px", maxWidth: 620 }}
+      >
+        Welcome back{firstName ? `, ${firstName}` : ""} — here&apos;s{" "}
+        <span className="wf-serif" style={{ fontStyle: "italic" }}>
+          {config.lead}
+        </span>
+      </h1>
+      <div
+        style={{
+          fontSize: 14,
+          color: "var(--wf-body)",
+          maxWidth: 560,
+          marginBottom: 18,
+          lineHeight: 1.5,
+        }}
+      >
+        {config.blurb}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {config.actions.map((a) => (
+          <Link key={a.href} href={a.href} style={{ textDecoration: "none" }}>
+            <Btn
+              variant={a.variant}
+              icon={
+                a.ai ? (
+                  <Icon name="sparkles" size={14} color="var(--wf-ai)" />
+                ) : undefined
+              }
+            >
+              {a.label}
+            </Btn>
+          </Link>
+        ))}
+      </div>
+      <div style={{ marginTop: 14, fontSize: 12, color: "var(--wf-mute)" }}>
+        Or browse the full course marketplace below.
+      </div>
+    </section>
   );
 }
