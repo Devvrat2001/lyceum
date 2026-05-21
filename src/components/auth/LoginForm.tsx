@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Btn, Icon } from "@/components/wf/primitives";
+import { homeForRole } from "@/lib/roles";
 
 export function LoginForm({ next }: { next?: string }) {
   const router = useRouter();
@@ -24,11 +25,17 @@ export function LoginForm({ next }: { next?: string }) {
           password,
           redirect: false,
         });
-        setPending(false);
         if (res?.ok) {
-          router.replace(next ?? "/student");
+          // signIn just set the session cookie. Read it back so we can
+          // land the user on a page their role can actually reach —
+          // defaulting everyone to /student sent teachers/admins/parents
+          // into a redirect loop off the role gate in proxy.ts.
+          const session = await getSession();
+          setPending(false);
+          router.replace(next ?? homeForRole(session?.user?.role));
           router.refresh();
         } else {
+          setPending(false);
           setError(
             "Couldn't sign you in. Check your email and password, or sign up below."
           );

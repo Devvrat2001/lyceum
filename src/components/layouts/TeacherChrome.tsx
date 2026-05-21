@@ -7,16 +7,13 @@ import { SidebarUserMenu } from "@/components/layouts/SidebarUserMenu";
 
 const NAV = [
   {
-    id: "overview",
-    icon: "home" as const,
-    label: "Overview",
-    href: "/teacher",
-  },
-  {
     id: "courses",
     icon: "book" as const,
     label: "My courses",
-    href: "/teacher/courses/algebra-foundations/edit",
+    // /teacher is the courses overview — it lists every course the
+    // teacher owns. Never hard-link a specific demo course here: it
+    // 404s for any teacher who doesn't own that slug.
+    href: "/teacher",
   },
   {
     id: "students",
@@ -72,7 +69,7 @@ export function TeacherChrome({
       ? "earnings"
       : pathname.startsWith("/teacher/discussions")
       ? "community"
-      : "overview");
+      : "courses");
 
   return (
     <div

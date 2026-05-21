@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { QuickLoginButton } from "@/components/auth/QuickLoginButton";
+import { homeForRole } from "@/lib/roles";
 
 export const metadata = { title: "Sign in · Lyceum" };
 
@@ -14,7 +15,10 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   const [session, sp] = await Promise.all([auth(), searchParams]);
-  if (session?.user) redirect(sp.next ?? "/student");
+  // Role-aware default: a teacher/admin/parent sent to /student would be
+  // bounced straight back here by proxy.ts, looping forever.
+  if (session?.user)
+    redirect(sp.next ?? homeForRole(session.user.role));
 
   // Dev-only demo accounts panel. Production builds never see this.
   const isDev = env.NODE_ENV === "development";
@@ -225,13 +229,7 @@ export default async function LoginPage({
                     key={u.email}
                     email={u.email}
                     label={u.name ?? u.firstName ?? u.email}
-                    next={
-                      roleKey === "STUDENT"
-                        ? "/student"
-                        : roleKey === "TEACHER"
-                        ? "/teacher/courses/algebra-foundations/edit"
-                        : "/admin"
-                    }
+                    next={homeForRole(roleKey)}
                   />
                 ))}
               </div>

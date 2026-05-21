@@ -17,7 +17,7 @@ export default function TeacherStorefrontPage() {
           "Embed testimonials and student outcomes",
           "Referral codes with revenue tracking",
         ]}
-        backHref="/teacher/courses/algebra-foundations/edit"
+        backHref="/teacher"
         backLabel="Back to my courses"
       />
     </TeacherChrome>
