@@ -1171,8 +1171,15 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
   // Re-render every 30s so the "starts in X" / "live now" / "ended"
   // affordance stays current without a refetch. The interval kicks off
   // a fresh now-state which derives all the display flags.
-  const [now, setNow] = useState(() => Date.now());
+  // `now` starts null so the server render and the first client
+  // render agree (both show the placeholder below). Reading Date.now()
+  // during render — or formatting a date in the runtime locale/
+  // timezone — diverges between the Node SSR pass and the browser.
+  // The clock is read post-mount; the time-derived card then renders
+  // entirely client-side.
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
@@ -1186,6 +1193,16 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
   if (!startsAt) {
     return (
       <EmptyBlockHint message="Your teacher hasn't scheduled this live session yet." />
+    );
+  }
+
+  // Stable, time-independent placeholder until the client clock is
+  // known — keeps SSR === first client render (no hydration drift).
+  if (now === null) {
+    return (
+      <div className="wf-mono" style={{ fontSize: 12, color: "var(--wf-mute)" }}>
+        ● Live session · {durationMin} min
+      </div>
     );
   }
 
@@ -1732,14 +1749,24 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
   const [typedFallback, setTypedFallback] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Feature-detect on mount and remember per-render. The actual
-  // recognition instance lives in a ref so the same one is reused
-  // across start/stop cycles.
-  const recognitionCtor = useMemo(() => getSpeechRecognitionCtor(), []);
-  const ttsAvailable = useMemo(
-    () => typeof window !== "undefined" && "speechSynthesis" in window,
-    []
-  );
+  // Browser-capability detection must not affect the first render:
+  // doing it in useMemo yields null/false on the server and the real
+  // values in the browser, so the SSR HTML and the first client
+  // render structurally disagree (a hydration mismatch). Both passes
+  // start from the no-capability state; the effect upgrades it
+  // post-mount.
+  const [recognitionCtor, setRecognitionCtor] = useState<{
+    new (): SpeechRecognitionLike;
+  } | null>(null);
+  const [ttsAvailable, setTtsAvailable] = useState(false);
+  useEffect(() => {
+    // Updater form — getSpeechRecognitionCtor returns a constructor,
+    // which a bare setState(fn) would mistake for a state updater.
+    setRecognitionCtor(() => getSpeechRecognitionCtor());
+    setTtsAvailable(
+      typeof window !== "undefined" && "speechSynthesis" in window
+    );
+  }, []);
 
   const recognitionRef = useMemo(() => {
     // useRef would be more conventional but useMemo with stable deps

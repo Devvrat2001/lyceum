@@ -31,7 +31,10 @@ function fmtPrice(cents: number) {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
+  // Pin the locale: `undefined` formats with each runtime's own
+  // locale, so the Node SSR pass and the browser disagree and React
+  // logs a hydration mismatch. Lyceum's UI is en-US throughout.
+  return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

@@ -1427,7 +1427,7 @@ function describeBlockSettings(block: LessonBlock): string | null {
       const body = typeof s.body === "string" ? s.body.trim() : "";
       if (!body) return null;
       const words = body.split(/\s+/).filter(Boolean).length;
-      return `${words.toLocaleString()} word${words === 1 ? "" : "s"}`;
+      return `${words.toLocaleString("en-US")} word${words === 1 ? "" : "s"}`;
     }
     case "MCQ": {
       const opts = Array.isArray(s.options) ? s.options : [];
@@ -1487,7 +1487,7 @@ function describeBlockSettings(block: LessonBlock): string | null {
       if (!startsAt) return null;
       const d = new Date(startsAt);
       if (Number.isNaN(d.getTime())) return "scheduled";
-      return d.toLocaleDateString(undefined, {
+      return d.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
       });
