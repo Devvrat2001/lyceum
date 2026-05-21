@@ -389,21 +389,61 @@ export default function AIGeneratorPage() {
             ) : (
               <Card p={20}>
                 <div
-                  className="wf-serif"
-                  style={{ fontSize: 19, fontWeight: 700, marginBottom: 4 }}
-                >
-                  {outline!.title}
-                </div>
-                <div
+                  className="wf-mono"
                   style={{
+                    fontSize: 10,
+                    color: "var(--wf-mute)",
+                    letterSpacing: "0.04em",
+                    marginBottom: 4,
+                  }}
+                >
+                  COURSE NAME · EDIT BEFORE SAVING
+                </div>
+                <input
+                  className="wf-serif"
+                  value={outline!.title}
+                  onChange={(e) =>
+                    setOutline((p) =>
+                      p ? { ...p, title: e.target.value } : p
+                    )
+                  }
+                  aria-label="Course title"
+                  placeholder="Course title"
+                  style={{
+                    width: "100%",
+                    fontSize: 19,
+                    fontWeight: 700,
+                    marginBottom: 6,
+                    color: "var(--wf-ink)",
+                    border: "1px solid var(--wf-hairline)",
+                    borderRadius: 3,
+                    padding: "6px 8px",
+                    background: "white",
+                    outline: "none",
+                  }}
+                />
+                <input
+                  value={outline!.tagline}
+                  onChange={(e) =>
+                    setOutline((p) =>
+                      p ? { ...p, tagline: e.target.value } : p
+                    )
+                  }
+                  aria-label="Course tagline"
+                  placeholder="One-line tagline"
+                  style={{
+                    width: "100%",
                     fontSize: 12,
                     color: "var(--wf-body)",
                     marginBottom: 8,
                     fontStyle: "italic",
+                    border: "1px solid var(--wf-hairline)",
+                    borderRadius: 3,
+                    padding: "5px 8px",
+                    background: "white",
+                    outline: "none",
                   }}
-                >
-                  {outline!.tagline}
-                </div>
+                />
                 <div
                   style={{
                     fontSize: 12,

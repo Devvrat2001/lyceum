@@ -14,6 +14,7 @@ export type AuditKind =
   | "auth.signup"
   | "course.publish"
   | "course.unpublish"
+  | "course.update"
   | "payment.refund_initiated";
 
 type AuditInput = {

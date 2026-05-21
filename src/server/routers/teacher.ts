@@ -191,6 +191,99 @@ export const teacherRouter = router({
       return { ok: true as const, status: input.status, changed: true };
     }),
 
+  /**
+   * Edit a course's identity + marketplace metadata — title, tagline,
+   * subject, grade, price. Partial update: only the provided fields
+   * change. The `slug` is deliberately NOT touched — it's the permanent
+   * URL, and rewriting it on every rename would break student bookmarks
+   * and in-flight share links.
+   */
+  updateCourse: teacherProcedure
+    .input(
+      z.object({
+        courseId: z.string(),
+        title: z.string().max(120).optional(),
+        tagline: z.string().max(160).optional(),
+        subject: z.string().max(40).optional(),
+        grade: z.string().max(40).optional(),
+        priceCents: z.number().int().min(0).max(1_000_000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const course = await ctx.db.course.findUnique({
+        where: { id: input.courseId },
+        select: { id: true, authorId: true },
+      });
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "ADMIN" && course.authorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const data: Prisma.CourseUpdateInput = {};
+      if (input.title !== undefined) {
+        const title = input.title.trim();
+        if (title.length === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Course title can't be empty.",
+          });
+        }
+        data.title = title;
+      }
+      if (input.tagline !== undefined) {
+        // Empty tagline clears the field rather than storing "".
+        const tagline = input.tagline.trim();
+        data.tagline = tagline.length > 0 ? tagline : null;
+      }
+      if (input.subject !== undefined) {
+        const subject = input.subject.trim();
+        if (subject.length === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Subject can't be empty.",
+          });
+        }
+        data.subject = subject;
+      }
+      if (input.grade !== undefined) {
+        const grade = input.grade.trim();
+        if (grade.length === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Grade can't be empty.",
+          });
+        }
+        data.grade = grade;
+      }
+      if (input.priceCents !== undefined) {
+        data.priceCents = input.priceCents;
+      }
+
+      if (Object.keys(data).length === 0) {
+        return { ok: true as const, changed: false };
+      }
+
+      const updated = await ctx.db.course.update({
+        where: { id: course.id },
+        data,
+        select: {
+          id: true,
+          title: true,
+          tagline: true,
+          subject: true,
+          grade: true,
+          priceCents: true,
+        },
+      });
+      await audit({
+        actorId: ctx.user.id,
+        kind: "course.update",
+        courseId: course.id,
+        payload: { fields: Object.keys(data) },
+      });
+      return { ok: true as const, changed: true, course: updated };
+    }),
+
   /** Aggregated analytics for the signed-in teacher. */
   analytics: teacherProcedure
     .input(
@@ -201,11 +294,16 @@ export const teacherRouter = router({
         .optional()
     )
     .query(async ({ ctx, input }) => {
-      const since = new Date(
-        Date.now() - (input?.rangeDays ?? 30) * 24 * 3600 * 1000
-      );
-      const ownerWhere =
-        ctx.user.role === "ADMIN" ? {} : { authorId: ctx.user.id };
+      const rangeDays = input?.rangeDays ?? 30;
+      const dayMs = 24 * 3600 * 1000;
+      const now = Date.now();
+      // Two back-to-back windows: [since, now] is the current period,
+      // [prevSince, since) the prior one — used for the period-over-period
+      // KPI deltas.
+      const since = new Date(now - rangeDays * dayMs);
+      const prevSince = new Date(now - 2 * rangeDays * dayMs);
+      const isAdmin = ctx.user.role === "ADMIN";
+      const ownerWhere = isAdmin ? {} : { authorId: ctx.user.id };
 
       const courses = await ctx.db.course.findMany({
         where: ownerWhere,
@@ -217,7 +315,12 @@ export const teacherRouter = router({
           enrollCount: true,
           _count: { select: { enrollments: true } },
           enrollments: {
-            select: { progressPct: true, completed: true, lastActivityAt: true },
+            select: {
+              progressPct: true,
+              completed: true,
+              lastActivityAt: true,
+              enrolledAt: true,
+            },
           },
         },
       });
@@ -268,15 +371,14 @@ export const teacherRouter = router({
             )
           : 0;
 
-      // Avg quiz score (% correct on attempts in range)
+      // Avg quiz score (% correct on attempts in the current window).
+      // createdAt is also used to bucket the daily chart series below.
       const attempts = await ctx.db.attempt.findMany({
         where: {
-          lesson: {
-            unit: { courseId: { in: courseIds } },
-          },
+          lesson: { unit: { courseId: { in: courseIds } } },
           createdAt: { gte: since },
         },
-        select: { correct: true, lessonId: true, userId: true },
+        select: { correct: true, userId: true, createdAt: true },
       });
       const avgQuiz =
         attempts.length > 0
@@ -286,33 +388,103 @@ export const teacherRouter = router({
             )
           : 0;
 
-      // Engagement minutes per student per week — placeholder until session-time tracking lands
-      const engagementMin = 47;
+      // AI tutor sessions on this teacher's lessons, across both windows
+      // so the KPI can show a real period-over-period delta.
+      const tutorRows = await ctx.db.tutorSession.findMany({
+        where: {
+          lesson: { unit: { courseId: { in: courseIds } } },
+          createdAt: { gte: prevSince },
+        },
+        select: { createdAt: true },
+      });
+      const tutorCurrent = tutorRows.filter((t) => t.createdAt >= since).length;
+      const tutorPrev = tutorRows.length - tutorCurrent;
+      const tutorDelta = tutorCurrent - tutorPrev;
 
-      // Earnings (dummy: $sum priceCents * enrollments / 100, rough proxy)
-      const earningsCents = courses.reduce(
-        (a, c) =>
-          a +
-          c.enrollments.length *
-            (courses.find((x) => x.id === c.id)?.enrollCount ? 0 : 0) +
-          0,
-        0
+      // Earnings — real money summed from PAID orders. Admins see the
+      // whole platform; a teacher sees only their own courses' orders.
+      const monthStart = new Date(
+        new Date().getFullYear(),
+        new Date().getMonth(),
+        1
       );
-      // Phase 1 stub: keep it round for the prototype.
-      const earningsLabel =
-        earningsCents > 0 ? `$${(earningsCents / 100).toFixed(0)}` : "$3,124";
+      const lastMonthStart = new Date(
+        new Date().getFullYear(),
+        new Date().getMonth() - 1,
+        1
+      );
+      const earningsWhere = isAdmin ? {} : { teacherId: ctx.user.id };
+      const [mtdAgg, lastMonthAgg] = await Promise.all([
+        ctx.db.order.aggregate({
+          where: {
+            ...earningsWhere,
+            status: "PAID",
+            paidAt: { gte: monthStart },
+          },
+          _sum: { netCents: true },
+        }),
+        ctx.db.order.aggregate({
+          where: {
+            ...earningsWhere,
+            status: "PAID",
+            paidAt: { gte: lastMonthStart, lt: monthStart },
+          },
+          _sum: { netCents: true },
+        }),
+      ]);
+      const mtdNet = mtdAgg._sum.netCents ?? 0;
+      const lastMonthNet = lastMonthAgg._sum.netCents ?? 0;
+      const earningsDeltaPct =
+        lastMonthNet > 0
+          ? Math.round(((mtdNet - lastMonthNet) / lastMonthNet) * 100)
+          : null;
 
-      // Drop-off funnel: stages × % of enrolled
-      // Phase 1: derived deterministically from progress buckets so it
-      // looks like real data without needing per-step events yet.
+      // Daily series for the "engagement over time" chart — one bucket
+      // per day across the current window. All three lines are real:
+      // active learners (≥1 quiz attempt that day), new enrollments,
+      // and AI tutor sessions.
+      const dayIndex = (d: Date) => {
+        const i = Math.floor((d.getTime() - since.getTime()) / dayMs);
+        return Math.min(rangeDays - 1, Math.max(0, i));
+      };
+      const activeByDay = Array.from(
+        { length: rangeDays },
+        () => new Set<string>()
+      );
+      const enrollByDay = new Array<number>(rangeDays).fill(0);
+      const tutorByDay = new Array<number>(rangeDays).fill(0);
+      for (const a of attempts) {
+        activeByDay[dayIndex(a.createdAt)].add(a.userId);
+      }
+      for (const c of courses) {
+        for (const e of c.enrollments) {
+          if (e.enrolledAt >= since) enrollByDay[dayIndex(e.enrolledAt)] += 1;
+        }
+      }
+      for (const t of tutorRows) {
+        if (t.createdAt >= since) tutorByDay[dayIndex(t.createdAt)] += 1;
+      }
+      const fmtDay = (d: Date) =>
+        d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const axisLabels = [0, 1, 2, 3].map((k) =>
+        fmtDay(
+          new Date(
+            since.getTime() + Math.round((k / 3) * (rangeDays - 1)) * dayMs
+          )
+        )
+      );
+
+      // Drop-off funnel: % of enrollments past each progress milestone.
+      // The percentages are real; labels describe honest progress bands
+      // rather than inventing per-lesson step names.
       const buckets = [0, 1, 25, 50, 75, 90, 100];
       const labelMap = [
         "Enrolled",
-        "Started L1",
-        "Finished U1",
-        "Finished U2",
-        "Quiz · Eq. 2-step",
-        "Capstone",
+        "Started",
+        "25% complete",
+        "50% complete",
+        "75% complete",
+        "90% complete",
         "Completed",
       ];
       const totalE = totalEnrollments || 1;
@@ -345,37 +517,57 @@ export const teacherRouter = router({
         kpis: [
           {
             l: "Active students",
-            v: activeStudents.toLocaleString(),
+            v: activeStudents.toLocaleString("en-US"),
             d: `${totalStudents} total`,
-            meta: `${input?.rangeDays ?? 30}-day`,
+            meta: `${rangeDays}-day`,
+            neg: false,
           },
           {
             l: "Avg. completion",
             v: `${avgProgress}%`,
             d: `${avgCompletion}% finished`,
             meta: "all courses",
+            neg: false,
           },
           {
             l: "Avg. quiz score",
             v: avgQuiz.toString(),
             d: `${attempts.length} attempts`,
             meta: "% correct",
+            neg: false,
           },
           {
-            l: "Engagement min/wk",
-            v: engagementMin.toString(),
-            d: "−2",
-            meta: "per student",
-            neg: true,
+            l: "AI tutor sessions",
+            v: tutorCurrent.toLocaleString("en-US"),
+            d:
+              tutorCurrent === 0 && tutorPrev === 0
+                ? "no activity yet"
+                : `${tutorDelta >= 0 ? "+" : "−"}${Math.abs(tutorDelta)} vs prev`,
+            meta: `${rangeDays}-day`,
+            neg: tutorDelta < 0,
           },
           {
             l: "Earnings · MTD",
-            v: earningsLabel,
-            d: "+22%",
+            v: `$${Math.round(mtdNet / 100).toLocaleString("en-US")}`,
+            d:
+              earningsDeltaPct !== null
+                ? `${earningsDeltaPct >= 0 ? "+" : "−"}${Math.abs(
+                    earningsDeltaPct
+                  )}% vs last mo.`
+                : mtdNet > 0
+                ? "first sales"
+                : "no sales yet",
             meta: "after fees",
+            neg: earningsDeltaPct !== null && earningsDeltaPct < 0,
           },
         ],
         funnel: stages,
+        series: {
+          active: activeByDay.map((s) => s.size),
+          enroll: enrollByDay,
+          tutor: tutorByDay,
+          axisLabels,
+        },
         coursePerformance: courses
           .sort((a, b) => b._count.enrollments - a._count.enrollments)
           .slice(0, 5)

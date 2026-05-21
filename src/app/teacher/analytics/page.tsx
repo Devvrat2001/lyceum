@@ -106,12 +106,12 @@ export default async function TeacherAnalyticsPage() {
                 Engagement over time
               </h3>
               <div style={{ display: "flex", gap: 8 }}>
-                <LegendDot color="var(--wf-ink)" label="Active" />
-                <LegendDot color="var(--wf-accent)" label="Completions" />
-                <LegendDot color="var(--wf-ai)" label="AI tutor uses" />
+                <LegendDot color="var(--wf-ink)" label="Active learners" />
+                <LegendDot color="var(--wf-accent)" label="New enrollments" />
+                <LegendDot color="var(--wf-ai)" label="AI tutor sessions" />
               </div>
             </div>
-            <ChartLine />
+            <ChartLine series={data.series} />
           </Card>
 
           <Card p={20}>

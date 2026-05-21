@@ -32,6 +32,7 @@ export default async function CourseBuilderPage({
           id: course.id,
           slug: course.slug,
           title: course.title,
+          tagline: course.tagline,
           status: course.status,
           subject: course.subject,
           grade: course.grade,

@@ -73,6 +73,7 @@ type CourseProps = {
   id: string;
   slug: string;
   title: string;
+  tagline: string | null;
   status: string;
   subject: string;
   grade: string;
@@ -675,6 +676,8 @@ function CourseInspector({
         {course.title}
       </h3>
 
+          <CourseDetailsEditor course={course} />
+
           <Field label="STATS">
             <div
               style={{
@@ -913,6 +916,148 @@ function Field({
       </div>
       {children}
     </div>
+  );
+}
+
+/**
+ * Editable course identity — title, tagline, subject, grade, price.
+ * Lives in the course-level inspector so a teacher can rename and
+ * re-tag a course the AI builder created. Saves via
+ * `teacher.updateCourse`; `router.refresh()` re-renders the header,
+ * structure card, and chips against the new values. The course slug
+ * (its URL) is intentionally left alone by a rename.
+ */
+function CourseDetailsEditor({ course }: { course: CourseProps }) {
+  const router = useRouter();
+  const [title, setTitle] = useState(course.title);
+  const [tagline, setTagline] = useState(course.tagline ?? "");
+  const [subject, setSubject] = useState(course.subject);
+  const [grade, setGrade] = useState(course.grade);
+  const [price, setPrice] = useState((course.priceCents / 100).toString());
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
+
+  const update = trpc.teacher.updateCourse.useMutation({
+    onSuccess: () => {
+      setSavedMsg("Saved");
+      router.refresh();
+      setTimeout(() => setSavedMsg(null), 3000);
+    },
+    onError: (e) => setSavedMsg(e.message),
+  });
+
+  const priceCents = Math.max(0, Math.round((parseFloat(price) || 0) * 100));
+  const titleEmpty = title.trim().length === 0;
+  const dirty =
+    title !== course.title ||
+    tagline !== (course.tagline ?? "") ||
+    subject !== course.subject ||
+    grade !== course.grade ||
+    priceCents !== course.priceCents;
+
+  return (
+    <Field label="COURSE DETAILS">
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <DetailInput label="Title" value={title} onChange={setTitle} />
+        <DetailInput
+          label="Tagline"
+          value={tagline}
+          onChange={setTagline}
+          placeholder="Optional one-liner"
+        />
+        <div style={{ display: "flex", gap: 8 }}>
+          <DetailInput label="Subject" value={subject} onChange={setSubject} />
+          <DetailInput label="Grade" value={grade} onChange={setGrade} />
+        </div>
+        <DetailInput
+          label="Price · USD"
+          value={price}
+          onChange={setPrice}
+          type="number"
+        />
+        <Btn
+          sm
+          variant="primary"
+          full
+          disabled={!dirty || titleEmpty || update.isPending}
+          onClick={() =>
+            update.mutate({
+              courseId: course.id,
+              title: title.trim(),
+              tagline: tagline.trim(),
+              subject: subject.trim(),
+              grade: grade.trim(),
+              priceCents,
+            })
+          }
+        >
+          {update.isPending ? "Saving…" : "Save course details"}
+        </Btn>
+        {savedMsg && (
+          <div
+            style={{
+              fontSize: 11,
+              color: update.isError ? "var(--wf-accent)" : "var(--wf-good)",
+            }}
+          >
+            {update.isError ? savedMsg : `✓ ${savedMsg}`}
+          </div>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+function DetailInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+}) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        flex: 1,
+        minWidth: 0,
+      }}
+    >
+      <span
+        className="wf-mono"
+        style={{
+          fontSize: 9,
+          color: "var(--wf-mute)",
+          letterSpacing: "0.04em",
+        }}
+      >
+        {label}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        min={type === "number" ? 0 : undefined}
+        style={{
+          width: "100%",
+          fontSize: 12,
+          border: "1px solid var(--wf-hairline)",
+          borderRadius: 3,
+          padding: "5px 7px",
+          background: "white",
+          outline: "none",
+          color: "var(--wf-ink)",
+        }}
+      />
+    </label>
   );
 }
 
