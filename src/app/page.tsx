@@ -507,14 +507,24 @@ export default async function MarketplacePage({
           >
             {paths.map((p) => {
               const totalSlots = 12;
-              const filledSlots = Math.min(totalSlots, p.courses.length || 4);
-              // Intersect this path's course IDs with the viewer's
-              // enrolled set so the button can flip 0-owned →
-              // "Enroll →", partial → with "N / M OWNED" hint, and
-              // fully-owned → "✓ In your library".
+              const totalCourses = p.courses.length;
+              // How many of the path's courses the viewer already
+              // owns. Drives the enroll button's "N / M owned" hint
+              // and the progress strip below — 0 for signed-out or
+              // non-enrolled visitors.
               const ownedInPath = p.courses.filter((pc) =>
                 enrolledIds.has(pc.course.id)
               ).length;
+              // The strip fills to the viewer's owned share of the
+              // path (0..totalSlots). Previously it filled by course
+              // COUNT — viewer-independent — so every visitor, signed
+              // out included, saw a partly-orange bar that reads as
+              // course progress they don't have. It now renders only
+              // when ownedInPath > 0 (see below).
+              const filledSlots =
+                totalCourses > 0
+                  ? Math.round((ownedInPath / totalCourses) * totalSlots)
+                  : 0;
               return (
                 <Card key={p.id} p={16}>
                   <div
@@ -556,28 +566,30 @@ export default async function MarketplacePage({
                   >
                     {p.subtitle}
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 4,
-                      marginBottom: 12,
-                    }}
-                  >
-                    {Array.from({ length: totalSlots }).map((_, j) => (
-                      <div
-                        key={j}
-                        style={{
-                          flex: 1,
-                          height: 6,
-                          background:
-                            j < filledSlots
-                              ? "var(--wf-accent)"
-                              : "var(--wf-fill)",
-                          borderRadius: 1,
-                        }}
-                      />
-                    ))}
-                  </div>
+                  {ownedInPath > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 4,
+                        marginBottom: 12,
+                      }}
+                    >
+                      {Array.from({ length: totalSlots }).map((_, j) => (
+                        <div
+                          key={j}
+                          style={{
+                            flex: 1,
+                            height: 6,
+                            background:
+                              j < filledSlots
+                                ? "var(--wf-accent)"
+                                : "var(--wf-fill)",
+                            borderRadius: 1,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                   <div
                     style={{
                       display: "flex",
