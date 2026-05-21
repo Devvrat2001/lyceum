@@ -78,7 +78,7 @@ export default async function MarketplacePage({
   // students both fall through to the default course-discovery hero;
   // only TEACHER / ADMIN / PARENT get a dashboard-oriented variant.
   const role = session?.user?.role ?? null;
-  const firstName = session?.user?.name?.trim().split(/\s+/)[0] || null;
+  const displayName = friendlyName(session?.user?.name ?? null);
 
   // Section header reflects the most specific dimension the user has
   // selected. Topic wins (it's the highest-level), then subject,
@@ -104,7 +104,7 @@ export default async function MarketplacePage({
             a dashboard-oriented welcome; students and anonymous
             visitors fall through to the default discovery hero. */}
         {role === "TEACHER" || role === "ADMIN" || role === "PARENT" ? (
-          <RoleHero role={role} firstName={firstName} />
+          <RoleHero role={role} displayName={displayName} />
         ) : (
         <section
           style={{
@@ -170,7 +170,7 @@ export default async function MarketplacePage({
                 marginBottom: 10,
               }}
             >
-              <Eyebrow>Recommended for {firstName ?? "you"}</Eyebrow>
+              <Eyebrow>Recommended for {displayName ?? "you"}</Eyebrow>
               <Annot ai>Adaptive recs</Annot>
             </div>
             <div
@@ -701,6 +701,32 @@ export default async function MarketplacePage({
 }
 
 /**
+ * Greeting-friendly form of a user's name. Plain names collapse to the
+ * first token ("Jordan Riley" → "Jordan"); a name that leads with an
+ * honorific keeps the honorific + the next word ("Mr. Adeyemi" → "Mr.
+ * Adeyemi"), since the bare first token would just be the title.
+ */
+function friendlyName(full: string | null | undefined): string | null {
+  const parts = (full ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return null;
+  const HONORIFICS = new Set([
+    "mr",
+    "mrs",
+    "ms",
+    "mx",
+    "dr",
+    "sr",
+    "sra",
+    "prof",
+  ]);
+  const head = parts[0].replace(/\.$/, "").toLowerCase();
+  if (HONORIFICS.has(head) && parts.length > 1) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+  return parts[0];
+}
+
+/**
  * Role-specific homepage hero for signed-in TEACHER / ADMIN / PARENT
  * viewers. Students and anonymous visitors get the default
  * course-discovery hero rendered inline in MarketplacePage above.
@@ -712,10 +738,10 @@ export default async function MarketplacePage({
  */
 function RoleHero({
   role,
-  firstName,
+  displayName,
 }: {
   role: "TEACHER" | "ADMIN" | "PARENT";
-  firstName: string | null;
+  displayName: string | null;
 }) {
   const config = {
     TEACHER: {
@@ -781,7 +807,7 @@ function RoleHero({
         className="wf-h1"
         style={{ fontSize: 42, margin: "8px 0 14px", maxWidth: 620 }}
       >
-        Welcome back{firstName ? `, ${firstName}` : ""} — here&apos;s{" "}
+        Welcome back{displayName ? `, ${displayName}` : ""} — here&apos;s{" "}
         <span className="wf-serif" style={{ fontStyle: "italic" }}>
           {config.lead}
         </span>
