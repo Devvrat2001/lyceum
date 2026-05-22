@@ -637,35 +637,47 @@ export default async function MarketplacePage({
           >
             {teachers.map((t) => (
               <Card key={t.id} p={14} style={{ textAlign: "center" }}>
-                <Avatar
-                  initials={t.name
-                    .split(" ")
-                    .map((x) => x[0])
-                    .join("")
-                    .slice(0, 2)}
-                  size={48}
-                  style={{ margin: "0 auto 10px", fontSize: 16 }}
-                />
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
-                <div
+                <Link
+                  href={`/t/${t.id}`}
                   style={{
-                    fontSize: 11,
-                    color: "var(--wf-mute)",
-                    marginTop: 2,
+                    textDecoration: "none",
+                    color: "inherit",
+                    display: "block",
                   }}
                 >
-                  {t.subjectsLabel} · {fmtCount(t.studentsCount)} students
-                </div>
-                <div
-                  className="wf-mono"
-                  style={{
-                    fontSize: 10,
-                    color: "var(--wf-mute)",
-                    marginTop: 8,
-                  }}
-                >
-                  {t.courseCount} {t.courseCount === 1 ? "course" : "courses"}
-                </div>
+                  <Avatar
+                    initials={t.name
+                      .split(" ")
+                      .map((x) => x[0])
+                      .join("")
+                      .slice(0, 2)}
+                    size={48}
+                    style={{ margin: "0 auto 10px", fontSize: 16 }}
+                  />
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    {t.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--wf-mute)",
+                      marginTop: 2,
+                    }}
+                  >
+                    {t.subjectsLabel} · {fmtCount(t.studentsCount)} students
+                  </div>
+                  <div
+                    className="wf-mono"
+                    style={{
+                      fontSize: 10,
+                      color: "var(--wf-mute)",
+                      marginTop: 8,
+                    }}
+                  >
+                    {t.courseCount}{" "}
+                    {t.courseCount === 1 ? "course" : "courses"}
+                  </div>
+                </Link>
                 <FollowButton teacherId={t.id} />
               </Card>
             ))}

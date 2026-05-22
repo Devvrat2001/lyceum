@@ -284,6 +284,40 @@ export const teacherRouter = router({
       return { ok: true as const, changed: true, course: updated };
     }),
 
+  /**
+   * Edit the signed-in teacher's public storefront profile — the
+   * headline and bio shown on /t/[teacherId]. Empty strings clear the
+   * field. Always scoped to ctx.user.id; a teacher can only edit their
+   * own profile.
+   */
+  updateProfile: teacherProcedure
+    .input(
+      z.object({
+        headline: z.string().max(120).optional(),
+        bio: z.string().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const data: Prisma.UserUpdateInput = {};
+      if (input.headline !== undefined) {
+        const headline = input.headline.trim();
+        data.headline = headline.length > 0 ? headline : null;
+      }
+      if (input.bio !== undefined) {
+        const bio = input.bio.trim();
+        data.bio = bio.length > 0 ? bio : null;
+      }
+      if (Object.keys(data).length === 0) {
+        return { ok: true as const, changed: false };
+      }
+      const updated = await ctx.db.user.update({
+        where: { id: ctx.user.id },
+        data,
+        select: { id: true, headline: true, bio: true },
+      });
+      return { ok: true as const, changed: true, profile: updated };
+    }),
+
   /** Aggregated analytics for the signed-in teacher. */
   analytics: teacherProcedure
     .input(

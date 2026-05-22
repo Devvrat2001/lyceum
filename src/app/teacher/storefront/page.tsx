@@ -1,24 +1,35 @@
+import { redirect } from "next/navigation";
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
-import { ComingSoon } from "@/components/ui/ComingSoon";
+import { StorefrontEditor } from "@/components/teacher/StorefrontEditor";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 
-export default function TeacherStorefrontPage() {
+export const metadata = { title: "Storefront · Lyceum" };
+
+export default async function TeacherStorefrontPage() {
+  const session = await auth();
+  // proxy.ts gates /teacher/* — a session is guaranteed, but narrow it.
+  if (!session?.user) redirect("/login");
+
+  const me = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      firstName: true,
+      headline: true,
+      bio: true,
+    },
+  });
+  if (!me) redirect("/login");
+
   return (
     <TeacherChrome active="storefront">
-      <ComingSoon
-        eyebrow="Storefront"
-        title="Your public teacher profile"
-        description="Customize your storefront page that buyers see in the marketplace. Pick a brand color, write a bio, pin top courses, link to your blog, and set referral codes. Storefront editing ships with Stripe Connect in Phase 3 — until then, your name and course list show up automatically on the marketplace."
-        icon="star"
-        phase="Phase 3"
-        bullets={[
-          "Custom URL: lyceum.app/t/your-handle",
-          "Brand color + cover photo upload",
-          "Pin top courses + create bundles",
-          "Embed testimonials and student outcomes",
-          "Referral codes with revenue tracking",
-        ]}
-        backHref="/teacher"
-        backLabel="Back to my courses"
+      <StorefrontEditor
+        teacherId={me.id}
+        name={me.name ?? me.firstName ?? "Teacher"}
+        headline={me.headline}
+        bio={me.bio}
       />
     </TeacherChrome>
   );

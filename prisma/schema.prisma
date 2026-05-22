@@ -51,6 +51,11 @@ model User {
   name           String?
   firstName      String?
   avatarUrl      String?
+  // Teacher storefront — public profile presentation. Both optional;
+  // a teacher who hasn't customized their storefront falls back to
+  // just their name + published course list.
+  headline       String?
+  bio            String?     @db.Text
   role           Role        @default(STUDENT)
   institutionId  String?
   institution    Institution? @relation(fields: [institutionId], references: [id])

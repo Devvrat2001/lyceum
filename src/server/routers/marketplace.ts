@@ -187,6 +187,65 @@ export const marketplaceRouter = router({
       });
     }),
 
+  /**
+   * Public teacher storefront — one teacher's profile + their published
+   * course catalog. Powers the /t/[teacherId] page. Anonymous-visible:
+   * a storefront is a public marketing surface.
+   */
+  teacherProfile: publicProcedure
+    .input(z.object({ teacherId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const teacher = await ctx.db.user.findUnique({
+        where: { id: input.teacherId },
+        select: {
+          id: true,
+          name: true,
+          firstName: true,
+          avatarUrl: true,
+          headline: true,
+          bio: true,
+          role: true,
+          _count: { select: { followers: true } },
+          authoredCourses: {
+            where: { status: "PUBLISHED" },
+            orderBy: [{ enrollCount: "desc" }, { ratingAvg: "desc" }],
+            select: {
+              id: true,
+              slug: true,
+              title: true,
+              tagline: true,
+              subject: true,
+              grade: true,
+              priceCents: true,
+              ratingAvg: true,
+              ratingCount: true,
+              enrollCount: true,
+              thumbnailUrl: true,
+            },
+          },
+        },
+      });
+      // Only TEACHER accounts have a storefront — a student/admin id
+      // shouldn't resolve to a profile page.
+      if (!teacher || teacher.role !== "TEACHER") {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      const totalStudents = teacher.authoredCourses.reduce(
+        (a, c) => a + c.enrollCount,
+        0
+      );
+      return {
+        id: teacher.id,
+        name: teacher.name ?? teacher.firstName ?? "Teacher",
+        avatarUrl: teacher.avatarUrl,
+        headline: teacher.headline,
+        bio: teacher.bio,
+        followerCount: teacher._count.followers,
+        studentsCount: totalStudents,
+        courses: teacher.authoredCourses,
+      };
+    }),
+
   /** Personalized recs for the hero card. Phase-1 stub: return next-up enrolled lessons. */
   recommendedFor: publicProcedure
     .input(z.object({ userId: z.string().optional() }).optional())
