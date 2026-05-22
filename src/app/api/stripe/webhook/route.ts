@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getStripe } from "@/lib/payments/stripe";
 import { audit } from "@/lib/audit";
+import { sendOrderReceipt } from "@/lib/email";
 
 /**
  * Stripe webhook. Only runs in real-Stripe mode — demo orders never
@@ -152,6 +153,8 @@ export async function POST(req: Request) {
             },
             courseId: order.courseId,
           });
+          // Purchase receipt — best-effort, swallows its own errors.
+          await sendOrderReceipt(orderId);
         }
       }
     } else if (event.type === "account.updated") {

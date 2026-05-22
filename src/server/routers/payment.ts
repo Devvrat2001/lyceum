@@ -8,6 +8,7 @@ import {
 } from "@/lib/payments/stripe";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
+import { sendOrderReceipt } from "@/lib/email";
 
 /**
  * Stripe Checkout Session shape (subset we use). Imported as a structural
@@ -238,6 +239,9 @@ export const paymentRouter = router({
           update: {},
         }),
       ]);
+      // Purchase receipt — best-effort, swallows its own errors so it
+      // can never break the confirm.
+      await sendOrderReceipt(order.id);
       return {
         ok: true as const,
         alreadyPaid: false,
