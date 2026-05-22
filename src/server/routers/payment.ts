@@ -90,10 +90,17 @@ export const paymentRouter = router({
 
       // Insert the Order row first (PENDING) so the webhook (or demo
       // confirm) has something to flip to PAID.
+      //
+      // externalId is @unique. The demo value is final; the stripe value
+      // is a placeholder, overwritten with the real Checkout Session id
+      // below. The placeholder MUST be unique per order — a constant
+      // ("stripe_pending") collides the instant a second order is pending,
+      // and a single never-completed order would block ALL future Stripe
+      // checkouts on the unique constraint.
       const externalId =
         provider === "demo"
           ? `demo_${crypto.randomUUID()}`
-          : "stripe_pending"; // overwritten below
+          : `stripe_pending_${crypto.randomUUID()}`;
       const order = await ctx.db.order.create({
         data: {
           userId: ctx.user.id,

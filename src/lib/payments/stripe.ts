@@ -17,11 +17,11 @@ export async function getStripe(): Promise<unknown | null> {
   if (_initialized) return _client;
   _initialized = true;
   try {
-    // @ts-expect-error - optional dep, may not be installed
     const StripeMod = (await import("stripe")).default;
-    _client = new StripeMod(env.STRIPE_SECRET_KEY, {
-      apiVersion: "2025-10-01.acacia" as never,
-    });
+    // No apiVersion pin — use the SDK's built-in default. A hardcoded
+    // version string only stays valid for the SDK build it was written
+    // against; a stale one throws "Invalid Stripe API version".
+    _client = new StripeMod(env.STRIPE_SECRET_KEY);
     return _client;
   } catch {
     console.warn(
