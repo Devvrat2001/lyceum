@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Btn, Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
+import { safeRedirect } from "@/lib/roles";
 
 type Role = "STUDENT" | "TEACHER";
 
@@ -26,8 +27,7 @@ export function SignupForm({ next }: { next?: string }) {
         redirect: false,
       });
       if (res?.ok) {
-        const fallback = role === "TEACHER" ? "/teacher" : "/student";
-        router.replace(next ?? fallback);
+        router.replace(safeRedirect(role, next));
         router.refresh();
       } else {
         setError("Account created. Please sign in.");

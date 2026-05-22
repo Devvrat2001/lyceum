@@ -31,3 +31,52 @@ export function homeForRole(role: Role | string | null | undefined): string {
   }
   return "/student";
 }
+
+/**
+ * Whether `role` may access `path` — mirrors the role gate in
+ * `src/proxy.ts`. Anything not under a role-gated prefix is public and
+ * always accessible. (Kept in sync with proxy.ts by hand; the
+ * duplication is small and proxy.ts runs on the edge runtime.)
+ */
+export function canRoleAccess(
+  role: Role | string | null | undefined,
+  path: string
+): boolean {
+  if (path.startsWith("/student")) {
+    return role === "STUDENT" || role === "ADMIN";
+  }
+  if (path.startsWith("/teacher")) {
+    return role === "TEACHER" || role === "ADMIN";
+  }
+  if (path.startsWith("/admin")) {
+    return role === "ADMIN";
+  }
+  if (path.startsWith("/parent")) {
+    return role === "PARENT" || role === "ADMIN";
+  }
+  return true;
+}
+
+/**
+ * Resolve where to send a signed-in user, honoring an optional post-login
+ * `next` ONLY when it's a same-site path the role can actually reach.
+ *
+ * A role-forbidden `next` (e.g. a teacher carrying `next=/student`) would
+ * otherwise loop forever: redirect(next) → proxy.ts rejects →
+ * /login?next=… → redirect(next) → … An off-site `next` (`//evil.com`,
+ * `https://…`) is rejected too — both fall back to the role's own home.
+ */
+export function safeRedirect(
+  role: Role | string | null | undefined,
+  next: string | null | undefined
+): string {
+  if (
+    next &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    canRoleAccess(role, next)
+  ) {
+    return next;
+  }
+  return homeForRole(role);
+}

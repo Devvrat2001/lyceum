@@ -5,7 +5,7 @@ import Link from "next/link";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Btn, Icon } from "@/components/wf/primitives";
-import { homeForRole } from "@/lib/roles";
+import { safeRedirect } from "@/lib/roles";
 
 export function LoginForm({ next }: { next?: string }) {
   const router = useRouter();
@@ -32,7 +32,7 @@ export function LoginForm({ next }: { next?: string }) {
           // into a redirect loop off the role gate in proxy.ts.
           const session = await getSession();
           setPending(false);
-          router.replace(next ?? homeForRole(session?.user?.role));
+          router.replace(safeRedirect(session?.user?.role, next));
           router.refresh();
         } else {
           setPending(false);

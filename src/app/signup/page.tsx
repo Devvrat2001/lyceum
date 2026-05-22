@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { Eyebrow, Icon } from "@/components/wf/primitives";
 import { SignupForm } from "@/components/auth/SignupForm";
+import { safeRedirect } from "@/lib/roles";
 
 export const metadata = { title: "Create account · Lyceum" };
 
@@ -12,7 +13,10 @@ export default async function SignupPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const [session, sp] = await Promise.all([auth(), searchParams]);
-  if (session?.user) redirect(sp.next ?? "/student");
+  // Already signed in — send them somewhere their role can reach. A
+  // hardcoded /student looped non-students (teacher → /student → proxy
+  // rejects → /login?next=/student → … ).
+  if (session?.user) redirect(safeRedirect(session.user.role, sp.next));
 
   return (
     <div
