@@ -171,7 +171,7 @@ export default async function MarketplacePage({
               }}
             >
               <Eyebrow>Recommended for {displayName ?? "you"}</Eyebrow>
-              <Annot ai>Adaptive recs</Annot>
+              <Annot>Top-rated</Annot>
             </div>
             <div
               style={{
@@ -180,7 +180,12 @@ export default async function MarketplacePage({
                 marginBottom: 14,
               }}
             >
-              Based on your last 5 quizzes, we picked a 2-week mini-path:
+              {/* Used to read "Based on your last 5 quizzes, we picked
+                  a 2-week mini-path" — implied personalization that
+                  doesn't exist yet (the resolver returns top-rated
+                  courses, not quiz-based recs). Honest copy until
+                  adaptive recs ship. */}
+              Highest-rated courses across the marketplace right now:
             </div>
             {recommended.map((p, i) => (
               <div

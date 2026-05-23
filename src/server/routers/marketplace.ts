@@ -246,32 +246,53 @@ export const marketplaceRouter = router({
       };
     }),
 
-  /** Personalized recs for the hero card. Phase-1 stub: return next-up enrolled lessons. */
+  /**
+   * Personalized recs for the homepage hero card. Returns the top
+   * highest-rated published courses with their REAL title + a meta
+   * line computed from the actual lesson count and total duration.
+   *
+   * The prototype version fetched real courses and then OVERWROTE
+   * their titles with hardcoded "Master Equivalent Fractions" /
+   * "Mini-game: Pizza Math" / "Project: Cookie recipe x2" strings,
+   * plus fake metas ("4 lessons · 1.5 hrs"). The displayed text
+   * never matched the course the link actually pointed to.
+   */
   recommendedFor: publicProcedure
     .input(z.object({ userId: z.string().optional() }).optional())
-    .query(async ({ ctx, input }) => {
-      // Phase-1: deterministic seed-based recs.
+    .query(async ({ ctx }) => {
       const sample = await ctx.db.course.findMany({
         where: { status: "PUBLISHED" },
         take: 3,
-        orderBy: { ratingAvg: "desc" },
-        select: { slug: true, title: true, units: { select: { estLabel: true } } },
+        orderBy: [{ ratingAvg: "desc" }, { ratingCount: "desc" }],
+        select: {
+          slug: true,
+          title: true,
+          units: {
+            select: {
+              lessons: { select: { durationMin: true } },
+            },
+          },
+        },
       });
-      return sample.map((c, i) => ({
-        slug: c.slug,
-        title:
-          i === 0
-            ? "Master Equivalent Fractions"
-            : i === 1
-            ? "Mini-game: Pizza Math"
-            : "Project: Cookie recipe x2",
-        meta:
-          i === 0
-            ? "4 lessons · 1.5 hrs"
-            : i === 1
-            ? "15 min · interactive"
-            : "40 min · real-world",
-      }));
+      return sample.map((c) => {
+        const lessons = c.units.flatMap((u) => u.lessons);
+        const lessonCount = lessons.length;
+        const totalMin = lessons.reduce(
+          (a, l) => a + (l.durationMin ?? 0),
+          0
+        );
+        const meta =
+          lessonCount === 0
+            ? "Outline ready"
+            : totalMin >= 60
+            ? `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} · ${(totalMin / 60).toFixed(1)} hrs`
+            : `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} · ${totalMin} min`;
+        return {
+          slug: c.slug,
+          title: c.title,
+          meta,
+        };
+      });
     }),
 
   /** Simple ILIKE search; pgvector replaces this in Phase 2. */

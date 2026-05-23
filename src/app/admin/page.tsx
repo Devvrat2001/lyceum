@@ -28,12 +28,10 @@ export default async function AdminDashboardPage() {
         }}
       >
         <span style={{ fontSize: 16, fontWeight: 600 }}>
-          Institution overview · {data.institution.name}
+          {data.institution.name
+            ? `Institution overview · ${data.institution.name}`
+            : "Institution overview"}
         </span>
-        <span className="wf-chip" style={{ marginLeft: 4 }}>
-          Spring 2026 ▾
-        </span>
-        <span className="wf-chip">All grades ▾</span>
         <div style={{ flex: 1 }} />
         <Btn variant="ghost" sm icon={<Icon name="download" size={12} />}>
           Board report
@@ -45,7 +43,6 @@ export default async function AdminDashboardPage() {
         >
           Invite teacher
         </Btn>
-        <Avatar initials="CM" />
       </header>
 
       <div style={{ flex: 1, overflow: "auto", padding: "24px 28px" }}>
@@ -74,20 +71,26 @@ export default async function AdminDashboardPage() {
               >
                 {k.v}
               </div>
-              <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: "var(--wf-good)",
-                    fontWeight: 600,
-                  }}
-                >
-                  {k.d}
-                </span>
-                <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                  {k.meta}
-                </span>
-              </div>
+              {(k.d || k.meta) && (
+                <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                  {k.d && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "var(--wf-good)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {k.d}
+                    </span>
+                  )}
+                  {k.meta && (
+                    <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
+                      {k.meta}
+                    </span>
+                  )}
+                </div>
+              )}
             </Card>
           ))}
         </div>
@@ -113,8 +116,17 @@ export default async function AdminDashboardPage() {
               </h3>
               <Annot>Heatmap · click to drill in</Annot>
             </div>
-            <div style={{ overflowX: "auto" }}>
-              <Heatmap />
+            <div
+              style={{
+                padding: "32px 16px",
+                textAlign: "center",
+                fontSize: 12,
+                color: "var(--wf-mute)",
+                lineHeight: 1.55,
+              }}
+            >
+              The per-class mastery heatmap appears here once classes
+              start logging skill-mastery data.
             </div>
           </Card>
 
@@ -325,35 +337,50 @@ export default async function AdminDashboardPage() {
               </h3>
               <Annot>K-12 specific</Annot>
             </div>
-            {data.compliance.map(([k, v], i) => (
+            {data.compliance.length === 0 ? (
               <div
-                key={k}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "8px 0",
                   fontSize: 12,
-                  borderBottom:
-                    i < data.compliance.length - 1
-                      ? "1px solid var(--wf-hairline)"
-                      : "none",
+                  color: "var(--wf-mute)",
+                  padding: 8,
+                  lineHeight: 1.5,
                 }}
               >
-                <span style={{ color: "var(--wf-body)" }}>{k}</span>
-                <span
+                No compliance checks configured yet. SSO, FERPA flags,
+                parent consent, and content-filter status appear here
+                once your district is wired up.
+              </div>
+            ) : (
+              data.compliance.map(([k, v], i) => (
+                <div
+                  key={k}
                   style={{
                     display: "flex",
-                    gap: 4,
-                    alignItems: "center",
-                    color: "var(--wf-good)",
-                    fontWeight: 600,
+                    justifyContent: "space-between",
+                    padding: "8px 0",
+                    fontSize: 12,
+                    borderBottom:
+                      i < data.compliance.length - 1
+                        ? "1px solid var(--wf-hairline)"
+                        : "none",
                   }}
                 >
-                  <Icon name="check" size={11} color="var(--wf-good)" />
-                  <span style={{ fontSize: 11 }}>{v}</span>
-                </span>
-              </div>
-            ))}
+                  <span style={{ color: "var(--wf-body)" }}>{k}</span>
+                  <span
+                    style={{
+                      display: "flex",
+                      gap: 4,
+                      alignItems: "center",
+                      color: "var(--wf-good)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Icon name="check" size={11} color="var(--wf-good)" />
+                    <span style={{ fontSize: 11 }}>{v}</span>
+                  </span>
+                </div>
+              ))
+            )}
           </Card>
         </div>
       </div>
@@ -361,130 +388,3 @@ export default async function AdminDashboardPage() {
   );
 }
 
-/**
- * Decorative cohort heatmap — uses deterministic Math.sin pseudo-random
- * values so the visual stays stable. Real per-skill mastery aggregation
- * by class will replace this in P2.
- */
-function Heatmap() {
-  const classes = ["6A", "6B", "6C", "7A", "7B", "7C", "8A", "8B", "8C"];
-  const skills = [
-    "Number",
-    "Fractions",
-    "Decimals",
-    "Algebra",
-    "Geometry",
-    "Statistics",
-    "Reading",
-    "Writing",
-    "Vocab",
-    "Science",
-    "Lab skills",
-    "Spanish",
-  ];
-  const cellW = 50;
-  const cellH = 32;
-  const rng = (i: number, j: number) =>
-    Math.sin(i * 13.7 + j * 7.3) * 0.5 + 0.5;
-  const colorFor = (v: number) =>
-    v > 0.5
-      ? `rgba(31,29,26,${0.15 + (v - 0.5) * 1.4})`
-      : `rgba(255,91,31,${0.1 + (0.5 - v) * 0.6})`;
-
-  return (
-    <div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `60px repeat(${classes.length}, ${cellW}px)`,
-          gap: 2,
-          marginBottom: 2,
-        }}
-      >
-        <div />
-        {classes.map((c) => (
-          <div
-            key={c}
-            className="wf-mono"
-            style={{
-              fontSize: 10,
-              color: "var(--wf-mute)",
-              textAlign: "center",
-            }}
-          >
-            {c}
-          </div>
-        ))}
-      </div>
-      {skills.map((s, i) => (
-        <div
-          key={s}
-          style={{
-            display: "grid",
-            gridTemplateColumns: `60px repeat(${classes.length}, ${cellW}px)`,
-            gap: 2,
-            marginBottom: 2,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--wf-body)",
-              alignSelf: "center",
-            }}
-          >
-            {s}
-          </div>
-          {classes.map((c, j) => {
-            const v = rng(i, j);
-            return (
-              <div
-                key={c}
-                className="wf-mono"
-                style={{
-                  height: cellH,
-                  background: colorFor(v),
-                  borderRadius: 2,
-                  fontSize: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: v > 0.7 ? "white" : "var(--wf-body)",
-                  cursor: "pointer",
-                }}
-              >
-                {Math.round(50 + v * 49)}
-              </div>
-            );
-          })}
-        </div>
-      ))}
-      <div
-        style={{
-          display: "flex",
-          gap: 16,
-          marginTop: 14,
-          fontSize: 10,
-          color: "var(--wf-mute)",
-          alignItems: "center",
-        }}
-      >
-        <span>Mastery score</span>
-        <div style={{ display: "flex", gap: 1, alignItems: "center" }}>
-          <span>50</span>
-          {[0, 0.2, 0.4, 0.6, 0.8, 1].map((v, i) => (
-            <div
-              key={i}
-              style={{
-                width: 14,
-                height: 12,
-                background: colorFor(v),
-              }}
-            />
-          ))}
-          <span>99</span>
-        </div>
-      </div>
-    </div>
-  );
-}

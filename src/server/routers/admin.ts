@@ -207,26 +207,23 @@ export const adminRouter = router({
       }),
     ]);
 
+    // Real average when we have any attempts; null lets the page
+    // render "—" instead of the prototype's hardcoded 79.
     const avgQuizScore =
       attempts.length > 0
         ? Math.round(
             (attempts.filter((a) => a.correct).length / attempts.length) * 100
           )
-        : 79;
+        : null;
 
     const seatTotal = institution?.seats ?? Math.max(seatUsers, 1);
     const seatPct = Math.round((activeStudents / Math.max(seatTotal, 1)) * 100);
 
     const teachersActivity = teachersList.map((t) => {
-      const total = t.taughtClasses.reduce(
+      const studentTotal = t.taughtClasses.reduce(
         (a, c) => a + c._count.students,
         0
       );
-      // Stub time today — derive from class size deterministically
-      const minsToday = Math.max(0.5, Math.min(4, total * 0.12));
-      let tag: "top" | "low" | "" = "";
-      if (minsToday >= 3) tag = "top";
-      else if (minsToday < 1) tag = "low";
       return {
         id: t.id,
         n: t.name ?? t.firstName ?? "—",
@@ -234,8 +231,14 @@ export const adminRouter = router({
           t.taughtClasses
             .map((c) => `${c.name} · ${c._count.students} students`)
             .join(", ") || "no classes assigned",
-        m: `${minsToday.toFixed(1)} hr today`,
-        t: tag,
+        // Used to show `${minsToday} hr today` derived from class
+        // size via `total * 0.12` — fake activity. Now shows the
+        // real student count so the right-side label means something.
+        m:
+          studentTotal === 0
+            ? "no students"
+            : `${studentTotal} student${studentTotal === 1 ? "" : "s"}`,
+        t: "" as "top" | "low" | "",
       };
     });
 
@@ -270,73 +273,42 @@ export const adminRouter = router({
 
     return {
       institution: {
-        name: institution?.name ?? "Cedar Middle",
+        // Real institution name when one exists; null lets the page
+        // render a generic header instead of the prototype's
+        // hardcoded "Cedar Middle" fallback.
+        name: institution?.name ?? null,
         plan: institution?.plan ?? "FREE",
         seats: seatTotal,
       },
+      // Only KPIs we can compute from real data. The prototype shipped
+      // a hardcoded "Avg engagement: 47m / +6m" tile and arbitrary
+      // deltas (`+spring`, `+4% 7-day` derived from multiplying counts)
+      // — those are gone. Empty `d` / `meta` strings render nothing.
       kpis: [
-        {
-          l: "Students",
-          v: students.toString(),
-          d: `+${Math.max(0, Math.round(students * 0.04))}`,
-          meta: "7-day",
-        },
-        {
-          l: "Teachers",
-          v: teachers.toString(),
-          d: "0",
-          meta: "no change",
-        },
-        {
-          l: "Classes",
-          v: classes.toString(),
-          d: "+2",
-          meta: "spring",
-        },
-        {
-          l: "Avg engagement",
-          v: "47m",
-          d: "+6m",
-          meta: "per stu/wk",
-        },
+        { l: "Students", v: students.toString(), d: "", meta: "" },
+        { l: "Teachers", v: teachers.toString(), d: "", meta: "" },
+        { l: "Classes", v: classes.toString(), d: "", meta: "" },
         {
           l: "Avg quiz score",
-          v: avgQuizScore.toString(),
-          d: `${attempts.length} attempts`,
-          meta: "all grades",
+          v: avgQuizScore === null ? "—" : `${avgQuizScore}%`,
+          d: "",
+          meta: `${attempts.length} attempt${attempts.length === 1 ? "" : "s"}`,
         },
         {
           l: "Seat usage",
           v: `${seatPct}%`,
-          d: `${activeStudents}/${seatTotal}`,
-          meta: "active 30d",
+          d: "",
+          meta: `${activeStudents}/${seatTotal} · active 30d`,
         },
       ],
       teachers: teachersActivity,
       curricula,
-      // Phase 1 stubs — these become real in Phase 4 (institution).
-      compliance: [
-        ["SSO with Clever", "Connected"],
-        ["COPPA / FERPA", "Compliant"],
-        [`Parent consent · ${students}/${students}`, "Up to date"],
-        ["Content filter", "Strict (K-12)"],
-        ["AI tutor logging", "Enabled"],
-        ["Data retention", "7 years"],
-      ] as [string, string][],
-      insights: [
-        {
-          tag: "STRENGTH",
-          t: "Grade 7 Math is outperforming district by 14%. Worth highlighting at next board meeting.",
-        },
-        {
-          tag: "WATCH",
-          t: "Grade 6 Reading scores are flat — suggest pairing with the Reading Lab path.",
-        },
-        {
-          tag: "TEACHER",
-          t: "Mr. Jacobs (8B) has 3× class engagement. Consider sharing his lesson plans.",
-        },
-      ],
+      // The prototype shipped a hardcoded compliance block ("SSO with
+      // Clever · Connected", "COPPA · Compliant", "Parent consent ·
+      // N/N", etc.) that didn't reflect any real configuration. Real
+      // institution-flag wiring is Phase 4; until then the page
+      // renders an empty-state card.
+      compliance: [] as [string, string][],
     };
   }),
 });

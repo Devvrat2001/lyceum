@@ -3,10 +3,14 @@ import { Btn, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 
 const INTEGRATIONS = [
   {
+    // Used to ship as `status: "Connected", statusGood: true` even
+    // though no Clever integration exists in the codebase — the page
+    // was lying about district SSO being wired up. Real Clever OAuth
+    // is Phase 4; until then this stays "Available" like the others.
     name: "Clever",
     desc: "Single sign-on + roster sync for K-12 districts",
-    status: "Connected",
-    statusGood: true,
+    status: "Available",
+    statusGood: false,
   },
   {
     name: "ClassLink",

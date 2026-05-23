@@ -123,49 +123,16 @@ export function StudentChrome({
             </Link>
           ))}
         </nav>
-        <div
-          style={{
-            borderTop: "1px solid var(--wf-hairline)",
-            paddingTop: 14,
-            marginTop: "auto",
-          }}
-        >
-          <div
-            className="wf-eyebrow"
-            style={{ padding: "0 6px 8px", fontSize: 9 }}
-          >
-            Class
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "4px 6px",
-            }}
-          >
-            <div
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 3,
-                background: "var(--wf-fill)",
-                border: "1px solid var(--wf-hairline)",
-                fontSize: 10,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 600,
-              }}
-            >
-              6B
-            </div>
-            <div style={{ fontSize: 12, color: "var(--wf-body)" }}>
-              Mrs. Reyes · 6B
-            </div>
-          </div>
+        {/* The hardcoded "Class · Mrs. Reyes · 6B" widget that used to
+            sit here showed the same fake teacher to every student. We
+            don't have a clean way to thread real `class` info into a
+            client component without prop-drilling through every page
+            that uses StudentChrome, so the widget is gone for now —
+            the dashboard's greeting already names the user's class
+            and teacher when they exist. */}
+        <div style={{ marginTop: "auto" }}>
+          <SidebarUserMenu />
         </div>
-        <SidebarUserMenu />
       </aside>
       <main
         style={{
