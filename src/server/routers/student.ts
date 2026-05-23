@@ -76,12 +76,16 @@ export const studentRouter = router({
       }),
     ]);
 
-    const assignmentsRaw = [
-      { d: "Wed", t: "Fractions Quiz · Mrs. Reyes", xp: 50, due: "Tomorrow" },
-      { d: "Thu", t: "Lab report: Plant cells", xp: 80, due: "In 2 days" },
-      { d: "Fri", t: "Spelling quiz · Unit 6", xp: 30, due: "In 3 days" },
-      { d: "Mon", t: "Project: Mini-biome", xp: 200, due: "Next week" },
-    ];
+    // No Assignment model exists in the schema yet, so there's nothing
+    // real to surface. The page renders a "no assignments" state when
+    // this is empty — better than shipping fake teacher work that
+    // doesn't tie back to any course in the user's library.
+    const assignments: Array<{
+      d: string;
+      t: string;
+      xp: number;
+      due: string;
+    }> = [];
 
     const leaderboard = classmatesRaw
       .map((u) => ({
@@ -117,49 +121,31 @@ export const studentRouter = router({
       };
     });
 
-    const todaysPlan = [
-      {
-        ico: "play" as const,
-        tag: "WATCH",
-        title: "Intro to Equivalent Fractions",
-        meta: "8 min · Math",
-        state: "done" as const,
-      },
-      {
-        ico: "sparkles" as const,
-        tag: "PRACTICE",
-        title: "Adaptive quiz · 10 questions",
-        meta: "Adjusts as you go",
-        state: "now" as const,
-      },
-      {
-        ico: "book" as const,
-        tag: "READ",
-        title: "Ch. 5 · Bridge to Terabithia",
-        meta: "12 min · ELA",
-        state: "next" as const,
-      },
-      {
-        ico: "mic" as const,
-        tag: "SPEAK",
-        title: "Spanish: order at a café (role-play)",
-        meta: "5 min · with AI partner",
-        state: "next" as const,
-      },
-    ];
+    // No real "today's plan" generator exists yet — the page renders
+    // an empty state when this is empty rather than ship a hardcoded
+    // mock plan ("Intro to Equivalent Fractions…") that doesn't
+    // reflect the user's actual courses. The item shape matches
+    // TodaysPlan's `PlanItem` so the component drops in once we wire
+    // a real source.
+    const todaysPlan: Array<{
+      ico: "play" | "sparkles" | "book" | "mic" | "check" | "arrow";
+      tag: string;
+      title: string;
+      meta: string;
+      state: "done" | "now" | "next";
+    }> = [];
 
-    const skillBars = skillMastery.map((m) => ({
-      name: m.skill.title,
-      v: Math.round(m.level * 100),
-    }));
-    const fillerSkills = [
-      { name: "Number sense", v: 86 },
-      { name: "Fractions", v: 62 },
-      { name: "Geometry", v: 41 },
-      { name: "Reading comprehension", v: 78 },
-      { name: "Vocabulary", v: 55 },
-    ];
-    const skills = (skillBars.length >= 5 ? skillBars : fillerSkills).slice(0, 5);
+    // Real per-skill mastery only — the prototype used to pad with a
+    // hardcoded "Number sense / Fractions / Geometry / …" filler when
+    // the user had fewer than 5 Mastery rows, which made fresh
+    // accounts look populated with skills they'd never practiced.
+    // Empty state is rendered by the page when there's nothing yet.
+    const skills = skillMastery
+      .map((m) => ({
+        name: m.skill.title,
+        v: Math.round(m.level * 100),
+      }))
+      .slice(0, 5);
 
     const badges = badgesRaw.map((ub) => ({
       slug: ub.badge.slug,
@@ -185,7 +171,7 @@ export const studentRouter = router({
       continueLearning,
       todaysPlan,
       skills,
-      assignments: assignmentsRaw,
+      assignments,
       leaderboard,
       badges,
     };

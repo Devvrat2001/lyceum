@@ -14,13 +14,6 @@ import { TutorMiniCard } from "@/components/student/TutorMiniCard";
 import { ContinueLearningCard } from "@/components/student/ContinueLearningCard";
 import { NotificationBell } from "@/components/layouts/NotificationBell";
 
-const ASSIGNMENTS = [
-  { d: "Wed", t: "Fractions Quiz · Mrs. Reyes", xp: 50, due: "Tomorrow" },
-  { d: "Thu", t: "Lab report: Plant cells", xp: 80, due: "In 2 days" },
-  { d: "Fri", t: "Spelling quiz · Unit 6", xp: 30, due: "In 3 days" },
-  { d: "Mon", t: "Project: Mini-biome", xp: 200, due: "Next week" },
-];
-
 const BADGE_ICON_FOR_SLUG: Record<string, string> = {
   "hot-streak": "flame",
   "first-quiz-ace": "star",
@@ -37,11 +30,10 @@ export default async function StudentDashboard() {
         <div style={{ padding: 32 }}>
           <Eyebrow>Heads up</Eyebrow>
           <h1 className="wf-h1" style={{ fontSize: 22, marginTop: 4 }}>
-            No demo user found.
+            Couldn&apos;t load your dashboard.
           </h1>
           <p style={{ fontSize: 13, color: "var(--wf-body)", maxWidth: 560 }}>
-            Run <code className="wf-mono">npm run db:seed</code> from the
-            project root.
+            Your session may have expired. Try signing out and back in.
           </p>
         </div>
       </StudentChrome>
@@ -128,22 +120,6 @@ export default async function StudentDashboard() {
               </h1>
               <Annot ai>Personalized greeting</Annot>
             </div>
-            <div
-              style={{
-                marginTop: 10,
-                display: "flex",
-                gap: 10,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <span className="wf-ai-pill">Tutor · suggestion</span>
-              <span style={{ fontSize: 13, color: "var(--wf-body)" }}>
-                You&apos;re 1 quiz away from unlocking{" "}
-                <b style={{ color: "var(--wf-ink)" }}>Fractions III</b>. Want a
-                5-min warm-up?
-              </span>
-            </div>
           </div>
 
           {/* Continue learning */}
@@ -189,7 +165,37 @@ export default async function StudentDashboard() {
             )}
           </section>
 
-          <TodaysPlan initialPlan={dashboard.todaysPlan} />
+          {dashboard.todaysPlan.length === 0 ? (
+            <section>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                  marginBottom: 10,
+                }}
+              >
+                <h2 className="wf-h2" style={{ fontSize: 16 }}>
+                  Today&apos;s plan
+                </h2>
+                <Annot ai>AI-curated</Annot>
+              </div>
+              <Card p={20} style={{ textAlign: "center" }}>
+                <Eyebrow>Nothing scheduled yet</Eyebrow>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 13,
+                    color: "var(--wf-body)",
+                  }}
+                >
+                  Enroll in a course and your AI-curated plan will appear here.
+                </div>
+              </Card>
+            </section>
+          ) : (
+            <TodaysPlan initialPlan={dashboard.todaysPlan} />
+          )}
 
           {/* Skills + assignments */}
           <section
@@ -218,31 +224,45 @@ export default async function StudentDashboard() {
                 </h3>
                 <Annot>Per-strand %</Annot>
               </div>
-              {dashboard.skills.map((s) => (
-                <div key={s.name} style={{ marginBottom: 10 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: 11,
-                      marginBottom: 3,
-                    }}
-                  >
-                    <span>{s.name}</span>
-                    <span
-                      className="wf-mono"
-                      style={{ color: "var(--wf-mute)" }}
-                    >
-                      {s.v}%
-                    </span>
-                  </div>
-                  <div
-                    className={`wf-meter ${s.v < 50 ? "wf-meter--accent" : ""}`}
-                  >
-                    <i style={{ width: `${s.v}%` }} />
-                  </div>
+              {dashboard.skills.length === 0 ? (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--wf-mute)",
+                    padding: "10px 0",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Complete a few lessons and your skill mastery will track
+                  here per strand.
                 </div>
-              ))}
+              ) : (
+                dashboard.skills.map((s) => (
+                  <div key={s.name} style={{ marginBottom: 10 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: 11,
+                        marginBottom: 3,
+                      }}
+                    >
+                      <span>{s.name}</span>
+                      <span
+                        className="wf-mono"
+                        style={{ color: "var(--wf-mute)" }}
+                      >
+                        {s.v}%
+                      </span>
+                    </div>
+                    <div
+                      className={`wf-meter ${s.v < 50 ? "wf-meter--accent" : ""}`}
+                    >
+                      <i style={{ width: `${s.v}%` }} />
+                    </div>
+                  </div>
+                ))
+              )}
             </Card>
             <Card>
               <div
@@ -263,46 +283,61 @@ export default async function StudentDashboard() {
                 </h3>
                 <Annot>From teacher</Annot>
               </div>
-              {ASSIGNMENTS.map((a, i) => (
+              {dashboard.assignments.length === 0 ? (
                 <div
-                  key={a.t}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
+                    fontSize: 12,
+                    color: "var(--wf-mute)",
                     padding: "10px 0",
-                    borderBottom:
-                      i < ASSIGNMENTS.length - 1
-                        ? "1px solid var(--wf-hairline)"
-                        : "none",
+                    lineHeight: 1.5,
                   }}
                 >
+                  No assignments due. Teachers can post weekly work here.
+                </div>
+              ) : (
+                dashboard.assignments.map((a, i) => (
                   <div
-                    className="wf-mono"
+                    key={a.t}
                     style={{
-                      width: 36,
-                      textAlign: "center",
-                      fontSize: 10,
-                      color: "var(--wf-mute)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 0",
+                      borderBottom:
+                        i < dashboard.assignments.length - 1
+                          ? "1px solid var(--wf-hairline)"
+                          : "none",
                     }}
                   >
-                    {a.d}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500 }}>{a.t}</div>
                     <div
+                      className="wf-mono"
                       style={{
+                        width: 36,
+                        textAlign: "center",
                         fontSize: 10,
                         color: "var(--wf-mute)",
-                        marginTop: 2,
                       }}
                     >
-                      {a.due} · +{a.xp} XP
+                      {a.d}
                     </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>
+                        {a.t}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "var(--wf-mute)",
+                          marginTop: 2,
+                        }}
+                      >
+                        {a.due} · +{a.xp} XP
+                      </div>
+                    </div>
+                    <Icon name="arrow" size={14} color="var(--wf-mute)" />
                   </div>
-                  <Icon name="arrow" size={14} color="var(--wf-mute)" />
-                </div>
-              ))}
+                ))
+              )}
             </Card>
           </section>
         </div>
@@ -444,7 +479,7 @@ export default async function StudentDashboard() {
                 className="wf-mono"
                 style={{ fontSize: 9, color: "var(--wf-mute)" }}
               >
-                WEEK 18
+                THIS WEEK
               </span>
             </div>
             {dashboard.leaderboard.map((u, i) => (
