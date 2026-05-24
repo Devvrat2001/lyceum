@@ -26,6 +26,25 @@ const Schema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default("gpt-4o"),
 
+  // Embeddings are split out from chat because the workloads have
+  // very different cost profiles: course-builder calls are infrequent
+  // and benefit from a top-tier model; embedding calls fire on every
+  // catalog change AND every typeahead keystroke, so they're better
+  // served by a cheaper key (potentially a separate OpenAI account
+  // on a lower tier, or a free-tier project).
+  //
+  // Both vars are optional and fall through to their chat counterparts
+  // — if you don't care about cost separation, just set OPENAI_API_KEY
+  // and embeddings will use the same key.
+  //
+  // NOTE: changing OPENAI_EMBEDDING_MODEL away from
+  // `text-embedding-3-small` will likely change the output dimension
+  // (-3-large is 3072). The Course.embedding column is `vector(1536)`,
+  // so a model swap means a migration + full re-backfill. Don't change
+  // this casually.
+  OPENAI_EMBEDDING_API_KEY: z.string().optional(),
+  OPENAI_EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
+
   // Phase 3 — Stripe. All optional; absence flips checkout into demo mode.
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),

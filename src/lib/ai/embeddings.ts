@@ -1,35 +1,69 @@
 import "server-only";
-import { getOpenAI, isOpenAIEnabled } from "./openai";
+import OpenAI from "openai";
+import { env } from "@/lib/env";
 
 /**
- * Embedding model used for course catalog + query embeddings.
+ * Embeddings are isolated from the chat completion client on purpose.
+ * Course-builder calls are infrequent and warrant a top-tier model;
+ * embedding calls fire on every catalog change AND every typeahead
+ * keystroke, so they belong on a cheaper / lower-tier key when the
+ * deployment can afford to separate them.
  *
- * text-embedding-3-small:
- *   - 1536 dims (matches Course.embedding column)
- *   - $0.02 / 1M tokens (~$0.0002 per course, ~$0.00002 per query)
- *   - 5x cheaper than -large with ~90% of the recall on short docs
+ * Key resolution:
+ *   - If OPENAI_EMBEDDING_API_KEY is set, use that.
+ *   - Else fall back to OPENAI_API_KEY (single-key deployments).
+ *   - Else embeddings are disabled — semanticSearch degrades to ILIKE.
  *
- * If we ever need higher quality, switching to text-embedding-3-large
- * requires bumping Course.embedding to vector(3072) and re-embedding
- * the whole catalog — keep an eye on EMBEDDING_DIM if it ever changes.
+ * Model:
+ *   OPENAI_EMBEDDING_MODEL (default: text-embedding-3-small).
+ *
+ * NOTE: dimension MUST match the Course.embedding column (`vector(1536)`).
+ * text-embedding-3-small is 1536; text-embedding-3-large is 3072.
+ * Switching to -large requires a migration to widen the column AND a
+ * full backfill — don't change the env var casually.
  */
-export const EMBEDDING_MODEL = "text-embedding-3-small";
-export const EMBEDDING_DIM = 1536;
+
+const EMBEDDING_DIM = 1536;
+
+let _client: OpenAI | null = null;
+let _resolvedKey: string | null | undefined; // undefined = not yet resolved
+
+function getEmbeddingsKey(): string | null {
+  if (_resolvedKey !== undefined) return _resolvedKey;
+  _resolvedKey =
+    env.OPENAI_EMBEDDING_API_KEY?.trim() ||
+    env.OPENAI_API_KEY?.trim() ||
+    null;
+  return _resolvedKey;
+}
+
+function getEmbeddingsClient(): OpenAI | null {
+  const key = getEmbeddingsKey();
+  if (!key) return null;
+  if (!_client) {
+    _client = new OpenAI({ apiKey: key });
+  }
+  return _client;
+}
 
 /**
- * Embed a single string. Returns null when OPENAI_API_KEY isn't
- * configured so callers can fall back gracefully (e.g., the marketplace
- * router routes to ILIKE search when this returns null).
+ * Which model the embeddings path is configured to call. Exposed
+ * mostly for diagnostics + the backfill script's log line so it's
+ * obvious when prod is running on a non-default model.
+ */
+export const EMBEDDING_MODEL = env.OPENAI_EMBEDDING_MODEL;
+
+/**
+ * Embed a single string. Returns null when no embeddings key is
+ * configured so callers can fall back gracefully (semanticSearch
+ * routes to ILIKE; refreshCourseEmbedding silently no-ops).
  *
- * The input is truncated to a reasonable max to keep token bills
- * bounded — embeddings of full novel-length text don't add value
- * over a few-hundred-token summary.
+ * Input is truncated to ~8K chars (~2K tokens) — well under the
+ * 8192-token API ceiling but plenty for a course description.
  */
 export async function embedText(text: string): Promise<number[] | null> {
-  if (!isOpenAIEnabled()) return null;
-  const client = getOpenAI()!;
-  // ~8k chars ≈ 2k tokens — well under the 8192 input limit but plenty
-  // for a course description.
+  const client = getEmbeddingsClient();
+  if (!client) return null;
   const trimmed = text.trim().slice(0, 8000);
   if (!trimmed) return null;
 
@@ -40,7 +74,10 @@ export async function embedText(text: string): Promise<number[] | null> {
   const vec = res.data[0]?.embedding;
   if (!vec || vec.length !== EMBEDDING_DIM) {
     throw new Error(
-      `Embedding length mismatch: got ${vec?.length ?? 0}, expected ${EMBEDDING_DIM}`
+      `Embedding dim mismatch: model=${EMBEDDING_MODEL} produced ${vec?.length ?? 0} dims, ` +
+        `Course.embedding column expects ${EMBEDDING_DIM}. ` +
+        `Likely you set OPENAI_EMBEDDING_MODEL to a model with a different output size. ` +
+        `Either revert to text-embedding-3-small or migrate the column + re-backfill.`
     );
   }
   return vec;
@@ -50,19 +87,19 @@ export async function embedText(text: string): Promise<number[] | null> {
  * Format a number[] as a pgvector literal string for $queryRaw.
  *
  * pgvector accepts `'[0.1, 0.2, …]'::vector` as text input. Prisma's
- * `$queryRaw` passes parameters as plain values; we serialize the
- * array client-side and let Postgres parse + cast.
+ * $queryRaw passes parameters as plain values; we serialize the array
+ * client-side and let Postgres parse + cast.
  *
- * Caller is responsible for adding `::vector(1536)` in the SQL.
+ * Caller is responsible for adding `::vector` in the SQL.
  */
 export function vectorLiteral(vec: number[]): string {
   return `[${vec.join(",")}]`;
 }
 
 /**
- * Build the canonical "embed me" text for a Course. Same composition
- * used at write time (course create/update) and at backfill time so
- * embeddings stay consistent across the catalog.
+ * Canonical "embed me" text composition for a Course. Used at write
+ * time (course create/update hooks) AND at backfill time so the same
+ * course produces the same embedding regardless of code path.
  *
  * Fields chosen: title carries the most signal; tagline + description
  * disambiguate similar titles; subject + grade help cluster by domain
@@ -87,9 +124,10 @@ export function courseEmbedText(args: {
 }
 
 /**
- * True when we can embed text. Used to gate the semantic search code
- * path — if false, callers should fall back to ILIKE / tsvector.
+ * True when an embeddings key is configured (dedicated or shared).
+ * Gates the semantic-search code path — callers fall back to ILIKE
+ * / no-op when this returns false.
  */
 export function isEmbeddingsEnabled(): boolean {
-  return isOpenAIEnabled();
+  return getEmbeddingsKey() !== null;
 }
