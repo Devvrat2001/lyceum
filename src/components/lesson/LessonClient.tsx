@@ -451,6 +451,38 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
               {lesson.blocks.map((b) => (
                 <BlockReader key={b.id} block={b} />
               ))}
+              {/* Blocks-only lessons have no quiz UI underneath, which
+                  meant students could read every block but never mark
+                  the lesson done — Enrollment.progressPct stayed at
+                  whatever it was and the course could never advance.
+                  This bottom-of-lesson button is the only completion
+                  signal for the modern (Block-authored) lesson shape.
+                  Lessons that ALSO have legacy questions use the
+                  "Lesson complete →" button at the end of the quiz
+                  UI instead. */}
+              {lesson.questions.length === 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    borderTop: "1px solid var(--wf-hairline)",
+                    paddingTop: 16,
+                    marginTop: 8,
+                  }}
+                >
+                  <Btn
+                    variant="primary"
+                    onClick={() =>
+                      markComplete.mutate({ lessonId: lesson.id })
+                    }
+                    disabled={markComplete.isPending}
+                  >
+                    {markComplete.isPending
+                      ? "Completing…"
+                      : "Mark lesson complete →"}
+                  </Btn>
+                </div>
+              )}
             </section>
           )}
           {!question ? (
