@@ -75,22 +75,50 @@ export async function completeStructured<S extends ZodTypeAny>(args: {
 
   if (isClaudeEnabled()) {
     const client = getClaude()!;
-    const res = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: maxTokens,
-      system: args.system,
-      messages: [{ role: "user", content: args.prompt }],
-      output_config: {
-        format: { type: "json_schema", schema: jsonSchema },
-      },
-    });
-    const text = res.content
-      .map((b) => (b.type === "text" ? b.text ?? "" : ""))
-      .join("");
-    return {
-      data: parseAndValidate(text, args.schema, "claude"),
-      mode: "claude",
-    };
+    // We deliberately don't use the Anthropic `output_config.format`
+    // structured-outputs feature — it only works on Opus 4.7, Sonnet 4.6
+    // and Haiku 4.5, and a lot of API keys (especially Tier 1) don't
+    // have access to those models. Instead we just inline the JSON schema
+    // into the system prompt and let `parseAndValidate` clean up code
+    // fences. This works on every Claude model that supports messages.
+    const systemWithSchema =
+      args.system +
+      `\n\nIMPORTANT OUTPUT CONTRACT: respond with ONLY a single JSON ` +
+      `object that conforms to the JSON Schema below. No prose before ` +
+      `or after the JSON. No markdown code fences. No commentary.\n\n` +
+      `JSON Schema:\n${JSON.stringify(jsonSchema)}`;
+    try {
+      const res = await client.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: maxTokens,
+        system: systemWithSchema,
+        messages: [{ role: "user", content: args.prompt }],
+      });
+      const text = res.content
+        .map((b) => (b.type === "text" ? b.text ?? "" : ""))
+        .join("");
+      return {
+        data: parseAndValidate(text, args.schema, "claude"),
+        mode: "claude",
+      };
+    } catch (err) {
+      // Surface the real Anthropic error to Vercel logs — otherwise the
+      // user just sees a generic toast and we have nothing to debug from.
+      // Anthropic SDK errors carry `status` + `message` + `error.type`.
+      const e = err as {
+        status?: number;
+        message?: string;
+        error?: { type?: string; error?: { message?: string } };
+      };
+      console.error("[llm.ts] Claude API call failed", {
+        model: CLAUDE_MODEL,
+        status: e?.status,
+        type: e?.error?.type,
+        message: e?.message,
+        innerMessage: e?.error?.error?.message,
+      });
+      throw err;
+    }
   }
 
   throw new Error(

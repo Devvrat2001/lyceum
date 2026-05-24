@@ -14,8 +14,11 @@ const Schema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
-  // Optional override; defaults to claude-opus-4-7 per Claude API skill guidance.
-  ANTHROPIC_MODEL: z.string().default("claude-opus-4-7"),
+  // Defaults to claude-sonnet-4-5 — broadly available across Anthropic
+  // account tiers. Newer/better models (claude-opus-4-7, claude-sonnet-4-6)
+  // require higher tier access. Override with ANTHROPIC_MODEL env var if
+  // your account has access to a better one.
+  ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5"),
   // OpenAI is supported as an alternative provider — when both
   // ANTHROPIC_API_KEY and OPENAI_API_KEY are set, OpenAI wins (it's
   // checked first in `isLlmEnabled()`). Either alone is fine; if
