@@ -11,6 +11,7 @@ import { CLAUDE_MODEL, getClaude, isClaudeEnabled } from "@/lib/ai/claude";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
 import { findBlockTemplate } from "@/lib/blockTemplates";
+import { refreshCourseEmbedding } from "@/lib/jobs/refreshCourseEmbedding";
 
 export const teacherRouter = router({
   /** Anyone can check follow state of a teacher (signed-in only). */
@@ -188,6 +189,12 @@ export const teacherRouter = router({
         courseId: course.id,
         payload: { from: course.status, to: input.status },
       });
+      // Refresh the semantic-search embedding when a course goes
+      // PUBLISHED so it's discoverable right away. Fire-and-forget to
+      // keep the publish click snappy.
+      if (input.status === "PUBLISHED") {
+        void refreshCourseEmbedding(course.id);
+      }
       return { ok: true as const, status: input.status, changed: true };
     }),
 
@@ -281,6 +288,13 @@ export const teacherRouter = router({
         courseId: course.id,
         payload: { fields: Object.keys(data) },
       });
+      // Refresh the embedding when an embed-relevant field changed.
+      // priceCents doesn't enter the embedding text so we skip the
+      // OpenAI round-trip for pure price edits.
+      const embedFields = new Set(["title", "tagline", "subject", "grade"]);
+      if (Object.keys(data).some((f) => embedFields.has(f))) {
+        void refreshCourseEmbedding(course.id);
+      }
       return { ok: true as const, changed: true, course: updated };
     }),
 

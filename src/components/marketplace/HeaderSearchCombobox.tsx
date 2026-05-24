@@ -9,7 +9,11 @@ import { trpc } from "@/lib/trpc/react";
  * Debounced typeahead in the marketplace header.
  *
  * Behaviour:
- * - Types ≥2 chars → debounced 220ms → `marketplace.search` fires
+ * - Types ≥2 chars → debounced 220ms → `marketplace.semanticSearch` fires
+ * - When OPENAI_API_KEY is configured the backend embeds the query and
+ *   ranks by pgvector cosine similarity ("physics" → "electromagnetism");
+ *   otherwise it falls back to plain ILIKE so the dropdown still works.
+ *   The response carries `mode: "semantic" | "keyword"` for the badge.
  * - Dropdown shows up to 6 matches: course title + author label + tag
  * - ↑/↓ navigates highlight; Enter goes to highlighted result (or first
  *   result if none highlighted); Esc closes; click-outside closes
@@ -42,7 +46,7 @@ export function HeaderSearchCombobox() {
   }, [q]);
 
   const enabled = debouncedQ.length >= 2;
-  const searchQuery = trpc.marketplace.search.useQuery(
+  const searchQuery = trpc.marketplace.semanticSearch.useQuery(
     { q: debouncedQ, limit: 7 },
     {
       enabled,
@@ -52,6 +56,7 @@ export function HeaderSearchCombobox() {
       placeholderData: (prev) => prev,
     }
   );
+  const searchMode = searchQuery.data?.mode ?? "keyword";
 
   const results = useMemo(() => {
     if (!enabled) return [];
@@ -172,7 +177,12 @@ export function HeaderSearchCombobox() {
             fontFamily: "inherit",
           }}
         />
-        <Annot ai>Semantic search</Annot>
+        {/* Honest label about what the backend is doing. When OPENAI_API_KEY
+            isn't set, semanticSearch degrades to ILIKE — say so rather than
+            mislabeling it as "Semantic search". */}
+        <Annot ai={searchMode === "semantic"}>
+          {searchMode === "semantic" ? "Semantic search" : "Keyword search"}
+        </Annot>
       </label>
 
       {showDropdown && (

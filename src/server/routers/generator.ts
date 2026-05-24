@@ -35,6 +35,7 @@ import {
   runOutlineJobInline,
   type OutlineJobInput,
 } from "@/lib/jobs/processOutlineJob";
+import { refreshCourseEmbedding } from "@/lib/jobs/refreshCourseEmbedding";
 
 const slugify = (s: string) =>
   s
@@ -667,6 +668,12 @@ export const generatorRouter = router({
         },
         select: { id: true, slug: true },
       });
+
+      // Fire-and-forget: populate the semantic-search embedding for
+      // this course. We don't await because the user shouldn't wait
+      // an extra ~500ms on OpenAI for the redirect — semantic search
+      // just won't find this course for ~1s after save, which is fine.
+      void refreshCourseEmbedding(created.id);
 
       return {
         ok: true as const,

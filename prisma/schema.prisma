@@ -188,6 +188,14 @@ model Course {
   publishedAt  DateTime?
   updatedAt    DateTime     @updatedAt
   createdAt    DateTime     @default(now())
+  // Semantic search vector: OpenAI text-embedding-3-small output of
+  // `title + tagline + description + subject + grade`. Populated via
+  // a fire-and-forget hook on course create/update; pgvector handles
+  // the similarity search in `marketplace.semanticSearch`. Nullable so
+  // rows can exist before the embedding lands (we backfill in batches);
+  // unembedded courses just don't appear in semantic results until then.
+  // Stored via raw SQL — pgvector has no Prisma-native type.
+  embedding    Unsupported("vector(1536)")?
   @@index([subject, grade, status])
 }
 

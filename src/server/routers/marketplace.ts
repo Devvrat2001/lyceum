@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import {
@@ -15,6 +15,11 @@ import {
 } from "@/lib/ai/prompts/marketplaceSearch";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
+import {
+  embedText,
+  isEmbeddingsEnabled,
+  vectorLiteral,
+} from "@/lib/ai/embeddings";
 
 /**
  * Translate a topic chip slug into a Prisma `where` fragment that
@@ -295,7 +300,12 @@ export const marketplaceRouter = router({
       });
     }),
 
-  /** Simple ILIKE search; pgvector replaces this in Phase 2. */
+  /**
+   * Substring search — `WHERE title|tagline|description ILIKE %q%`.
+   * Kept as the fallback path for the header combobox when embeddings
+   * aren't configured (no OPENAI_API_KEY). For real semantic matching
+   * use `semanticSearch` below.
+   */
   search: publicProcedure
     .input(z.object({ q: z.string().min(1).max(120), limit: z.number().int().min(1).max(20).default(10) }))
     .query(async ({ ctx, input }) => {
@@ -311,7 +321,105 @@ export const marketplaceRouter = router({
         take: input.limit,
         select: { slug: true, title: true, authorLabel: true, tag: true, ratingAvg: true },
       });
-      return { courses };
+      return { courses, mode: "keyword" as const };
+    }),
+
+  /**
+   * Semantic typeahead search. Embeds the query with OpenAI
+   * text-embedding-3-small, then uses pgvector's cosine-distance
+   * operator (`<=>`) to rank PUBLISHED courses against the
+   * `Course.embedding` column populated by the create/update hook +
+   * backfill script.
+   *
+   * When `OPENAI_API_KEY` isn't set we fall back to the same ILIKE
+   * query the `search` procedure runs, so the combobox stays usable
+   * in demo deployments. Callers can read `mode` to distinguish.
+   *
+   * The score column from pgvector is cosine *distance* (0 = identical,
+   * 2 = opposite). We surface `1 - distance` as a similarity so the
+   * UI can render a confidence pip without having to remember the
+   * direction of the comparison.
+   */
+  semanticSearch: publicProcedure
+    .input(
+      z.object({
+        q: z.string().min(1).max(120),
+        limit: z.number().int().min(1).max(20).default(10),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const enabled = isEmbeddingsEnabled();
+      if (!enabled) {
+        // No embeddings provider — degrade to ILIKE so the header
+        // combobox still works on demo deployments.
+        const courses = await ctx.db.course.findMany({
+          where: {
+            status: "PUBLISHED",
+            OR: [
+              { title: { contains: input.q, mode: "insensitive" } },
+              { description: { contains: input.q, mode: "insensitive" } },
+              { tagline: { contains: input.q, mode: "insensitive" } },
+            ],
+          },
+          take: input.limit,
+          select: { slug: true, title: true, authorLabel: true, tag: true, ratingAvg: true },
+        });
+        return {
+          courses: courses.map((c) => ({ ...c, similarity: null })),
+          mode: "keyword" as const,
+        };
+      }
+
+      const queryVec = await embedText(input.q);
+      if (!queryVec) {
+        // Provider configured but returned nothing — same fallback.
+        return { courses: [], mode: "keyword" as const };
+      }
+      const litStr = vectorLiteral(queryVec);
+
+      // Raw query because Prisma has no native pgvector operator.
+      // Filter to PUBLISHED + embedding IS NOT NULL so unembedded
+      // rows don't pollute the result (they'd sort as distance=NULL).
+      // Cap at 0.6 distance (~0.4 similarity) to suppress unrelated
+      // matches when the catalog is sparse.
+      const rows = await ctx.db.$queryRaw<
+        Array<{
+          slug: string;
+          title: string;
+          authorLabel: string | null;
+          tag: string | null;
+          ratingAvg: number;
+          distance: number;
+        }>
+      >(Prisma.sql`
+        SELECT
+          "slug",
+          "title",
+          "authorLabel",
+          "tag",
+          "ratingAvg",
+          ("embedding" <=> ${litStr}::vector) AS "distance"
+        FROM "Course"
+        WHERE "status" = 'PUBLISHED'
+          AND "embedding" IS NOT NULL
+          AND ("embedding" <=> ${litStr}::vector) < 0.6
+        ORDER BY "embedding" <=> ${litStr}::vector
+        LIMIT ${input.limit}
+      `);
+
+      return {
+        courses: rows.map((r) => ({
+          slug: r.slug,
+          title: r.title,
+          authorLabel: r.authorLabel,
+          tag: r.tag,
+          ratingAvg: r.ratingAvg,
+          // Cosine distance ∈ [0, 2] → similarity ∈ [-1, 1]; we only
+          // surface positive matches in practice (distance < 1).
+          similarity: 1 - r.distance,
+        })),
+        mode: "semantic" as const,
+      };
     }),
 
   /**
