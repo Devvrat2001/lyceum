@@ -60,7 +60,10 @@ export const generatorRouter = router({
         const schema = zodToJsonSchema(OutlineSchema);
         const res = await client.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 4096,
+          // Bumped from 4096: the outline now includes per-lesson title,
+          // summary, and an 80-180 word readingContent block per lesson.
+          // A 5-unit / 4-lesson course needs ~6-7K output tokens.
+          max_tokens: 8192,
           system: COURSE_GENERATOR_SYSTEM_PROMPT,
           messages: [
             { role: "user", content: buildCourseGenPrompt({ brief: input.brief, settings }) },
@@ -118,12 +121,14 @@ export const generatorRouter = router({
         const schema = zodToJsonSchema(OutlineUnitSchema);
         const res = await client.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 1024,
+          // Same reason as the outline call: a regenerated unit now
+          // carries N full lesson readings (~600-1500 tokens each).
+          max_tokens: 4096,
           system: COURSE_GENERATOR_SYSTEM_PROMPT,
           messages: [
             {
               role: "user",
-              content: `Course brief:\n"""\n${input.brief.trim()}\n"""\n\nFull outline so far:\n${others}\n\nThe unit at position ${input.unitIndex + 1} currently is:\n- ${target.title} — ${target.subtitle}\n\nProduce a *different* unit for that slot that fits the surrounding units. Keep the same shortLabel ("${target.shortLabel}").`,
+              content: `Course brief:\n"""\n${input.brief.trim()}\n"""\n\nFull outline so far:\n${others}\n\nThe unit at position ${input.unitIndex + 1} currently is:\n- ${target.title} — ${target.subtitle}\n\nProduce a *different* unit for that slot that fits the surrounding units. Keep the same shortLabel ("${target.shortLabel}"). Generate the same number of lessons as before (${target.lessons.length}).`,
             },
           ],
           output_config: {
@@ -134,21 +139,24 @@ export const generatorRouter = router({
         return { unit, elapsedMs: Date.now() - t0 };
       }
 
-      // Demo fallback: shuffle the title/subtitle around so the unit visibly changes.
+      // Demo fallback: shuffle the title/subtitle around so the unit
+      // visibly changes. The lessons themselves stay the same — we
+      // don't have a stub-content generator that's smart enough to
+      // rewrite N readings while keeping the schema valid.
       const original = input.outline.units[input.unitIndex];
       const alternates: Record<string, OutlineUnit> = {
         "What is a variable?": {
           shortLabel: original.shortLabel,
           title: "Letters that hide numbers",
           subtitle: "Use boxes, blanks, and emojis to discover variables",
-          lessonCount: original.lessonCount,
+          lessons: original.lessons,
           durationLabel: original.durationLabel,
         },
         "Expressions & evaluating": {
           shortLabel: original.shortLabel,
           title: "Building math machines",
           subtitle: "Combine operations into reusable expressions",
-          lessonCount: original.lessonCount,
+          lessons: original.lessons,
           durationLabel: original.durationLabel,
         },
       };
@@ -156,7 +164,7 @@ export const generatorRouter = router({
         shortLabel: original.shortLabel,
         title: original.title + " (revised)",
         subtitle: "Refined to better connect with the unit before it",
-        lessonCount: original.lessonCount,
+        lessons: original.lessons,
         durationLabel: original.durationLabel,
       };
       await audit({
@@ -527,15 +535,33 @@ export const generatorRouter = router({
               order: i + 1,
               title: u.title,
               subtitle: u.subtitle,
-              estLabel: `${u.lessonCount} lessons · ${u.durationLabel}`,
+              estLabel: `${u.lessons.length} lessons · ${u.durationLabel}`,
+              // Real per-lesson titles + intros now, plus a starter
+               // READING block seeded with the AI-generated content so
+               // students see actual prose on day one. The prototype
+               // version saved a stub shell labeled "Lesson 1" with
+               // intro=null and zero blocks, which made every freshly
+               // saved AI course look empty to students.
               lessons: {
-                create: Array.from({ length: u.lessonCount }).map((_, j) => ({
+                create: u.lessons.map((lesson, j) => ({
                   order: j + 1,
-                  title: `Lesson ${j + 1}`,
+                  title: lesson.title,
                   slug: `${slug}-u${i + 1}-l${j + 1}`,
                   durationMin: 8,
                   isPreview: i === 0 && j === 0,
-                  intro: null,
+                  intro: lesson.summary,
+                  blocks: {
+                    create: [
+                      {
+                        type: "READING",
+                        order: 1,
+                        settings: {
+                          label: "Read this first",
+                          body: lesson.readingContent,
+                        } as Prisma.InputJsonValue,
+                      },
+                    ],
+                  },
                 })),
               },
             })),

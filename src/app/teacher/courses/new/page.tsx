@@ -60,7 +60,14 @@ export default function AIGeneratorPage() {
       shortLabel: string;
       title: string;
       subtitle: string;
-      lessonCount: number;
+      // Full per-lesson shape — keeping all three fields here so the
+      // outline state object can be passed straight into
+      // `generator.regenerateUnit` without a cast or shape narrowing.
+      lessons: {
+        title: string;
+        summary: string;
+        readingContent: string;
+      }[];
       durationLabel: string;
     }[];
   } | null>(null);
@@ -511,7 +518,7 @@ export default function AIGeneratorPage() {
                           marginTop: 4,
                         }}
                       >
-                        {u.lessonCount} lessons · {u.durationLabel}
+                        {u.lessons.length} lessons · {u.durationLabel}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
