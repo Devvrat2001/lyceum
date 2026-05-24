@@ -325,20 +325,26 @@ export const marketplaceRouter = router({
     }),
 
   /**
-   * Semantic typeahead search. Embeds the query with OpenAI
-   * text-embedding-3-small, then uses pgvector's cosine-distance
-   * operator (`<=>`) to rank PUBLISHED courses against the
-   * `Course.embedding` column populated by the create/update hook +
-   * backfill script.
+   * Hybrid typeahead search — BM25 + vector + Reciprocal Rank Fusion.
    *
-   * When `OPENAI_API_KEY` isn't set we fall back to the same ILIKE
-   * query the `search` procedure runs, so the combobox stays usable
-   * in demo deployments. Callers can read `mode` to distinguish.
+   * Pure vector search has known weaknesses: it misses exact-term
+   * queries (course slugs, standard codes like "CCSS 6.EE.A", proper
+   * nouns) and can confidently surface unrelated content for short
+   * queries. Pure BM25 misses synonyms ("physics" → "electromagnetism").
    *
-   * The score column from pgvector is cosine *distance* (0 = identical,
-   * 2 = opposite). We surface `1 - distance` as a similarity so the
-   * UI can render a confidence pip without having to remember the
-   * direction of the comparison.
+   * We run BOTH in parallel and combine via RRF:
+   *   score(doc) = 1/(k + rank_bm25) + 1/(k + rank_vec)
+   * with k=60 (the canonical RRF constant). A doc that appears in
+   * both lists gets a fused boost; a doc that only appears in one
+   * still gets credit at its individual rank.
+   *
+   * Fallback ladder:
+   *   1. Embeddings configured  → hybrid (BM25 + vector + RRF)   [best]
+   *   2. Embeddings absent      → BM25 only via ts_rank_cd       [good]
+   *   3. BM25 returns 0 results → ILIKE substring                [last resort]
+   *
+   * `mode` in the response tells the UI which path actually ran so the
+   * badge label stays honest ("Semantic" vs "Keyword").
    */
   semanticSearch: publicProcedure
     .input(
@@ -348,78 +354,169 @@ export const marketplaceRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const enabled = isEmbeddingsEnabled();
-      if (!enabled) {
-        // No embeddings provider — degrade to ILIKE so the header
-        // combobox still works on demo deployments.
-        const courses = await ctx.db.course.findMany({
+      const q = input.q.trim();
+      const limit = input.limit;
+
+      // Tunables — keep them inline rather than constants so the
+      // tradeoff is visible at the call site.
+      const RRF_K = 60;        // canonical RRF damping constant
+      const CANDIDATE_POOL = 30; // pull this many from each ranker before fusing
+
+      const useVectors = isEmbeddingsEnabled();
+      const queryVec = useVectors ? await embedText(q) : null;
+      const litStr = queryVec ? vectorLiteral(queryVec) : null;
+
+      // BM25-ranked candidates via Postgres FTS. plainto_tsquery is
+      // forgiving with messy user input (handles word boundaries,
+      // stopwords). The `@@` predicate uses the GIN expression index
+      // we added in 20260524120000_add_course_fts_index.
+      const bm25Rows = await ctx.db.$queryRaw<
+        Array<{ id: string; rank: number; bm25_score: number }>
+      >(Prisma.sql`
+        WITH ranked AS (
+          SELECT
+            "id",
+            ts_rank_cd(
+              to_tsvector(
+                'english',
+                coalesce("title", '') || ' ' ||
+                coalesce("tagline", '') || ' ' ||
+                coalesce("description", '')
+              ),
+              plainto_tsquery('english', ${q})
+            ) AS bm25_score
+          FROM "Course"
+          WHERE "status" = 'PUBLISHED'
+            AND to_tsvector(
+                  'english',
+                  coalesce("title", '') || ' ' ||
+                  coalesce("tagline", '') || ' ' ||
+                  coalesce("description", '')
+                ) @@ plainto_tsquery('english', ${q})
+        )
+        SELECT
+          "id",
+          bm25_score,
+          ROW_NUMBER() OVER (ORDER BY bm25_score DESC) AS rank
+        FROM ranked
+        ORDER BY bm25_score DESC
+        LIMIT ${CANDIDATE_POOL}
+      `);
+
+      // Vector-ranked candidates via pgvector. Only runs if we have an
+      // embedded query — if litStr is null, the candidate pool is empty
+      // and RRF falls back to BM25-only ranking.
+      const vecRows = litStr
+        ? await ctx.db.$queryRaw<
+            Array<{ id: string; rank: number; distance: number }>
+          >(Prisma.sql`
+            SELECT
+              "id",
+              ("embedding" <=> ${litStr}::vector) AS distance,
+              ROW_NUMBER() OVER (ORDER BY "embedding" <=> ${litStr}::vector) AS rank
+            FROM "Course"
+            WHERE "status" = 'PUBLISHED'
+              AND "embedding" IS NOT NULL
+              AND ("embedding" <=> ${litStr}::vector) < 0.6
+            ORDER BY "embedding" <=> ${litStr}::vector
+            LIMIT ${CANDIDATE_POOL}
+          `)
+        : [];
+
+      // Build RRF score map. A course id missing from one list just
+      // doesn't contribute that term, so it ranks below courses that
+      // appear in both — exactly what we want from fusion.
+      const rrf = new Map<string, { score: number; bm25?: number; vec?: number }>();
+      for (const r of bm25Rows) {
+        const e = rrf.get(r.id) ?? { score: 0 };
+        e.score += 1 / (RRF_K + Number(r.rank));
+        e.bm25 = Number(r.rank);
+        rrf.set(r.id, e);
+      }
+      for (const r of vecRows) {
+        const e = rrf.get(r.id) ?? { score: 0 };
+        e.score += 1 / (RRF_K + Number(r.rank));
+        e.vec = Number(r.rank);
+        rrf.set(r.id, e);
+      }
+
+      const sortedIds = Array.from(rrf.entries())
+        .sort((a, b) => b[1].score - a[1].score)
+        .slice(0, limit)
+        .map(([id]) => id);
+
+      // No matches from either ranker. Last-resort ILIKE so the header
+      // combobox always has SOMETHING for the user (e.g., when a query
+      // hits no full-text matches but contains a substring of a title).
+      if (sortedIds.length === 0) {
+        const fallback = await ctx.db.course.findMany({
           where: {
             status: "PUBLISHED",
             OR: [
-              { title: { contains: input.q, mode: "insensitive" } },
-              { description: { contains: input.q, mode: "insensitive" } },
-              { tagline: { contains: input.q, mode: "insensitive" } },
+              { title: { contains: q, mode: "insensitive" } },
+              { description: { contains: q, mode: "insensitive" } },
+              { tagline: { contains: q, mode: "insensitive" } },
             ],
           },
-          take: input.limit,
+          take: limit,
           select: { slug: true, title: true, authorLabel: true, tag: true, ratingAvg: true },
         });
         return {
-          courses: courses.map((c) => ({ ...c, similarity: null })),
+          courses: fallback.map((c) => ({
+            ...c,
+            similarity: null,
+            rrfScore: null,
+          })),
           mode: "keyword" as const,
         };
       }
 
-      const queryVec = await embedText(input.q);
-      if (!queryVec) {
-        // Provider configured but returned nothing — same fallback.
-        return { courses: [], mode: "keyword" as const };
-      }
-      const litStr = vectorLiteral(queryVec);
+      // Hydrate the ranked id list. We do this in one query and then
+      // re-sort client-side so the RRF ordering is preserved — Prisma
+      // doesn't support ORDER BY id-list natively.
+      const rows = await ctx.db.course.findMany({
+        where: { id: { in: sortedIds } },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          authorLabel: true,
+          tag: true,
+          ratingAvg: true,
+        },
+      });
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      const ordered = sortedIds
+        .map((id) => byId.get(id))
+        .filter((r): r is NonNullable<typeof r> => !!r)
+        .map((r) => {
+          const meta = rrf.get(r.id)!;
+          return {
+            slug: r.slug,
+            title: r.title,
+            authorLabel: r.authorLabel,
+            tag: r.tag,
+            ratingAvg: r.ratingAvg,
+            rrfScore: meta.score,
+            // Approximate similarity for UI: prefer vector distance if
+            // available (interpretable as cosine sim), else fall back to
+            // a normalized BM25 rank position.
+            similarity:
+              meta.vec !== undefined
+                ? 1 - (vecRows.find((v) => v.id === r.id)?.distance ?? 0.5)
+                : meta.bm25 !== undefined
+                ? Math.max(0, 1 - meta.bm25 / CANDIDATE_POOL)
+                : null,
+          };
+        });
 
-      // Raw query because Prisma has no native pgvector operator.
-      // Filter to PUBLISHED + embedding IS NOT NULL so unembedded
-      // rows don't pollute the result (they'd sort as distance=NULL).
-      // Cap at 0.6 distance (~0.4 similarity) to suppress unrelated
-      // matches when the catalog is sparse.
-      const rows = await ctx.db.$queryRaw<
-        Array<{
-          slug: string;
-          title: string;
-          authorLabel: string | null;
-          tag: string | null;
-          ratingAvg: number;
-          distance: number;
-        }>
-      >(Prisma.sql`
-        SELECT
-          "slug",
-          "title",
-          "authorLabel",
-          "tag",
-          "ratingAvg",
-          ("embedding" <=> ${litStr}::vector) AS "distance"
-        FROM "Course"
-        WHERE "status" = 'PUBLISHED'
-          AND "embedding" IS NOT NULL
-          AND ("embedding" <=> ${litStr}::vector) < 0.6
-        ORDER BY "embedding" <=> ${litStr}::vector
-        LIMIT ${input.limit}
-      `);
+      // Mode reporting: if the vector ranker contributed any rows, call
+      // it "semantic" (the BM25 lift is fine but the headline benefit is
+      // the synonym matching). Otherwise it's pure BM25 / keyword.
+      const mode: "semantic" | "keyword" =
+        vecRows.length > 0 ? "semantic" : "keyword";
 
-      return {
-        courses: rows.map((r) => ({
-          slug: r.slug,
-          title: r.title,
-          authorLabel: r.authorLabel,
-          tag: r.tag,
-          ratingAvg: r.ratingAvg,
-          // Cosine distance ∈ [0, 2] → similarity ∈ [-1, 1]; we only
-          // surface positive matches in practice (distance < 1).
-          similarity: 1 - r.distance,
-        })),
-        mode: "semantic" as const,
-      };
+      return { courses: ordered, mode };
     }),
 
   /**
