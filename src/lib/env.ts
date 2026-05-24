@@ -16,6 +16,12 @@ const Schema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   // Optional override; defaults to claude-opus-4-7 per Claude API skill guidance.
   ANTHROPIC_MODEL: z.string().default("claude-opus-4-7"),
+  // OpenAI is supported as an alternative provider — when both
+  // ANTHROPIC_API_KEY and OPENAI_API_KEY are set, OpenAI wins (it's
+  // checked first in `isLlmEnabled()`). Either alone is fine; if
+  // neither is set, the AI generator + tutor fall back to demo stubs.
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default("gpt-4o"),
 
   // Phase 3 — Stripe. All optional; absence flips checkout into demo mode.
   STRIPE_SECRET_KEY: z.string().optional(),

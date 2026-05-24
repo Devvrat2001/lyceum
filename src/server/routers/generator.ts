@@ -3,11 +3,6 @@ import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { router, teacherProcedure } from "../trpc";
 import {
-  CLAUDE_MODEL,
-  getClaude,
-  isClaudeEnabled,
-} from "@/lib/ai/claude";
-import {
   COURSE_GENERATOR_SYSTEM_PROMPT,
   OutlineSchema,
   OutlineUnitSchema,
@@ -27,7 +22,11 @@ import {
 } from "@/lib/ai/prompts/questionGenerator";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
-import { zodToJsonSchema } from "@/lib/ai/zodToJsonSchema";
+import {
+  completeStructured,
+  isLlmEnabled,
+  type LlmMode,
+} from "@/lib/ai/llm";
 
 const slugify = (s: string) =>
   s
@@ -52,39 +51,34 @@ export const generatorRouter = router({
       const settings = SettingsSchema.parse(input.settings ?? {});
       const t0 = Date.now();
 
-      if (isClaudeEnabled()) {
-        const client = getClaude()!;
-        // Anthropic's structured-output JSON Schema doesn't accept Zod
-        // descriptions on `.describe()` chains in every field — convert
-        // to a plain JSON Schema instead.
-        const schema = zodToJsonSchema(OutlineSchema);
-        const res = await client.messages.create({
-          model: CLAUDE_MODEL,
-          // Bumped from 4096: the outline now includes per-lesson title,
-          // summary, and an 80-180 word readingContent block per lesson.
-          // A 5-unit / 4-lesson course needs ~6-7K output tokens.
-          max_tokens: 8192,
+      let outline: Outline;
+      let mode: LlmMode;
+      if (isLlmEnabled()) {
+        // The outline now includes per-lesson title + summary + an
+        // 80-180 word readingContent block. A 5-unit / 4-lesson course
+        // needs ~6-7K output tokens, hence the 8192 ask.
+        const result = await completeStructured({
+          schema: OutlineSchema,
           system: COURSE_GENERATOR_SYSTEM_PROMPT,
-          messages: [
-            { role: "user", content: buildCourseGenPrompt({ brief: input.brief, settings }) },
-          ],
-          output_config: {
-            format: { type: "json_schema", schema },
-          },
+          prompt: buildCourseGenPrompt({ brief: input.brief, settings }),
+          maxTokens: 8192,
         });
-        const outline = extractOutlineFromResponse(res);
-        return { outline, elapsedMs: Date.now() - t0 };
+        outline = result.data;
+        mode = result.mode;
+      } else {
+        outline = buildDemoOutline({ brief: input.brief, settings });
+        mode = "demo";
       }
 
-      // Demo fallback.
-      const outline = buildDemoOutline({ brief: input.brief, settings });
+      // Audit unconditionally now — the previous version only logged
+      // the demo path, so we had no record of real Claude generations.
       await audit({
         actorId: ctx.user.id,
         kind: "ai.course_outline",
         payload: {
           briefChars: input.brief.length,
           unitCount: outline.units.length,
-          mode: isClaudeEnabled() ? "claude" : "demo",
+          mode,
           elapsedMs: Date.now() - t0,
         },
       });
@@ -112,30 +106,40 @@ export const generatorRouter = router({
       }
       const t0 = Date.now();
 
-      if (isClaudeEnabled()) {
-        const client = getClaude()!;
+      let unit: OutlineUnit;
+      let mode: LlmMode;
+      if (isLlmEnabled()) {
         const target = input.outline.units[input.unitIndex];
         const others = input.outline.units
-          .map((u, i) => (i === input.unitIndex ? "[REGENERATE THIS]" : `${i + 1}. ${u.title} — ${u.subtitle} (${u.lessonCount} lessons)`))
+          .map((u, i) =>
+            i === input.unitIndex
+              ? "[REGENERATE THIS]"
+              : `${i + 1}. ${u.title} — ${u.subtitle} (${u.lessons.length} lessons)`
+          )
           .join("\n");
-        const schema = zodToJsonSchema(OutlineUnitSchema);
-        const res = await client.messages.create({
-          model: CLAUDE_MODEL,
-          // Same reason as the outline call: a regenerated unit now
-          // carries N full lesson readings (~600-1500 tokens each).
-          max_tokens: 4096,
+        // Same reason as the outline call: a regenerated unit now
+        // carries N full lesson readings (~600-1500 tokens each).
+        const result = await completeStructured({
+          schema: OutlineUnitSchema,
           system: COURSE_GENERATOR_SYSTEM_PROMPT,
-          messages: [
-            {
-              role: "user",
-              content: `Course brief:\n"""\n${input.brief.trim()}\n"""\n\nFull outline so far:\n${others}\n\nThe unit at position ${input.unitIndex + 1} currently is:\n- ${target.title} — ${target.subtitle}\n\nProduce a *different* unit for that slot that fits the surrounding units. Keep the same shortLabel ("${target.shortLabel}"). Generate the same number of lessons as before (${target.lessons.length}).`,
-            },
-          ],
-          output_config: {
-            format: { type: "json_schema", schema },
+          prompt: `Course brief:\n"""\n${input.brief.trim()}\n"""\n\nFull outline so far:\n${others}\n\nThe unit at position ${input.unitIndex + 1} currently is:\n- ${target.title} — ${target.subtitle}\n\nProduce a *different* unit for that slot that fits the surrounding units. Keep the same shortLabel ("${target.shortLabel}"). Generate the same number of lessons as before (${target.lessons.length}).`,
+          maxTokens: 4096,
+        });
+        // Force the shortLabel back so positions stay stable — the
+        // model occasionally helpfully renumbers when it shouldn't.
+        unit = { ...result.data, shortLabel: target.shortLabel };
+        mode = result.mode;
+        await audit({
+          actorId: ctx.user.id,
+          kind: "ai.regenerate_unit",
+          payload: {
+            unitIndex: input.unitIndex,
+            before: { title: target.title },
+            after: { title: unit.title },
+            mode,
+            elapsedMs: Date.now() - t0,
           },
         });
-        const unit = extractUnitFromResponse(res, target.shortLabel);
         return { unit, elapsedMs: Date.now() - t0 };
       }
 
@@ -174,7 +178,7 @@ export const generatorRouter = router({
           unitIndex: input.unitIndex,
           before: { title: original.title },
           after: { title: fallback.title },
-          mode: isClaudeEnabled() ? "claude" : "demo",
+          mode: "demo" as LlmMode,
           elapsedMs: Date.now() - t0,
         },
       });
@@ -219,41 +223,21 @@ export const generatorRouter = router({
       const maxOrder = lesson.questions.length;
 
       let generated: GeneratedQuestion[];
-      if (isClaudeEnabled()) {
-        const client = getClaude()!;
-        const schema = zodToJsonSchema(QuestionBatchSchema);
-        const res = await client.messages.create({
-          model: CLAUDE_MODEL,
-          max_tokens: 3072,
+      let mode: LlmMode;
+      if (isLlmEnabled()) {
+        const result = await completeStructured({
+          schema: QuestionBatchSchema,
           system: QUESTION_GENERATOR_SYSTEM_PROMPT,
-          messages: [
-            {
-              role: "user",
-              content: buildQuestionGenPrompt({
-                lessonTitle: lesson.title,
-                courseTitle: lesson.unit.course.title,
-                existingStems,
-                count: input.count,
-              }),
-            },
-          ],
-          output_config: { format: { type: "json_schema", schema } },
+          prompt: buildQuestionGenPrompt({
+            lessonTitle: lesson.title,
+            courseTitle: lesson.unit.course.title,
+            existingStems,
+            count: input.count,
+          }),
+          maxTokens: 3072,
         });
-        const text = res.content
-          .map((b) => (b.type === "text" ? b.text ?? "" : ""))
-          .join("")
-          .trim()
-          .replace(/^```(?:json)?\s*/i, "")
-          .replace(/\s*```$/i, "");
-        const parsed = QuestionBatchSchema.safeParse(JSON.parse(text));
-        if (!parsed.success) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `AI returned invalid questions: ${parsed.error.message}`,
-          });
-        }
         // Sanity-check: enforce exactly one correct per question.
-        generated = parsed.data.questions.filter(
+        generated = result.data.questions.filter(
           (q) => q.answers.filter((a) => a.correct).length === 1
         );
         if (generated.length === 0) {
@@ -262,11 +246,13 @@ export const generatorRouter = router({
             message: "AI didn't return any well-formed questions.",
           });
         }
+        mode = result.mode;
       } else {
         generated = buildDemoQuestions({
           lessonTitle: lesson.title,
           count: input.count,
         });
+        mode = "demo";
       }
 
       // Persist as Question rows.
@@ -292,7 +278,7 @@ export const generatorRouter = router({
         payload: {
           requested: input.count,
           added: created.length,
-          mode: isClaudeEnabled() ? "claude" : "demo",
+          mode,
           elapsedMs: Date.now() - t0,
         },
         lessonId: lesson.id,
@@ -399,41 +385,21 @@ export const generatorRouter = router({
       }
 
       let generated: GeneratedQuestion[];
-      if (isClaudeEnabled()) {
-        const client = getClaude()!;
-        const schema = zodToJsonSchema(QuestionBatchSchema);
-        const res = await client.messages.create({
-          model: CLAUDE_MODEL,
-          max_tokens: 3072,
+      let mode: LlmMode;
+      if (isLlmEnabled()) {
+        const result = await completeStructured({
+          schema: QuestionBatchSchema,
           system: QUESTION_GENERATOR_SYSTEM_PROMPT,
-          messages: [
-            {
-              role: "user",
-              content: buildQuestionGenPrompt({
-                lessonTitle,
-                courseTitle,
-                existingStems: previousQuestions.map((q) => q.stem),
-                count: input.count,
-                weakSpots,
-              }),
-            },
-          ],
-          output_config: { format: { type: "json_schema", schema } },
+          prompt: buildQuestionGenPrompt({
+            lessonTitle,
+            courseTitle,
+            existingStems: previousQuestions.map((q) => q.stem),
+            count: input.count,
+            weakSpots,
+          }),
+          maxTokens: 3072,
         });
-        const text = res.content
-          .map((b) => (b.type === "text" ? b.text ?? "" : ""))
-          .join("")
-          .trim()
-          .replace(/^```(?:json)?\s*/i, "")
-          .replace(/\s*```$/i, "");
-        const parsed = QuestionBatchSchema.safeParse(JSON.parse(text));
-        if (!parsed.success) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `AI returned invalid questions: ${parsed.error.message}`,
-          });
-        }
-        generated = parsed.data.questions.filter(
+        generated = result.data.questions.filter(
           (q) => q.answers.filter((a) => a.correct).length === 1
         );
         if (generated.length === 0) {
@@ -442,8 +408,10 @@ export const generatorRouter = router({
             message: "AI didn't return any well-formed questions.",
           });
         }
+        mode = result.mode;
       } else {
         generated = buildDemoQuestions({ lessonTitle, count: input.count });
+        mode = "demo";
       }
 
       const nextSettings: Record<string, unknown> = {
@@ -454,7 +422,7 @@ export const generatorRouter = router({
         generated: {
           questions: generated,
           generatedAt: new Date().toISOString(),
-          mode: isClaudeEnabled() ? "claude" : "demo",
+          mode,
         },
       };
       await ctx.db.block.update({
@@ -469,7 +437,7 @@ export const generatorRouter = router({
           blockId: block.id,
           requested: input.count,
           added: generated.length,
-          mode: isClaudeEnabled() ? "claude" : "demo",
+          mode,
           elapsedMs: Date.now() - t0,
           scope: "ai_quiz_block",
           weakSpotsUsed: weakSpots.length,
@@ -578,53 +546,7 @@ export const generatorRouter = router({
     }),
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// Helpers
-
-type ContentBlock = { type?: string; text?: string; input?: unknown };
-
-function extractOutlineFromResponse(res: { content: ContentBlock[] }): Outline {
-  // Anthropic returns structured outputs as a single text block whose
-  // .text is parseable JSON. Sometimes wrapped in code fences — strip
-  // them defensively.
-  const text = res.content
-    .map((b) => (b.type === "text" ? b.text ?? "" : ""))
-    .join("");
-  const stripped = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "");
-  const parsed = OutlineSchema.safeParse(JSON.parse(stripped));
-  if (!parsed.success) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `AI returned invalid outline: ${parsed.error.message}`,
-    });
-  }
-  return parsed.data;
-}
-
-function extractUnitFromResponse(
-  res: { content: ContentBlock[] },
-  enforceLabel: string
-): OutlineUnit {
-  const text = res.content
-    .map((b) => (b.type === "text" ? b.text ?? "" : ""))
-    .join("");
-  const stripped = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "");
-  const obj = JSON.parse(stripped) as Record<string, unknown>;
-  // Force the shortLabel back to what the caller wanted so positions stay stable.
-  obj.shortLabel = enforceLabel;
-  const parsed = OutlineUnitSchema.safeParse(obj);
-  if (!parsed.success) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `AI returned invalid unit: ${parsed.error.message}`,
-    });
-  }
-  return parsed.data;
-}
+// Helpers used to live here for parsing Anthropic-shaped structured
+// outputs. They're now obsolete — `lib/ai/llm.ts#completeStructured`
+// handles the parse + validate for both providers in one place.
 
