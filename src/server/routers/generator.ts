@@ -27,6 +27,14 @@ import {
   isLlmEnabled,
   type LlmMode,
 } from "@/lib/ai/llm";
+import {
+  enqueueOutlineChunk,
+  isQStashEnabled,
+} from "@/lib/qstash";
+import {
+  runOutlineJobInline,
+  type OutlineJobInput,
+} from "@/lib/jobs/processOutlineJob";
 
 const slugify = (s: string) =>
   s
@@ -83,6 +91,128 @@ export const generatorRouter = router({
         },
       });
       return { outline, elapsedMs: Date.now() - t0 };
+    }),
+
+  /**
+   * Start a background outline-generation job. Returns a jobId
+   * immediately; client polls `getJob` for progress and the final
+   * outline. The work is chunked across multiple worker invocations
+   * so each chunk fits inside Vercel's 60s function timeout.
+   *
+   * If QStash is configured, the first chunk is enqueued and the
+   * worker takes over. If not, the chunks are run inline (works on
+   * local dev where there's no platform timeout).
+   */
+  startOutlineJob: teacherProcedure
+    .input(
+      z.object({
+        brief: z.string().min(20).max(2000),
+        settings: SettingsSchema.optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkAIQuota({ actorId: ctx.user.id });
+      const settings = SettingsSchema.parse(input.settings ?? {});
+
+      const jobInput: OutlineJobInput = { brief: input.brief, settings };
+      const job = await ctx.db.generationJob.create({
+        data: {
+          userId: ctx.user.id,
+          kind: "outline",
+          status: "pending",
+          step: "Queued",
+          input: jobInput as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      if (isQStashEnabled()) {
+        // Fire async — webhook will pick up chunk 0 within a few seconds.
+        try {
+          await enqueueOutlineChunk(job.id);
+        } catch (err) {
+          // If enqueue itself fails, mark the job failed so the client
+          // sees a clear error on first poll instead of hanging at
+          // "Queued" forever.
+          const msg = err instanceof Error ? err.message : String(err);
+          await ctx.db.generationJob.update({
+            where: { id: job.id },
+            data: { status: "failed", error: `QStash enqueue failed: ${msg}` },
+          });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to queue generation job",
+          });
+        }
+      } else {
+        // No QStash: run inline. We await here so any thrown error
+        // surfaces immediately to the client. On platforms with no
+        // function timeout (local dev) this finishes before returning.
+        // On Vercel Hobby without QStash, this WILL hit 60s — the
+        // expected fix is to configure QStash for production.
+        await runOutlineJobInline(job.id);
+      }
+
+      return { jobId: job.id };
+    }),
+
+  /**
+   * Poll a job by id. Returns the full row so the client can render
+   * progress + the partial outline as it builds up + the final result
+   * when status="succeeded".
+   *
+   * Owner-only: a teacher can only see their own jobs.
+   */
+  getJob: teacherProcedure
+    .input(z.object({ jobId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const job = await ctx.db.generationJob.findUnique({
+        where: { id: input.jobId },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      if (job.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      return {
+        id: job.id,
+        kind: job.kind,
+        status: job.status,
+        step: job.step,
+        progress: job.progress,
+        partial: job.partial as Outline | null,
+        output: job.output as Outline | null,
+        mode: job.mode as LlmMode | null,
+        error: job.error,
+        nextChunk: job.nextChunk,
+        totalChunks: job.totalChunks,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+      };
+    }),
+
+  /**
+   * Mark a job as canceled. The next webhook invocation will see the
+   * status change and bail before doing more work. Best-effort —
+   * in-flight chunks complete to keep the DB consistent.
+   */
+  cancelJob: teacherProcedure
+    .input(z.object({ jobId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const job = await ctx.db.generationJob.findUnique({
+        where: { id: input.jobId },
+        select: { userId: true, status: true },
+      });
+      if (!job) throw new TRPCError({ code: "NOT_FOUND" });
+      if (job.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      if (job.status === "succeeded" || job.status === "failed" || job.status === "canceled") {
+        return { ok: true, alreadyTerminal: true };
+      }
+      await ctx.db.generationJob.update({
+        where: { id: input.jobId },
+        data: { status: "canceled", step: "Canceled by user" },
+      });
+      return { ok: true, alreadyTerminal: false };
     }),
 
   /** Regenerate just one unit in an existing outline. */

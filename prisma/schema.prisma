@@ -94,6 +94,9 @@ model User {
   parentLinks    ParentChild[] @relation("ChildLinks")
   // Per-lesson completion checkpoints — drive Enrollment.progressPct.
   lessonProgress LessonProgress[]
+  // Background AI generation jobs (outline, regenerate, …). One row per
+  // job kicked off by this user; survives until manually cleaned up.
+  generationJobs GenerationJob[]
 
   @@index([role])
 }
@@ -640,6 +643,38 @@ model Insight {
   expiresAt DateTime
   @@index([audience, scope, expiresAt])
   @@index([scope, createdAt])
+}
+
+/// Background AI generation job. The full course-outline call exceeds
+/// Hobby's 60s function timeout, so it's broken into chunks: chunk 0
+/// generates the outline skeleton (units + lesson titles, no readings),
+/// chunks 1..N each generate readingContent for one unit's lessons.
+/// Upstash QStash drives the work — each webhook hit runs one chunk
+/// and re-enqueues if more remain. Client polls `generator.getJob`
+/// every 2s and hydrates the final `output` when status="succeeded".
+///
+/// `mode` is the provider that actually ran ("claude" | "openai" | "demo");
+/// set after the first chunk runs, used for audit. `error` carries the
+/// friendly failure message when status="failed".
+model GenerationJob {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        String
+  status      String   @default("pending")
+  step        String?
+  progress    Int      @default(0)
+  input       Json
+  partial     Json?
+  output      Json?
+  mode        String?
+  error       String?
+  nextChunk   Int      @default(0)
+  totalChunks Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([userId, createdAt])
+  @@index([status, updatedAt])
 }
 
 /// Append-only audit log. Captures every AI call + sensitive mutation

@@ -33,6 +33,16 @@ const Schema = z.object({
   STRIPE_PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10_000).default(1500),
   PUBLIC_BASE_URL: z.string().url().default("http://localhost:3000"),
 
+  // Phase 5 — Upstash QStash for background AI generation jobs.
+  // Hobby Vercel functions cap at 60s; full course-outline generation
+  // exceeds that, so we chunk via QStash. All three vars must be set
+  // in production for the async path to activate — absence makes
+  // `generator.startOutlineJob` fall back to running inline (which
+  // works locally but will hit the 60s timeout on Vercel Hobby).
+  QSTASH_TOKEN: z.string().optional(),
+  QSTASH_CURRENT_SIGNING_KEY: z.string().optional(),
+  QSTASH_NEXT_SIGNING_KEY: z.string().optional(),
+
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
@@ -45,6 +45,26 @@ const SETTING_LABELS: { key: keyof Settings; label: string }[] = [
   { key: "difficulty", label: "Difficulty curve" },
 ];
 
+type Outline = {
+  title: string;
+  tagline: string;
+  description: string;
+  units: {
+    shortLabel: string;
+    title: string;
+    subtitle: string;
+    // Full per-lesson shape — keeping all three fields here so the
+    // outline state object can be passed straight into
+    // `generator.regenerateUnit` without a cast or shape narrowing.
+    lessons: {
+      title: string;
+      summary: string;
+      readingContent: string;
+    }[];
+    durationLabel: string;
+  }[];
+};
+
 export default function AIGeneratorPage() {
   const router = useRouter();
   const [brief, setBrief] = useState(DEFAULT_BRIEF);
@@ -52,37 +72,60 @@ export default function AIGeneratorPage() {
   const [editingSetting, setEditingSetting] = useState<keyof Settings | null>(
     null
   );
-  const [outline, setOutline] = useState<{
-    title: string;
-    tagline: string;
-    description: string;
-    units: {
-      shortLabel: string;
-      title: string;
-      subtitle: string;
-      // Full per-lesson shape — keeping all three fields here so the
-      // outline state object can be passed straight into
-      // `generator.regenerateUnit` without a cast or shape narrowing.
-      lessons: {
-        title: string;
-        summary: string;
-        readingContent: string;
-      }[];
-      durationLabel: string;
-    }[];
-  } | null>(null);
-  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
+  const [outline, setOutline] = useState<Outline | null>(null);
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStartedAt, setJobStartedAt] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
 
-  const generateOutline = trpc.generator.outline.useMutation({
-    onSuccess: (r) => {
-      setOutline(r.outline);
-      setElapsedMs(r.elapsedMs);
+  const startOutlineJob = trpc.generator.startOutlineJob.useMutation({
+    onSuccess: ({ jobId }) => {
+      setJobId(jobId);
+      setJobStartedAt(Date.now());
       setErrorMsg(null);
     },
     onError: (e) => setErrorMsg(e.message),
   });
+
+  // Poll the job every 2s until it reaches a terminal state. tRPC
+  // refetchInterval can return false to stop polling, which we do as
+  // soon as status is succeeded/failed/canceled.
+  const jobQuery = trpc.generator.getJob.useQuery(
+    { jobId: jobId! },
+    {
+      enabled: !!jobId,
+      refetchInterval: (query) => {
+        const status = query.state.data?.status;
+        if (
+          status === "succeeded" ||
+          status === "failed" ||
+          status === "canceled"
+        ) {
+          return false;
+        }
+        return 2000;
+      },
+      // Don't keep stale data around between job runs — each job is its
+      // own request, want a clean slate on the next Generate click.
+      gcTime: 0,
+    }
+  );
+
+  // React to job status transitions: on success hydrate the outline +
+  // record elapsed time; on failure surface the error to the toast.
+  useEffect(() => {
+    const job = jobQuery.data;
+    if (!job) return;
+    if (job.status === "succeeded" && job.output) {
+      setOutline(job.output as Outline);
+      if (jobStartedAt) setElapsedMs(Date.now() - jobStartedAt);
+    } else if (job.status === "failed") {
+      setErrorMsg(job.error ?? "Generation failed");
+    } else if (job.status === "canceled") {
+      setErrorMsg("Generation canceled");
+    }
+  }, [jobQuery.data, jobStartedAt]);
 
   const regenerateUnit = trpc.generator.regenerateUnit.useMutation({
     onMutate: ({ unitIndex }) => setRegenIdx(unitIndex),
@@ -113,6 +156,20 @@ export default function AIGeneratorPage() {
   });
 
   const hasOutline = outline !== null;
+
+  // Derived state for the live job UI. Both `startOutlineJob.isPending`
+  // (mutation in flight) AND a non-terminal `jobQuery.data.status`
+  // count as "still running" — first covers the initial enqueue, second
+  // covers everything between enqueue and final webhook.
+  const jobStatus = jobQuery.data?.status;
+  const isRunning =
+    startOutlineJob.isPending ||
+    jobStatus === "pending" ||
+    jobStatus === "running";
+  const progressPct = jobQuery.data?.progress ?? 0;
+  const stepText =
+    jobQuery.data?.step ??
+    (startOutlineJob.isPending ? "Queueing job…" : null);
 
   return (
     <TeacherChrome active="courses">
@@ -195,7 +252,7 @@ export default function AIGeneratorPage() {
                 value={brief}
                 onChange={(e) => setBrief(e.target.value)}
                 rows={5}
-                disabled={generateOutline.isPending}
+                disabled={isRunning}
                 style={{
                   fontSize: 13,
                   color: "var(--wf-ink)",
@@ -306,14 +363,17 @@ export default function AIGeneratorPage() {
             <Btn
               variant="ai"
               full
-              disabled={generateOutline.isPending || brief.trim().length < 20}
+              disabled={isRunning || brief.trim().length < 20}
               icon={<Icon name="sparkles" size={14} color="var(--wf-ai)" />}
               onClick={() => {
                 setErrorMsg(null);
-                generateOutline.mutate({ brief, settings });
+                setOutline(null);
+                setElapsedMs(null);
+                setJobId(null);
+                startOutlineJob.mutate({ brief, settings });
               }}
             >
-              {generateOutline.isPending
+              {isRunning
                 ? "Generating outline…"
                 : hasOutline
                 ? "Regenerate outline"
@@ -364,7 +424,76 @@ export default function AIGeneratorPage() {
               )}
             </div>
 
-            {generateOutline.isPending && !hasOutline ? (
+            {/* Live job-status strip — shown whenever a job is in flight.
+                Lets the user watch the chunked generation progress
+                without staring at an opaque spinner for 90 seconds. */}
+            {isRunning && (
+              <Card
+                p={16}
+                style={{
+                  marginBottom: 14,
+                  background: "var(--wf-ai-soft)",
+                  borderColor: "var(--wf-ai)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 10,
+                  }}
+                >
+                  <Icon name="sparkles" size={14} color="var(--wf-ai)" />
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--wf-ink)",
+                    }}
+                  >
+                    {stepText ?? "Working…"}
+                  </span>
+                  <div style={{ flex: 1 }} />
+                  <span
+                    className="wf-mono"
+                    style={{ fontSize: 11, color: "var(--wf-mute)" }}
+                  >
+                    {progressPct}%
+                  </span>
+                </div>
+                <div
+                  style={{
+                    height: 4,
+                    background: "var(--wf-hairline)",
+                    borderRadius: 2,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${progressPct}%`,
+                      background: "var(--wf-ai)",
+                      transition: "width 0.4s ease",
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 11,
+                    color: "var(--wf-mute)",
+                  }}
+                >
+                  Chunked across {jobQuery.data?.totalChunks ?? "…"} steps so
+                  each fits inside the function timeout. Safe to leave this
+                  tab open — the job continues even if you navigate away.
+                </div>
+              </Card>
+            )}
+
+            {isRunning && !hasOutline ? (
               <Card p={32} style={{ textAlign: "center" }}>
                 <div
                   className="wf-pulse"
