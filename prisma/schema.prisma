@@ -92,6 +92,8 @@ model User {
   // kids, and a STUDENT user's reverse link back to their parents.
   childLinks     ParentChild[] @relation("ParentLinks")
   parentLinks    ParentChild[] @relation("ChildLinks")
+  // Per-lesson completion checkpoints — drive Enrollment.progressPct.
+  lessonProgress LessonProgress[]
 
   @@index([role])
 }
@@ -217,6 +219,7 @@ model Lesson {
   steps       LessonStep[]
   tutorSessions TutorSession[]
   chunks      LessonChunk[]
+  progress    LessonProgress[]
   @@index([unitId, order])
 }
 
@@ -360,6 +363,23 @@ model Enrollment {
   progressPct    Int       @default(0)
   @@unique([userId, courseId])
   @@index([userId, lastActivityAt])
+}
+
+/// Per-(user, lesson) completion marker. Driven by `lesson.markComplete`
+/// on the student client (the "Lesson complete →" button). The resolver
+/// upserts a row here, then recomputes Enrollment.progressPct as
+/// completed-lessons / total-lessons in the course so the dashboard +
+/// library cards stay in sync.
+model LessonProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+  @@unique([userId, lessonId])
+  @@index([userId, completedAt])
+  @@index([lessonId])
 }
 
 model Attempt {

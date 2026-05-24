@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Annot,
   Btn,
@@ -64,6 +65,24 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
 
   const attempt = trpc.lesson.attempt.useMutation({
     onSuccess: (res) => setFeedback(res),
+  });
+
+  // "Lesson complete →" on the last question used to call `next()`
+  // which clamped qIdx to the same index and reset state — students
+  // were stuck on the final question with no way to progress and no
+  // course-status update. This mutation persists the completion,
+  // recomputes Enrollment.progressPct, and returns the next lesson
+  // slug so the student is actually moved forward.
+  const router = useRouter();
+  const markComplete = trpc.lesson.markComplete.useMutation({
+    onSuccess: (data) => {
+      if (data.nextLessonSlug) {
+        router.push(`/student/lesson/${data.nextLessonSlug}`);
+      } else {
+        router.push(`/course/${data.courseSlug}`);
+      }
+      router.refresh();
+    },
   });
 
   const initialAi = lesson.intro ?? "Let's break this down step by step.";
@@ -231,10 +250,19 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
   };
 
   const next = () => {
+    // On the last question, "Next" turns into "Lesson complete →" —
+    // fire the completion mutation and let its onSuccess navigate
+    // forward. The old version called setQIdx with a Math.min clamp,
+    // which on the last question evaluated to the same index, so the
+    // button visibly did nothing.
+    if (qIdx >= lesson.questions.length - 1) {
+      markComplete.mutate({ lessonId: lesson.id });
+      return;
+    }
     setChecked(false);
     setSelected(null);
     setFeedback(null);
-    setQIdx((i) => Math.min(lesson.questions.length - 1, i + 1));
+    setQIdx((i) => i + 1);
   };
 
   const isLastQuestion = qIdx >= lesson.questions.length - 1;
@@ -428,7 +456,7 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
           {!question ? (
             lesson.blocks.length === 0 && (
               <Card p={32} style={{ textAlign: "center" }}>
-                <Eyebrow>No questions yet</Eyebrow>
+                <Eyebrow>Lesson is empty</Eyebrow>
                 <div
                   style={{
                     marginTop: 8,
@@ -436,8 +464,18 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
                     color: "var(--wf-body)",
                   }}
                 >
-                  This lesson is content-only for now.
+                  Your teacher hasn&apos;t added content to this lesson
+                  yet. Check back soon — or pick another lesson from
+                  the course outline.
                 </div>
+                <Link
+                  href={`/course/${lesson.courseSlug}`}
+                  style={{ textDecoration: "none" }}
+                >
+                  <Btn variant="ghost" sm style={{ marginTop: 14 }}>
+                    Back to course
+                  </Btn>
+                </Link>
               </Card>
             )
           ) : (
@@ -620,9 +658,15 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
                     <Btn
                       variant="primary"
                       onClick={next}
-                      disabled={isLastQuestion && isWrong}
+                      disabled={
+                        (isLastQuestion && isWrong) || markComplete.isPending
+                      }
                     >
-                      {isLastQuestion ? "Lesson complete →" : "Next question →"}
+                      {isLastQuestion
+                        ? markComplete.isPending
+                          ? "Completing…"
+                          : "Lesson complete →"
+                        : "Next question →"}
                     </Btn>
                   )}
                 </div>

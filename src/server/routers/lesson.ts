@@ -717,4 +717,133 @@ export const lessonRouter = router({
         total: rows.length,
       };
     }),
+
+  /**
+   * Mark a lesson complete for the signed-in student.
+   *
+   * Idempotent: re-completing the same lesson is a no-op on the
+   * checkpoint (LessonProgress is uniqued by (userId, lessonId)) but
+   * still recomputes Enrollment.progressPct + bumps lastActivityAt so
+   * the dashboard's "continue learning" sort updates.
+   *
+   * Returns the next lesson's slug (within the same course, sorted by
+   * unit-then-lesson order) so the client can navigate the student
+   * forward. When the course is fully complete, returns no next slug
+   * and the caller falls back to the course page.
+   */
+  markComplete: protectedProcedure
+    .input(z.object({ lessonId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Pull the lesson + its sibling lessons (for next-up + total count)
+      // in a single query — avoids a follow-up round-trip to compute
+      // the new progress percentage.
+      const lesson = await ctx.db.lesson.findUnique({
+        where: { id: input.lessonId },
+        select: {
+          id: true,
+          unit: {
+            select: {
+              courseId: true,
+              course: {
+                select: {
+                  slug: true,
+                  units: {
+                    orderBy: { order: "asc" },
+                    select: {
+                      id: true,
+                      order: true,
+                      lessons: {
+                        orderBy: { order: "asc" },
+                        select: { id: true, slug: true, order: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      const courseId = lesson.unit.courseId;
+      const courseSlug = lesson.unit.course.slug;
+
+      // Idempotent completion checkpoint.
+      await ctx.db.lessonProgress.upsert({
+        where: {
+          userId_lessonId: {
+            userId: ctx.user.id,
+            lessonId: input.lessonId,
+          },
+        },
+        create: { userId: ctx.user.id, lessonId: input.lessonId },
+        update: {},
+      });
+
+      // Recompute progressPct from real LessonProgress rows in this
+      // course — never trust the existing enrollment.progressPct,
+      // since lessons can be added/removed from the course after the
+      // student enrolled.
+      const orderedLessons = lesson.unit.course.units.flatMap(
+        (u) => u.lessons
+      );
+      const totalLessons = orderedLessons.length;
+      const completedRows = await ctx.db.lessonProgress.findMany({
+        where: {
+          userId: ctx.user.id,
+          lesson: { unit: { courseId } },
+        },
+        select: { lessonId: true },
+      });
+      const completedCount = new Set(completedRows.map((r) => r.lessonId))
+        .size;
+      const progressPct =
+        totalLessons > 0
+          ? Math.min(
+              100,
+              Math.round((completedCount / totalLessons) * 100)
+            )
+          : 0;
+      const isCourseComplete =
+        totalLessons > 0 && completedCount >= totalLessons;
+
+      // Upsert so a student who hits Complete on a free-preview lesson
+      // (without enrolling first) still gets an Enrollment row.
+      await ctx.db.enrollment.upsert({
+        where: {
+          userId_courseId: { userId: ctx.user.id, courseId },
+        },
+        create: {
+          userId: ctx.user.id,
+          courseId,
+          progressPct,
+          completed: isCourseComplete,
+          lastActivityAt: new Date(),
+        },
+        update: {
+          progressPct,
+          completed: isCourseComplete,
+          lastActivityAt: new Date(),
+        },
+      });
+
+      // Find the next lesson in unit-then-lesson order. The query
+      // already ordered by `unit.order` then `lesson.order`, so the
+      // flat list is in playback sequence.
+      const currentIdx = orderedLessons.findIndex(
+        (l) => l.id === input.lessonId
+      );
+      const nextLesson =
+        currentIdx >= 0 && currentIdx + 1 < orderedLessons.length
+          ? orderedLessons[currentIdx + 1]
+          : null;
+
+      return {
+        ok: true as const,
+        progressPct,
+        completed: isCourseComplete,
+        nextLessonSlug: nextLesson?.slug ?? null,
+        courseSlug,
+      };
+    }),
 });
