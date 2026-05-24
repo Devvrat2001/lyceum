@@ -3,15 +3,16 @@ import type { Prisma } from "@prisma/client";
 import { db as prisma } from "@/lib/db";
 import {
   OutlineSkeletonSchema,
-  UnitReadingsSchema,
+  UnitLessonsSchema,
   COURSE_GENERATOR_SYSTEM_PROMPT,
   SettingsSchema,
   buildOutlineSkeletonPrompt,
-  buildUnitReadingsPrompt,
+  buildUnitLessonsPrompt,
   type Outline,
   type OutlineSkeleton,
   type OutlineLesson,
   type GeneratorSettings,
+  type RichLessonBlock,
 } from "@/lib/ai/prompts/courseGenerator";
 import { completeStructured, isLlmEnabled } from "@/lib/ai/llm";
 import { enqueueOutlineChunk, isQStashEnabled } from "@/lib/qstash";
@@ -109,23 +110,33 @@ export async function processOutlineChunk(
       where: { id: jobId },
       data: {
         status: "running",
-        step: `Generating readings for ${unit.shortLabel}: ${unit.title}`,
+        step: `Building rich content for ${unit.shortLabel}: ${unit.title}`,
       },
     });
 
     if (!isLlmEnabled()) {
-      // Demo mode: stub readings.
-      const stubbed = unit.lessons.map(
-        (l) =>
-          `Placeholder reading for "${l.title}". Set ANTHROPIC_API_KEY or OPENAI_API_KEY on this deployment and regenerate to get real content.`
+      // Demo mode: stub a minimal block stack so the rest of the
+      // pipeline (validation, save) exercises the same code paths
+      // it'd use in prod.
+      const stubbedLessons = unit.lessons.map((l) =>
+        stubBlockStack(l.title)
       );
-      return await advanceAfterReadings(jobId, partial, unitIdx, stubbed);
+      return await advanceAfterRichLessons(
+        jobId,
+        partial,
+        unitIdx,
+        stubbedLessons
+      );
     }
 
+    // Rich path: ~5-8K output tokens (4-7 blocks × 3-10 lessons), so
+    // bump max_tokens to 8192. Still fits in 60s for typical unit
+    // sizes; pathological 10-lesson units may need a per-lesson split
+    // later, but we'll cross that bridge when we see it failing.
     const { data: result } = await completeStructured({
-      schema: UnitReadingsSchema,
+      schema: UnitLessonsSchema,
       system: COURSE_GENERATOR_SYSTEM_PROMPT,
-      prompt: buildUnitReadingsPrompt({
+      prompt: buildUnitLessonsPrompt({
         brief: input.brief,
         settings,
         courseTitle: partial.title,
@@ -140,18 +151,23 @@ export async function processOutlineChunk(
           })),
         },
       }),
-      maxTokens: 4096,
+      maxTokens: 8192,
     });
 
-    // Trust the model on count but fall back gracefully on length
-    // mismatch — pad with empty strings or truncate so we never write
-    // garbage rows.
+    // Pad/truncate to expected length so a model that returns N±1
+    // lessons doesn't corrupt the merge. Missing lessons get a stub
+    // block stack so the lesson row still has SOMETHING when the
+    // teacher opens it in the editor.
     const expected = unit.lessons.length;
-    const readings = [...result.readings];
-    while (readings.length < expected) readings.push("");
-    readings.length = expected;
+    const lessons: RichLessonBlock[][] = result.lessons.map(
+      (l) => l.blocks as RichLessonBlock[]
+    );
+    while (lessons.length < expected) {
+      lessons.push(stubBlockStack(unit.lessons[lessons.length].title));
+    }
+    lessons.length = expected;
 
-    return await advanceAfterReadings(jobId, partial, unitIdx, readings);
+    return await advanceAfterRichLessons(jobId, partial, unitIdx, lessons);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[processOutlineChunk] chunk failed", { jobId, msg });
@@ -228,13 +244,18 @@ async function advanceAfterSkeleton(
   return { done: false };
 }
 
-async function advanceAfterReadings(
+/**
+ * Merge a unit's full rich block stacks back into the partial outline.
+ * Each lesson now carries a `blocks` array; we also keep `readingContent`
+ * populated from the first READING block (if any) so the legacy code
+ * paths (regenerateUnit, the saveAsCourse fallback) keep working.
+ */
+async function advanceAfterRichLessons(
   jobId: string,
   partial: Outline,
   unitIdx: number,
-  readings: string[]
+  lessonsBlocks: RichLessonBlock[][]
 ): Promise<{ done: boolean }> {
-  // Merge readings into the unit's lessons.
   const updated: Outline = {
     ...partial,
     units: partial.units.map((u, i) =>
@@ -242,10 +263,22 @@ async function advanceAfterReadings(
         ? u
         : {
             ...u,
-            lessons: u.lessons.map((l, j) => ({
-              ...l,
-              readingContent: readings[j] || l.readingContent,
-            })),
+            lessons: u.lessons.map((l, j) => {
+              const blocks = lessonsBlocks[j] ?? [];
+              const readingBlock = blocks.find(
+                (b): b is Extract<RichLessonBlock, { type: "READING" }> =>
+                  b.type === "READING"
+              );
+              return {
+                ...l,
+                // Keep readingContent in sync with the first READING
+                // block so anything that still reads it (legacy
+                // saveAsCourse fallback, the regenerate-unit path)
+                // sees the latest content.
+                readingContent: readingBlock?.body ?? l.readingContent,
+                blocks,
+              };
+            }),
           }
     ),
   };
@@ -278,13 +311,38 @@ async function advanceAfterReadings(
       partial: updated as unknown as Prisma.InputJsonValue,
       nextChunk,
       progress: Math.round((nextChunk / totalChunks) * 100),
-      step: `Readings for ${partial.units[unitIdx].shortLabel} done — moving on`,
+      step: `${partial.units[unitIdx].shortLabel} content ready — moving on`,
     },
   });
   if (isQStashEnabled()) {
     await enqueueOutlineChunk(jobId);
   }
   return { done: false };
+}
+
+/**
+ * Stub block stack used in demo mode and as padding when the model
+ * returns fewer lessons than the skeleton declared. Honest about
+ * being a placeholder so teachers + students can tell at a glance.
+ */
+function stubBlockStack(lessonTitle: string): RichLessonBlock[] {
+  return [
+    {
+      type: "READING",
+      label: "Read this first",
+      body:
+        `Placeholder reading for "${lessonTitle}". The AI builder is running ` +
+        `in demo mode because no AI provider key is configured on this ` +
+        `deployment. Set ANTHROPIC_API_KEY or OPENAI_API_KEY in Vercel ` +
+        `and regenerate to get real, grade-appropriate content.`,
+    },
+    {
+      type: "DISCUSSION",
+      label: "Talk it over",
+      prompt:
+        `What do you think this lesson is about, just from the title "${lessonTitle}"?`,
+    },
+  ];
 }
 
 async function markFailed(jobId: string, message: string): Promise<void> {

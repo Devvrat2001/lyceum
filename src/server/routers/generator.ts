@@ -6,11 +6,13 @@ import {
   COURSE_GENERATOR_SYSTEM_PROMPT,
   OutlineSchema,
   OutlineUnitSchema,
+  RichLessonBlockSchema,
   SettingsSchema,
   buildCourseGenPrompt,
   buildDemoOutline,
   type Outline,
   type OutlineUnit,
+  type RichLessonBlock,
 } from "@/lib/ai/prompts/courseGenerator";
 import {
   QUESTION_GENERATOR_SYSTEM_PROMPT,
@@ -45,6 +47,127 @@ const slugify = (s: string) =>
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 80);
+
+/**
+ * Map one rich block emitted by the AI worker (RichLessonBlock) into
+ * the `{type, settings}` shape Prisma's Block.create expects.
+ *
+ * Settings shape MUST match `src/lib/blocks.ts` so the runtime
+ * BlockReader can render it without a translation layer. Each branch
+ * here mirrors the SettingsFor<T> type for the corresponding block.
+ *
+ * The `order` field is set by the caller (positional within the
+ * lesson) — we deliberately keep that concern outside this helper.
+ */
+function richBlockToCreateInput(block: RichLessonBlock): {
+  type: "READING" | "MCQ" | "QUIZ" | "DRAG_MATCH" | "POLL" | "DISCUSSION" | "SECTION";
+  settings: Prisma.InputJsonValue;
+} {
+  switch (block.type) {
+    case "READING":
+      return {
+        type: "READING",
+        settings: { label: block.label, body: block.body },
+      };
+    case "MCQ":
+      // McqSettings.options is McqOption[] = {text, correct}[] — same
+      // shape RichBlockMcq emits, so this is a straight pass-through.
+      return {
+        type: "MCQ",
+        settings: {
+          label: block.label,
+          stem: block.stem,
+          options: block.options,
+        },
+      };
+    case "QUIZ":
+      // QuizSettings.questions[] matches our schema 1:1 (stem +
+      // answers[{key,text,correct}] + optional hint).
+      return {
+        type: "QUIZ",
+        settings: {
+          label: block.label,
+          questions: block.questions,
+        },
+      };
+    case "DRAG_MATCH":
+      return {
+        type: "DRAG_MATCH",
+        settings: {
+          // DragMatchSettings has no `instructions` field — we surface
+          // the AI's label as the heading; nothing else to map.
+          label: block.label,
+          pairs: block.pairs,
+        },
+      };
+    case "POLL":
+      return {
+        type: "POLL",
+        settings: {
+          label: block.label,
+          prompt: block.prompt,
+          options: block.options,
+        },
+      };
+    case "DISCUSSION":
+      return {
+        type: "DISCUSSION",
+        settings: { label: block.label, prompt: block.prompt },
+      };
+    case "SECTION":
+      return {
+        type: "SECTION",
+        settings: { title: block.title, subtitle: block.subtitle ?? undefined },
+      };
+  }
+}
+
+/**
+ * Build the full block-create array for one lesson. Uses the rich
+ * `blocks` array when the AI worker produced one; otherwise falls
+ * back to the legacy single-READING shape using `readingContent` so
+ * the regenerate-unit + demo flows still produce a usable lesson.
+ *
+ * Each emitted entry has its `order` set by position so the runtime
+ * Block.order matches the AI's intended sequence.
+ */
+function buildLessonBlocks(lesson: {
+  summary: string;
+  readingContent: string;
+  blocks?: unknown[];
+}): Prisma.BlockCreateWithoutLessonInput[] {
+  if (lesson.blocks && lesson.blocks.length > 0) {
+    // Validate each block against the discriminated union. Invalid
+    // ones (model returned a bad shape) get dropped rather than
+    // failing the whole save — the teacher can still ship with the
+    // valid blocks and the dropped ones are visible in audit.
+    const valid: RichLessonBlock[] = [];
+    for (const raw of lesson.blocks) {
+      const parsed = RichLessonBlockSchema.safeParse(raw);
+      if (parsed.success) valid.push(parsed.data);
+    }
+    if (valid.length > 0) {
+      return valid.map((b, i) => {
+        const { type, settings } = richBlockToCreateInput(b);
+        return { type, order: i + 1, settings };
+      });
+    }
+  }
+  // Fallback: single READING with the legacy text. This is the same
+  // shape the previous saveAsCourse always produced — kept so demo
+  // mode + regenerate-unit + any out-of-date client snapshots still
+  // yield a saveable course.
+  return [
+    {
+      type: "READING",
+      order: 1,
+      settings: {
+        label: "Read this first",
+        body: lesson.readingContent,
+      } as Prisma.InputJsonValue,
+    },
+  ];
+}
 
 export const generatorRouter = router({
   /** Generate a fresh outline from a brief + settings. */
@@ -649,17 +772,11 @@ export const generatorRouter = router({
                   durationMin: 8,
                   isPreview: i === 0 && j === 0,
                   intro: lesson.summary,
+                  // Rich block stack when the worker produced one
+                  // (modern flow); single READING fallback otherwise.
+                  // See `buildLessonBlocks` for the full mapping.
                   blocks: {
-                    create: [
-                      {
-                        type: "READING",
-                        order: 1,
-                        settings: {
-                          label: "Read this first",
-                          body: lesson.readingContent,
-                        } as Prisma.InputJsonValue,
-                      },
-                    ],
+                    create: buildLessonBlocks(lesson),
                   },
                 })),
               },
