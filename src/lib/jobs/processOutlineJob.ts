@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { db as prisma } from "@/lib/db";
 import {
   OutlineSkeletonSchema,
+  RichLessonBlockSchema,
   UnitLessonsSchema,
   COURSE_GENERATOR_SYSTEM_PROMPT,
   SettingsSchema,
@@ -154,14 +155,41 @@ export async function processOutlineChunk(
       maxTokens: 8192,
     });
 
-    // Pad/truncate to expected length so a model that returns N±1
-    // lessons doesn't corrupt the merge. Missing lessons get a stub
-    // block stack so the lesson row still has SOMETHING when the
-    // teacher opens it in the editor.
+    // Per-block validation. UnitLessonsSchema is intentionally loose
+    // (blocks: unknown[]) so a single bad block doesn't kill the whole
+    // chunk — we filter here instead. If a model hallucinates a block
+    // type that isn't in RichLessonBlockSchema's discriminator (e.g.
+    // VIDEO, SLIDES) we drop just that entry and keep the valid ones.
+    // If a lesson ends up with zero valid blocks, we fall back to a
+    // stub stack so the teacher still has something to edit.
     const expected = unit.lessons.length;
-    const lessons: RichLessonBlock[][] = result.lessons.map(
-      (l) => l.blocks as RichLessonBlock[]
-    );
+    const lessons: RichLessonBlock[][] = result.lessons.map((l, lessonIdx) => {
+      const valid: RichLessonBlock[] = [];
+      let dropped = 0;
+      for (const raw of l.blocks) {
+        const parsed = RichLessonBlockSchema.safeParse(raw);
+        if (parsed.success) {
+          valid.push(parsed.data);
+        } else {
+          dropped += 1;
+        }
+      }
+      if (dropped > 0) {
+        console.warn("[processOutlineChunk] dropped invalid blocks", {
+          jobId,
+          unitIdx,
+          lessonIdx,
+          dropped,
+          kept: valid.length,
+        });
+      }
+      // Empty lesson → stub. Better than persisting a content-less
+      // shell the teacher has to debug.
+      if (valid.length === 0) {
+        return stubBlockStack(unit.lessons[lessonIdx]?.title ?? "Lesson");
+      }
+      return valid;
+    });
     while (lessons.length < expected) {
       lessons.push(stubBlockStack(unit.lessons[lessons.length].title));
     }

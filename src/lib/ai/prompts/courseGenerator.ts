@@ -308,11 +308,35 @@ export const RichLessonSchema = z.object({
 
 export type RichLesson = z.infer<typeof RichLessonSchema>;
 
+// Strict-typed variant — kept for callers that want type-safety on
+// the full unit (saveAsCourse paths consuming the merged Outline use
+// RichLessonBlock directly). For the LLM round-trip we use the loose
+// variant below because providers occasionally emit a stray block type
+// outside the discriminator (e.g. VIDEO, SLIDES) — those bad blocks
+// would kill the whole chunk under strict parsing instead of being
+// dropped cleanly.
+export const UnitLessonsStrictSchema = z.object({
+  lessons: z.array(RichLessonSchema),
+});
+
+/**
+ * Permissive schema used at the LLM-to-Zod boundary. Each block is
+ * `z.unknown()` so a single bad shape doesn't fail the whole parse;
+ * the worker then runs `RichLessonBlockSchema.safeParse(block)` on
+ * each entry and drops invalid ones. JSON Schema guidance for the
+ * model still comes from the prompt text (which lists the 7 types
+ * + per-type rules), so we don't lose much by going loose at the
+ * Zod layer.
+ */
 export const UnitLessonsSchema = z.object({
   lessons: z
-    .array(RichLessonSchema)
+    .array(
+      z.object({
+        blocks: z.array(z.unknown()),
+      })
+    )
     .describe(
-      "One RichLesson per lesson, in lesson order. The array length MUST match the lesson count provided in the prompt."
+      "One entry per lesson, in lesson order. The array length MUST match the lesson count provided in the prompt."
     ),
 });
 
@@ -449,6 +473,14 @@ Use 4-7 blocks per lesson. The exact mix depends on the lesson:
 - Conceptual/abstract lesson → more MCQs probing understanding
 - Capstone/project lesson → POLL + DISCUSSION instead of a QUIZ
 - Always START with a READING and END with either a QUIZ or DISCUSSION
+
+ALLOWED block "type" values (case-sensitive, exact strings only):
+  READING, MCQ, QUIZ, DRAG_MATCH, POLL, DISCUSSION, SECTION
+
+DO NOT emit any other type. The platform supports more block types
+(VIDEO, SLIDES, PDF, SIMULATION, BRANCHING, AI_QUIZ, SPEAK, LIVE) but
+those need teacher-supplied assets that you can't author — emitting
+them here will fail validation and your block will be dropped.
 
 Per-block authoring rules:
 
