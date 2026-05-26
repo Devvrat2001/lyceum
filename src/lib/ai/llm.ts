@@ -30,17 +30,35 @@ export function activeLlm(): LlmMode {
  *
  * Provider precedence: OPENAI_API_KEY wins when both keys are set.
  *
+ * Two-schema mode: pass `validateSchema` separately when you want
+ * the LLM to see a strict shape for guidance (so OpenAI's structured
+ * outputs know the exact field names) but want lenient Zod parsing
+ * on the response (so one bad sub-element doesn't kill the whole
+ * call). Discriminated unions over many block types are the
+ * canonical case — see `processOutlineJob.ts`. When `validateSchema`
+ * is omitted, both jobs use `schema` (the original behavior).
+ *
  * Throws if neither key is configured — callers should gate on
  * `isLlmEnabled()` and fall back to their demo path if false.
  */
-export async function completeStructured<S extends ZodTypeAny>(args: {
+export async function completeStructured<
+  S extends ZodTypeAny,
+  V extends ZodTypeAny = S
+>(args: {
   schema: S;
+  validateSchema?: V;
   system: string;
   prompt: string;
   maxTokens?: number;
-}): Promise<{ data: z.infer<S>; mode: Exclude<LlmMode, "demo"> }> {
+}): Promise<{ data: z.infer<V>; mode: Exclude<LlmMode, "demo"> }> {
   const maxTokens = args.maxTokens ?? 4096;
+  // `schema` shapes the JSON Schema sent to the LLM (guidance) AND
+  // the prompt-inlined Claude schema. `validateSchema` (default =
+  // schema) is what Zod actually parses against. Keeping them split
+  // lets callers ask the model for a strict shape while accepting a
+  // permissive parse.
   const jsonSchema = zodToJsonSchema(args.schema);
+  const parseSchema = (args.validateSchema ?? args.schema) as ZodTypeAny;
 
   if (isOpenAIEnabled()) {
     const client = getOpenAI()!;
@@ -68,7 +86,7 @@ export async function completeStructured<S extends ZodTypeAny>(args: {
     });
     const text = res.choices[0]?.message?.content ?? "";
     return {
-      data: parseAndValidate(text, args.schema, "openai"),
+      data: parseAndValidate(text, parseSchema, "openai") as z.infer<V>,
       mode: "openai",
     };
   }
@@ -98,7 +116,7 @@ export async function completeStructured<S extends ZodTypeAny>(args: {
         .map((b) => (b.type === "text" ? b.text ?? "" : ""))
         .join("");
       return {
-        data: parseAndValidate(text, args.schema, "claude"),
+        data: parseAndValidate(text, parseSchema, "claude") as z.infer<V>,
         mode: "claude",
       };
     } catch (err) {

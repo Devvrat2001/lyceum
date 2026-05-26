@@ -5,6 +5,7 @@ import {
   OutlineSkeletonSchema,
   RichLessonBlockSchema,
   UnitLessonsSchema,
+  UnitLessonsStrictSchema,
   COURSE_GENERATOR_SYSTEM_PROMPT,
   SettingsSchema,
   buildOutlineSkeletonPrompt,
@@ -134,8 +135,19 @@ export async function processOutlineChunk(
     // bump max_tokens to 8192. Still fits in 60s for typical unit
     // sizes; pathological 10-lesson units may need a per-lesson split
     // later, but we'll cross that bridge when we see it failing.
+    //
+    // Two-schema mode:
+    //   - schema = UnitLessonsStrictSchema → drives the JSON Schema
+    //     OpenAI sees as `response_format`, so it knows our exact
+    //     field names (body, stem, options, pairs, …) and which
+    //     discriminator strings are valid.
+    //   - validateSchema = UnitLessonsSchema → loose Zod parse on
+    //     the response, blocks: z.array(z.unknown()). We then run
+    //     per-block validation below so one wonky block doesn't
+    //     kill the whole unit.
     const { data: result } = await completeStructured({
-      schema: UnitLessonsSchema,
+      schema: UnitLessonsStrictSchema,
+      validateSchema: UnitLessonsSchema,
       system: COURSE_GENERATOR_SYSTEM_PROMPT,
       prompt: buildUnitLessonsPrompt({
         brief: input.brief,
@@ -166,12 +178,25 @@ export async function processOutlineChunk(
     const lessons: RichLessonBlock[][] = result.lessons.map((l, lessonIdx) => {
       const valid: RichLessonBlock[] = [];
       let dropped = 0;
+      // Sample the first rejected block + its Zod error so the log is
+      // actually diagnostic — without this we just see "dropped N"
+      // and have no idea what shape the model emitted.
+      let firstReject: {
+        block: unknown;
+        issues: unknown;
+      } | null = null;
       for (const raw of l.blocks) {
         const parsed = RichLessonBlockSchema.safeParse(raw);
         if (parsed.success) {
           valid.push(parsed.data);
         } else {
           dropped += 1;
+          if (firstReject === null) {
+            firstReject = {
+              block: raw,
+              issues: parsed.error.issues,
+            };
+          }
         }
       }
       if (dropped > 0) {
@@ -181,6 +206,12 @@ export async function processOutlineChunk(
           lessonIdx,
           dropped,
           kept: valid.length,
+          // Truncated sample so a huge block doesn't blow log size.
+          sampleBlock:
+            firstReject !== null
+              ? JSON.stringify(firstReject.block).slice(0, 500)
+              : null,
+          sampleIssues: firstReject?.issues,
         });
       }
       // Empty lesson → stub. Better than persisting a content-less
