@@ -286,6 +286,111 @@ export const SectionBlockSchema = z.object({
     .describe("Optional sub-line under the title."),
 });
 
+/**
+ * Speaking-practice block. The student speaks the answer aloud; the
+ * platform compares it against `expected` (key terms or a model
+ * answer). Genuinely useful for language learning, but also for
+ * "explain it back" exercises that catch misconceptions text MCQs
+ * miss — e.g., "explain why a charged particle moves in a circle in
+ * a magnetic field."
+ *
+ * Use sparingly: ~1 SPEAK per lesson at most, and only when the
+ * concept benefits from spoken articulation. Math drills don't.
+ */
+export const SpeakBlockSchema = z.object({
+  type: z.literal("SPEAK"),
+  label: z.string().describe("Heading, e.g. 'Speak it out' or 'Explain aloud'."),
+  prompt: z
+    .string()
+    .describe("What the student should say. One clear sentence ending in a question or imperative."),
+  expected: z
+    .string()
+    .describe(
+      "Model answer or a comma-separated list of key terms the student MUST include. 1-2 sentences max; the matcher is lenient."
+    ),
+  language: z
+    .string()
+    .optional()
+    .describe("ISO language code, e.g. 'en'. Omit for English."),
+});
+
+/**
+ * Branching scenario — choose-your-own-path with consequences.
+ * Strongest fit for ethics, decision-making, historical "what if",
+ * ecology cause-effect, customer-service / negotiation roleplay.
+ * Bad fit for math: numbers don't branch.
+ *
+ * Validation contract:
+ *   - Exactly one entry node (the rest are reachable from it).
+ *   - Terminal nodes have an empty `choices` array.
+ *   - Every `to` MUST reference an existing node `id`.
+ *   - 3-6 nodes total — bigger graphs become hard to navigate.
+ */
+export const BranchingBlockSchema = z.object({
+  type: z.literal("BRANCHING"),
+  label: z.string().describe("Heading, e.g. 'Choose your path' or 'What would you do?'"),
+  nodes: z
+    .array(
+      z.object({
+        id: z
+          .string()
+          .describe(
+            "Short, lowercase, snake_case id unique within this block. The first node is the entry point. Examples: 'start', 'help_them', 'walk_away', 'consequence_a'."
+          ),
+        title: z.string().describe("One-line node title shown above the body."),
+        body: z
+          .string()
+          .describe(
+            "Scenario text — 2-4 sentences setting the situation and the stakes."
+          ),
+        choices: z
+          .array(
+            z.object({
+              label: z
+                .string()
+                .describe("Choice button text. Short, parallel structure to siblings."),
+              to: z
+                .string()
+                .describe(
+                  "Target node id (must match another node's id in this block)."
+                ),
+            })
+          )
+          .describe(
+            "2-3 choices for branching nodes. Terminal nodes use an empty array."
+          ),
+      })
+    )
+    .describe("3-6 nodes. First node is the entry. Each `to` must reference another node's id."),
+});
+
+/**
+ * Adaptive AI-generated quiz placeholder. At render time, the
+ * platform asks the LLM for `count` fresh questions on `topic`, so
+ * each student session gets a different quiz. We just emit the
+ * config; the quiz itself is generated lazily.
+ *
+ * Use this when:
+ *   - The topic warrants infinite practice (drills, vocabulary).
+ *   - The teacher wants retry value across sessions.
+ * Don't use this when the regular QUIZ block (with fixed,
+ * pre-generated questions) is enough — adaptive quizzes are slower
+ * to load and cost AI tokens per attempt.
+ */
+export const AiQuizBlockSchema = z.object({
+  type: z.literal("AI_QUIZ"),
+  label: z.string().describe("Heading, e.g. 'Adaptive quiz' or 'Endless practice'."),
+  topic: z
+    .string()
+    .describe(
+      "Specific, narrow topic for the runtime generator. Better: 'solving one-step linear equations with positive integers'. Worse: 'algebra'."
+    ),
+  count: z
+    .number()
+    .int()
+    .describe("How many questions to generate per attempt. Typical: 5-10."),
+});
+
 export const RichLessonBlockSchema = z.discriminatedUnion("type", [
   ReadingBlockSchema,
   McqBlockSchema,
@@ -294,6 +399,9 @@ export const RichLessonBlockSchema = z.discriminatedUnion("type", [
   PollBlockSchema,
   DiscussionBlockSchema,
   SectionBlockSchema,
+  SpeakBlockSchema,
+  BranchingBlockSchema,
+  AiQuizBlockSchema,
 ]);
 
 export type RichLessonBlock = z.infer<typeof RichLessonBlockSchema>;
@@ -468,19 +576,34 @@ learning arc. A strong default shape:
   5. DISCUSSION              (reflection prompt for the class)
   6. QUIZ                    (consolidating 3-5 question quiz)
 
-Use 4-7 blocks per lesson. The exact mix depends on the lesson:
+Use 4-8 blocks per lesson. The exact mix depends on the lesson:
 - Vocabulary-heavy lesson → emphasize DRAG_MATCH
 - Conceptual/abstract lesson → more MCQs probing understanding
 - Capstone/project lesson → POLL + DISCUSSION instead of a QUIZ
-- Always START with a READING and END with either a QUIZ or DISCUSSION
+- Lesson with ethical / decision-making content → use BRANCHING
+- Language or "explain it back" lesson → use SPEAK
+- Drill-heavy topic the student needs to retry → end with AI_QUIZ
+- Always START with a READING and END with either a QUIZ, AI_QUIZ,
+  or DISCUSSION
 
 ALLOWED block "type" values (case-sensitive, exact strings only):
-  READING, MCQ, QUIZ, DRAG_MATCH, POLL, DISCUSSION, SECTION
+  READING, MCQ, QUIZ, DRAG_MATCH, POLL, DISCUSSION, SECTION,
+  SPEAK, BRANCHING, AI_QUIZ
 
-DO NOT emit any other type. The platform supports more block types
-(VIDEO, SLIDES, PDF, SIMULATION, BRANCHING, AI_QUIZ, SPEAK, LIVE) but
-those need teacher-supplied assets that you can't author — emitting
-them here will fail validation and your block will be dropped.
+DO NOT emit these types — they need teacher-supplied assets (URLs,
+calendar entries) that you can't author. Trying to use them will
+fail validation:
+  VIDEO, SLIDES, PDF, SIMULATION, LIVE
+
+Pick the new types ONLY when they're a natural fit:
+- SPEAK: language-learning lessons, or any lesson where saying it
+  aloud surfaces misconceptions text can hide. ~1 per lesson max.
+- BRANCHING: ethics, history "what if", customer-service roleplay,
+  ecology cause-effect. NOT for math/drill topics.
+- AI_QUIZ: at the END of a drillable lesson, when the teacher wants
+  the student to be able to retry with fresh questions. Prefer the
+  regular QUIZ block when fixed questions suffice — adaptive quizzes
+  are slower and cost AI tokens per attempt.
 
 Per-block authoring rules:
 

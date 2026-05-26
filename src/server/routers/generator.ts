@@ -60,7 +60,17 @@ const slugify = (s: string) =>
  * lesson) — we deliberately keep that concern outside this helper.
  */
 function richBlockToCreateInput(block: RichLessonBlock): {
-  type: "READING" | "MCQ" | "QUIZ" | "DRAG_MATCH" | "POLL" | "DISCUSSION" | "SECTION";
+  type:
+    | "READING"
+    | "MCQ"
+    | "QUIZ"
+    | "DRAG_MATCH"
+    | "POLL"
+    | "DISCUSSION"
+    | "SECTION"
+    | "SPEAK"
+    | "BRANCHING"
+    | "AI_QUIZ";
   settings: Prisma.InputJsonValue;
 } {
   switch (block.type) {
@@ -118,6 +128,41 @@ function richBlockToCreateInput(block: RichLessonBlock): {
       return {
         type: "SECTION",
         settings: { title: block.title, subtitle: block.subtitle ?? undefined },
+      };
+    case "SPEAK":
+      // SpeakSettings { label?, prompt?, expected?, language? } —
+      // straight pass-through.
+      return {
+        type: "SPEAK",
+        settings: {
+          label: block.label,
+          prompt: block.prompt,
+          expected: block.expected,
+          language: block.language ?? undefined,
+        },
+      };
+    case "BRANCHING":
+      // BranchingSettings.nodes shape matches BranchingNode = {
+      //   id, title, body, choices: [{label, to}]
+      // } — same as our schema, so no remap needed.
+      return {
+        type: "BRANCHING",
+        settings: {
+          label: block.label,
+          nodes: block.nodes,
+        },
+      };
+    case "AI_QUIZ":
+      // AiQuizSettings has a `generated` slot for the runtime cache;
+      // we don't pre-fill it (the runtime populates on first attempt),
+      // we just emit the trigger config (topic + count).
+      return {
+        type: "AI_QUIZ",
+        settings: {
+          label: block.label,
+          topic: block.topic,
+          count: block.count,
+        },
       };
   }
 }
