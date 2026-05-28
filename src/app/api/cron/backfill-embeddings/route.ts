@@ -41,9 +41,13 @@ const SLEEP_MS = 150;
  * same posture as the QStash webhook signature verification.
  *
  * Per-tick budget: at most MAX_PER_TICK courses are processed.
- * Larger backlogs catch up over multiple ticks (50/hour × 24 =
- * 1200/day). Trade-off: keeps each invocation well under the
- * function timeout and OpenAI's per-second rate limits.
+ * On Vercel Hobby (daily cron) that's 50 catch-up embeds per day —
+ * fine for the realistic "publish-hook missed one because OpenAI
+ * was down" trickle, and for any historical backlog under a few
+ * hundred. Larger backlogs catch up over multiple days, or run
+ * `npm run embed:backfill` manually against prod once for a
+ * one-shot bulk fill. On Pro the schedule can be tightened to
+ * hourly (vercel.json) without changing this file.
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
