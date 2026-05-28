@@ -1,6 +1,15 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector/pgvector:pg16 is the official pgvector image, built on
+    # postgres:16 (Debian-based). The data dir is wire-compatible with
+    # the prior postgres:16-alpine image — same major version, same
+    # Postgres binary on disk — so the existing `lyceum_pg_data`
+    # volume persists across the swap. We need pgvector here because
+    # migration `20260524110000_add_course_embeddings` does
+    # `CREATE EXTENSION vector`; the stock postgres:16-alpine image
+    # has no vector.control file and the migration explodes with
+    # `extension "vector" is not available`.
+    image: pgvector/pgvector:pg16
     container_name: lyceum-postgres
     restart: unless-stopped
     environment:

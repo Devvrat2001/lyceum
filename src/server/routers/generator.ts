@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { after } from "next/server";
 import { router, teacherProcedure } from "../trpc";
 import {
   COURSE_GENERATOR_SYSTEM_PROMPT,
@@ -831,11 +832,18 @@ export const generatorRouter = router({
         select: { id: true, slug: true },
       });
 
-      // Fire-and-forget: populate the semantic-search embedding for
-      // this course. We don't await because the user shouldn't wait
-      // an extra ~500ms on OpenAI for the redirect — semantic search
-      // just won't find this course for ~1s after save, which is fine.
-      void refreshCourseEmbedding(created.id);
+      // Populate the semantic-search embedding for this course
+      // outside the critical path — the user shouldn't wait an extra
+      // ~500ms on OpenAI for the redirect, and semantic search just
+      // won't find this course for ~1s after save (acceptable).
+      //
+      // `after()` (not bare `void`) is essential on Vercel: the
+      // serverless function may be torn down the instant the response
+      // is flushed, and a plain unawaited promise would be killed
+      // mid-OpenAI-call, leaving the course unembedded. `after()`
+      // tells Next.js to keep the function alive until the work
+      // completes.
+      after(() => refreshCourseEmbedding(created.id));
 
       return {
         ok: true as const,
