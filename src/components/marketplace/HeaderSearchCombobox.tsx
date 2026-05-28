@@ -24,8 +24,19 @@ import { trpc } from "@/lib/trpc/react";
  * The dropdown lives inside the header so it inherits the header's
  * z-index and doesn't need a portal; the parent must be
  * `position: relative` (already is in MarketChrome).
+ *
+ * `compact` mode renders a narrower input suitable for the role
+ * chromes' sidebars (Student/Teacher/Admin) — same logic, smaller
+ * footprint, no flex-grow (sidebars are flex-column, so the default
+ * `flex: 1` would stretch the wrapper vertically and detach the
+ * dropdown from the input). Without `compact`, defaults match the
+ * MarketChrome header treatment unchanged.
  */
-export function HeaderSearchCombobox() {
+export function HeaderSearchCombobox({
+  compact = false,
+}: {
+  compact?: boolean;
+} = {}) {
   const router = useRouter();
   const inputId = useId();
   const listId = `${inputId}-list`;
@@ -77,10 +88,11 @@ export function HeaderSearchCombobox() {
     return () => document.removeEventListener("pointerdown", onPointer);
   }, [isOpen]);
 
-  // Reset highlight when results change shape.
-  useEffect(() => {
-    setHighlight(-1);
-  }, [debouncedQ]);
+  // Reset highlight is folded into the input's onChange below — using
+  // useEffect for "when debouncedQ changes, reset highlight" trips the
+  // react-hooks/set-state-in-effect rule (setState in effect → cascading
+  // render). Per React docs the correct place is the event handler that
+  // *causes* the change, which is the input's onChange.
 
   const goTo = (slug: string) => {
     setIsOpen(false);
@@ -127,11 +139,11 @@ export function HeaderSearchCombobox() {
   return (
     <div
       ref={wrapRef}
-      style={{
-        flex: 1,
-        position: "relative",
-        maxWidth: 480,
-      }}
+      style={
+        compact
+          ? { width: "100%", position: "relative" }
+          : { flex: 1, position: "relative", maxWidth: 480 }
+      }
     >
       <label
         htmlFor={inputId}
@@ -159,11 +171,18 @@ export function HeaderSearchCombobox() {
           aria-activedescendant={
             highlight >= 0 ? `${listId}-${highlight}` : undefined
           }
-          placeholder="Search 12,400+ courses, skills, or grades…"
+          placeholder={
+            compact ? "Search…" : "Search 12,400+ courses, skills, or grades…"
+          }
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
             setIsOpen(true);
+            // Typing means the previous highlighted result is stale —
+            // drop it so Enter selects the top result from the new
+            // (debounced) query rather than whatever was highlighted
+            // before.
+            setHighlight(-1);
           }}
           onFocus={() => setIsOpen(true)}
           onKeyDown={onKeyDown}

@@ -369,7 +369,14 @@ export const marketplaceRouter = router({
       // BM25-ranked candidates via Postgres FTS. plainto_tsquery is
       // forgiving with messy user input (handles word boundaries,
       // stopwords). The `@@` predicate uses the GIN expression index
-      // we added in 20260524120000_add_course_fts_index.
+      // we added in 20260527140000_widen_course_fts_to_subject_grade.
+      //
+      // CRITICAL: the to_tsvector expression here MUST match the
+      // expression baked into Course_fts_idx exactly, or Postgres
+      // planner won't use the index and falls back to a seqscan.
+      // Includes subject + grade so a query like "math" matches every
+      // course with subject="math", not just those with the word
+      // "math" in their title/tagline/description.
       const bm25Rows = await ctx.db.$queryRaw<
         Array<{ id: string; rank: number; bm25_score: number }>
       >(Prisma.sql`
@@ -381,7 +388,9 @@ export const marketplaceRouter = router({
                 'english',
                 coalesce("title", '') || ' ' ||
                 coalesce("tagline", '') || ' ' ||
-                coalesce("description", '')
+                coalesce("description", '') || ' ' ||
+                "subject" || ' ' ||
+                "grade"
               ),
               plainto_tsquery('english', ${q})
             ) AS bm25_score
@@ -391,7 +400,9 @@ export const marketplaceRouter = router({
                   'english',
                   coalesce("title", '') || ' ' ||
                   coalesce("tagline", '') || ' ' ||
-                  coalesce("description", '')
+                  coalesce("description", '') || ' ' ||
+                  "subject" || ' ' ||
+                  "grade"
                 ) @@ plainto_tsquery('english', ${q})
         )
         SELECT

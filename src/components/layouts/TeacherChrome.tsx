@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, Btn, Card } from "@/components/wf/primitives";
 import { SidebarUserMenu } from "@/components/layouts/SidebarUserMenu";
+import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombobox";
 
 const NAV = [
   {
@@ -139,6 +140,7 @@ export function TeacherChrome({
             TEACH
           </span>
         </Link>
+        <HeaderSearchCombobox compact />
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map((item) => (
             <Link

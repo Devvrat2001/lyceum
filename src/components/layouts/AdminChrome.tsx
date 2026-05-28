@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/wf/primitives";
 import { SidebarUserMenu } from "@/components/layouts/SidebarUserMenu";
+import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombobox";
 
 const NAV = [
   { id: "overview", icon: "home" as const, label: "Overview", href: "/admin" },
@@ -142,6 +143,7 @@ export function AdminChrome({
             </div>
           </div>
         </Link>
+        <HeaderSearchCombobox compact />
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map((item) => {
             const isActive = item.id === computedActive;
