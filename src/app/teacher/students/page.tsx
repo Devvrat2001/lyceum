@@ -5,33 +5,109 @@ import {
   Btn,
   Card,
   Eyebrow,
-  Icon,
   Meter,
 } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { StudentsToolbar } from "@/components/teacher/StudentsToolbar";
 
-export default async function TeacherStudentsPage() {
+/**
+ * Teacher gradebook — list of students enrolled in any of this
+ * teacher's courses. URL search params drive filtering:
+ *   ?courseSlug=<slug>  → only students enrolled in that course
+ *   ?classId=<id>       → only students whose class.id matches
+ *
+ * Filter options (courses + classes) are loaded server-side and
+ * passed into `<StudentsToolbar>` so the dropdowns render with their
+ * full option list on first paint — no flash of empty selects, no
+ * extra client query.
+ */
+export default async function TeacherStudentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ courseSlug?: string; classId?: string }>;
+}) {
   const session = await auth();
   const teacherId = session?.user?.id;
+  const isAdmin = session?.user?.role === "ADMIN";
+  const { courseSlug, classId } = await searchParams;
 
-  // Students enrolled in any of this teacher's courses.
+  // Filter-option data: the teacher's own courses (admin sees all) and
+  // every class in their institution. Both are bounded-size lookups,
+  // safe to fetch on every render.
+  const [coursesOwned, classes, institutionId] = teacherId
+    ? await Promise.all([
+        db.course.findMany({
+          where: isAdmin ? {} : { authorId: teacherId },
+          orderBy: { updatedAt: "desc" },
+          select: { slug: true, title: true },
+        }),
+        // Defer the actual class query until we know the institution.
+        Promise.resolve(null as null),
+        db.user
+          .findUnique({
+            where: { id: teacherId },
+            select: { institutionId: true },
+          })
+          .then((u) => u?.institutionId ?? null),
+      ])
+    : [[], null, null];
+
+  const classOptions = institutionId
+    ? await db.class.findMany({
+        where: { institutionId },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      })
+    : [];
+  // Mark `classes` as used so the destructure stays symmetric for a
+  // future swap to a single Promise.all — currently we depend on the
+  // institutionId before we can issue the class query.
+  void classes;
+
+  // Resolve the selected-course filter to the matching owned course
+  // (prevents one teacher from filtering by another teacher's course
+  // slug via URL fiddling — out-of-scope slugs silently fall back to
+  // "no filter").
+  const filterCourseSlug = courseSlug
+    ? coursesOwned.find((c) => c.slug === courseSlug)?.slug
+    : undefined;
+  // Same idempotency for classes: only honor classIds that belong to
+  // the teacher's institution.
+  const filterClassId = classId
+    ? classOptions.find((c) => c.id === classId)?.id
+    : undefined;
+
   const students = teacherId
     ? await db.user.findMany({
         where: {
           role: "STUDENT",
           enrollments: {
             some: {
-              course:
-                session?.user?.role === "ADMIN"
-                  ? undefined
-                  : { authorId: teacherId },
+              course: isAdmin
+                ? filterCourseSlug
+                  ? { slug: filterCourseSlug }
+                  : undefined
+                : {
+                    authorId: teacherId,
+                    ...(filterCourseSlug ? { slug: filterCourseSlug } : {}),
+                  },
             },
           },
+          ...(filterClassId ? { classId: filterClassId } : {}),
         },
         include: {
           enrollments: {
+            // When filtering by course, only show that course's
+            // enrollment for the per-row progress meter — otherwise
+            // the meter averages every course they're in, which is
+            // confusing when the page is supposed to be scoped.
+            where: filterCourseSlug
+              ? { course: { slug: filterCourseSlug } }
+              : isAdmin
+                ? undefined
+                : { course: { authorId: teacherId } },
             include: {
               course: {
                 select: { title: true, slug: true, subject: true },
@@ -63,19 +139,12 @@ export default async function TeacherStudentsPage() {
         }}
       >
         <span style={{ fontSize: 16, fontWeight: 600 }}>Students</span>
-        <span className="wf-chip">All courses ▾</span>
-        <span className="wf-chip">All classes ▾</span>
-        <div style={{ flex: 1 }} />
-        <Btn variant="ghost" sm icon={<Icon name="download" size={12} />}>
-          Export
-        </Btn>
-        <Btn
-          variant="primary"
-          sm
-          icon={<Icon name="plus" size={12} color="white" />}
-        >
-          Invite student
-        </Btn>
+        <StudentsToolbar
+          courses={coursesOwned}
+          classes={classOptions}
+          initialCourseSlug={filterCourseSlug}
+          initialClassId={filterClassId}
+        />
       </header>
 
       <div style={{ flex: 1, overflow: "auto", padding: "24px 28px" }}>
@@ -129,6 +198,7 @@ export default async function TeacherStudentsPage() {
               }}
             >
               {students.length} student{students.length === 1 ? "" : "s"}
+              {filterCourseSlug || filterClassId ? " · filtered" : ""}
             </span>
           </div>
           {students.length === 0 ? (
@@ -140,7 +210,9 @@ export default async function TeacherStudentsPage() {
                 color: "var(--wf-body)",
               }}
             >
-              No students have enrolled in your courses yet.
+              {filterCourseSlug || filterClassId
+                ? "No students match the current filters."
+                : "No students have enrolled in your courses yet."}
             </div>
           ) : (
             students.map((s, i) => {

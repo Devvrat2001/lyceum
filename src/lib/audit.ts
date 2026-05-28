@@ -15,7 +15,8 @@ export type AuditKind =
   | "course.publish"
   | "course.unpublish"
   | "course.update"
-  | "payment.refund_initiated";
+  | "payment.refund_initiated"
+  | "teacher.invite_student";
 
 type AuditInput = {
   actorId?: string | null;

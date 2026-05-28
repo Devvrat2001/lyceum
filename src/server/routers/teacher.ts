@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { after } from "next/server";
 import {
   router,
   teacherProcedure,
@@ -190,12 +191,252 @@ export const teacherRouter = router({
         payload: { from: course.status, to: input.status },
       });
       // Refresh the semantic-search embedding when a course goes
-      // PUBLISHED so it's discoverable right away. Fire-and-forget to
-      // keep the publish click snappy.
+      // PUBLISHED so it's discoverable right away. `after()` (instead
+      // of bare `void`) tells Next.js/Vercel to keep the serverless
+      // function alive past the response flush until the embedding
+      // call completes — a plain void would let Vercel tear the
+      // instance down mid-OpenAI-call and silently lose the embed.
       if (input.status === "PUBLISHED") {
-        void refreshCourseEmbedding(course.id);
+        after(() => refreshCourseEmbedding(course.id));
       }
       return { ok: true as const, status: input.status, changed: true };
+    }),
+
+  /**
+   * Detail view for a single student in the teacher's gradebook.
+   *
+   * Visibility is scoped: a teacher can only see students who have at
+   * least one enrollment in one of this teacher's courses (admins
+   * bypass the scope). That's the same boundary `teacher.students`
+   * uses on /teacher/students — the detail page is just a zoom-in.
+   *
+   * Returns: identity + class + XP/streak summary; every enrollment
+   * that touches one of this teacher's courses (with progress); the
+   * student's last 25 attempts across those courses (with lesson +
+   * unit + course labels so the UI can render them without a second
+   * round-trip).
+   */
+  studentDetail: teacherProcedure
+    .input(z.object({ studentId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const isAdmin = ctx.user.role === "ADMIN";
+      const ownedCourseWhere = isAdmin
+        ? {}
+        : { course: { authorId: ctx.user.id } };
+
+      const student = await ctx.db.user.findFirst({
+        where: {
+          id: input.studentId,
+          role: "STUDENT",
+          // Ownership gate: must share at least one enrollment with this
+          // teacher (admin bypasses by passing {} above).
+          ...(isAdmin
+            ? {}
+            : {
+                enrollments: {
+                  some: { course: { authorId: ctx.user.id } },
+                },
+              }),
+        },
+        select: {
+          id: true,
+          name: true,
+          firstName: true,
+          email: true,
+          createdAt: true,
+          class: { select: { id: true, name: true } },
+          xpEvents: { select: { points: true } },
+          streak: { select: { current: true, longest: true, lastDay: true } },
+          enrollments: {
+            where: ownedCourseWhere,
+            orderBy: { enrolledAt: "desc" },
+            select: {
+              id: true,
+              progressPct: true,
+              completed: true,
+              enrolledAt: true,
+              lastActivityAt: true,
+              course: {
+                select: { id: true, slug: true, title: true, subject: true },
+              },
+            },
+          },
+        },
+      });
+      if (!student) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const courseIds = student.enrollments.map((e) => e.course.id);
+      const attempts = courseIds.length
+        ? await ctx.db.attempt.findMany({
+            where: {
+              userId: student.id,
+              lesson: { unit: { courseId: { in: courseIds } } },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 25,
+            select: {
+              id: true,
+              correct: true,
+              createdAt: true,
+              lesson: {
+                select: {
+                  id: true,
+                  slug: true,
+                  title: true,
+                  unit: { select: { course: { select: { title: true } } } },
+                },
+              },
+            },
+          })
+        : [];
+
+      const xp = student.xpEvents.reduce((a, e) => a + e.points, 0);
+      return {
+        id: student.id,
+        name: student.name,
+        firstName: student.firstName,
+        email: student.email,
+        createdAt: student.createdAt,
+        className: student.class?.name ?? null,
+        xp,
+        streak: student.streak,
+        enrollments: student.enrollments,
+        recentAttempts: attempts,
+      };
+    }),
+
+  /**
+   * Invite a student by email to one of the teacher's courses.
+   *
+   * v1 behaviour (no Resend yet, so this returns a link instead of
+   * sending mail):
+   *
+   *   - If a STUDENT user already exists with that email AND the
+   *     selected course is free → upsert an Enrollment. Idempotent if
+   *     they're already enrolled.
+   *   - If the user exists but their role isn't STUDENT → reject; we
+   *     don't silently coerce roles.
+   *   - If the user exists and the course is paid → reject with a
+   *     hint that the student needs to checkout themselves
+   *     (we won't pay on their behalf).
+   *   - If no user exists with that email → return a copyable signup
+   *     link the teacher can share manually. Once the student signs
+   *     up they can add the course via the normal marketplace flow.
+   *
+   * `courseId` is required because the teacher dropdown always picks a
+   * course; we don't yet have a "join my class without picking a
+   * course" lobby concept.
+   */
+  inviteStudent: teacherProcedure
+    .input(
+      z.object({
+        email: z.string().email().max(200),
+        courseId: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const normalizedEmail = input.email.trim().toLowerCase();
+
+      // Course ownership check — a teacher can only invite to their own
+      // courses (admin bypasses).
+      const course = await ctx.db.course.findUnique({
+        where: { id: input.courseId },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          priceCents: true,
+          authorId: true,
+        },
+      });
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "ADMIN" && course.authorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const existing = await ctx.db.user.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true, role: true, name: true, firstName: true },
+      });
+
+      // Branch 1: no user with that email — return a signup link the
+      // teacher can hand to the prospective student. We embed the
+      // course slug in `next` so they land on it after sign-in.
+      if (!existing) {
+        const inviteUrl =
+          `/signup?email=${encodeURIComponent(normalizedEmail)}` +
+          `&next=${encodeURIComponent(`/course/${course.slug}`)}`;
+        await audit({
+          actorId: ctx.user.id,
+          kind: "teacher.invite_student",
+          courseId: course.id,
+          payload: { outcome: "signup_link", email: normalizedEmail },
+        });
+        return {
+          outcome: "signup_link" as const,
+          email: normalizedEmail,
+          inviteUrl,
+          message: `No account yet for ${normalizedEmail}. Share this link so they can sign up and join the course.`,
+        };
+      }
+
+      // Branch 2: user exists but wrong role. Don't coerce — teachers
+      // and admins shouldn't be silently re-roled into students.
+      if (existing.role !== "STUDENT") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `${normalizedEmail} is registered as a ${existing.role.toLowerCase()}, not a student.`,
+        });
+      }
+
+      // Branch 3: paid course — we won't pay on their behalf. Tell the
+      // teacher to share the course link directly.
+      if (course.priceCents > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `"${course.title}" is a paid course. Share /course/${course.slug} with ${normalizedEmail} so they can purchase it themselves.`,
+        });
+      }
+
+      // Branch 4: existing student + free course → upsert enrollment.
+      // Idempotent: the @@unique([userId, courseId]) means the upsert
+      // is safe to re-run, and we treat a pre-existing row as success.
+      const enrollment = await ctx.db.enrollment.upsert({
+        where: {
+          userId_courseId: { userId: existing.id, courseId: course.id },
+        },
+        update: {}, // no-op when already enrolled
+        create: { userId: existing.id, courseId: course.id },
+        select: { id: true, enrolledAt: true },
+      });
+      const wasAlreadyEnrolled =
+        Date.now() - enrollment.enrolledAt.getTime() > 5_000;
+
+      await audit({
+        actorId: ctx.user.id,
+        kind: "teacher.invite_student",
+        courseId: course.id,
+        payload: {
+          outcome: wasAlreadyEnrolled ? "already_enrolled" : "enrolled",
+          studentId: existing.id,
+          email: normalizedEmail,
+        },
+      });
+
+      return {
+        outcome: wasAlreadyEnrolled
+          ? ("already_enrolled" as const)
+          : ("enrolled" as const),
+        email: normalizedEmail,
+        student: {
+          id: existing.id,
+          name: existing.name ?? existing.firstName ?? normalizedEmail,
+        },
+        course: { id: course.id, slug: course.slug, title: course.title },
+        message: wasAlreadyEnrolled
+          ? `${existing.name ?? normalizedEmail} was already enrolled in "${course.title}".`
+          : `${existing.name ?? normalizedEmail} enrolled in "${course.title}".`,
+      };
     }),
 
   /**
@@ -290,10 +531,12 @@ export const teacherRouter = router({
       });
       // Refresh the embedding when an embed-relevant field changed.
       // priceCents doesn't enter the embedding text so we skip the
-      // OpenAI round-trip for pure price edits.
+      // OpenAI round-trip for pure price edits. `after()` keeps the
+      // serverless function alive until the embed call finishes —
+      // see setCourseStatus above for the rationale.
       const embedFields = new Set(["title", "tagline", "subject", "grade"]);
       if (Object.keys(data).some((f) => embedFields.has(f))) {
-        void refreshCourseEmbedding(course.id);
+        after(() => refreshCourseEmbedding(course.id));
       }
       return { ok: true as const, changed: true, course: updated };
     }),
