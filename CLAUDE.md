@@ -25,6 +25,7 @@ npm run db:reset      # Wipes DB — destructive
 - **Auth.js split config:** edge-safe `auth.config.ts` + full `auth.ts`. Don't import server-only deps in the edge config.
 - **Stripe metadata:** stamp `orderId` on BOTH session AND PaymentIntent. Webhooks read `charge.metadata.orderId` (inherited from PI, not session).
 - **JWT role changes** require user to sign out + sign in. Updating `role` in DB alone doesn't propagate.
+- **Vercel Cron `/api/cron/backfill-embeddings`** sweeps PUBLISHED courses with `embedding IS NULL` hourly. Requires `CRON_SECRET` env on Vercel (auto-generated when you add a cron in the dashboard, or set manually). Without it the route refuses to run rather than expose an OpenAI-cost endpoint to the public internet.
 
 ## Companion docs
 - `AGENT_NOTES.md` — session-to-session scratchpad (phase status, last commit, new gotchas). **Update every session.**
