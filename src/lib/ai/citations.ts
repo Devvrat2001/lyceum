@@ -12,10 +12,16 @@ export type CitationHit = {
 /**
  * Look up the best-matching lesson chunk for a free-text query.
  *
- * Uses Postgres full-text search (`plainto_tsquery` + `ts_rank`) against
- * the `LessonChunk.searchable` GIN-indexed tsvector column. The same
- * call site shape will work when we swap pgvector + dense embeddings
- * in (P3+) — only the SQL inside this function changes.
+ * Uses Postgres full-text search (`to_tsvector` + `ts_rank`) over
+ * `LessonChunk.content`, matched by the GIN *expression* index
+ * `LessonChunk_content_fts_idx`. We compute the tsvector inline rather
+ * than reading a stored `searchable` column on purpose: a stored
+ * tsvector column isn't representable in `schema.prisma`, so the next
+ * `prisma migrate dev` treats it as drift and drops it (which is
+ * exactly what silently broke the tutor once already). An expression
+ * index has no column for Prisma to diff against, so it survives.
+ * The same call-site shape will work when we swap pgvector + dense
+ * embeddings in (P3+) — only the SQL inside this function changes.
  *
  * Returns `null` when no chunk matches at all OR when the corpus
  * for that lesson is empty. Caller should fall back to a generic
@@ -44,10 +50,13 @@ export async function findCitation(args: {
       "page",
       "section",
       "content",
-      ts_rank("searchable", to_tsquery('english', ${tsq})) AS score
+      ts_rank(
+        to_tsvector('english', coalesce("content", '')),
+        to_tsquery('english', ${tsq})
+      ) AS score
     FROM "LessonChunk"
     WHERE "lessonId" = ${args.lessonId}
-      AND "searchable" @@ to_tsquery('english', ${tsq})
+      AND to_tsvector('english', coalesce("content", '')) @@ to_tsquery('english', ${tsq})
     ORDER BY score DESC
     LIMIT 1
   `);

@@ -137,11 +137,22 @@ export async function POST(req: Request) {
 
   // Real citation lookup from chunked lesson content (P2-03/04).
   // Falls back to a generic course/unit citation when no chunk matches
-  // or when the lesson has no seeded chunks yet.
-  const hit = await findCitation({
-    query: body.message,
-    lessonId: lesson.id,
-  });
+  // or when the lesson has no seeded chunks yet. Wrapped because a
+  // citation lookup must NEVER take down the tutor — the citation is a
+  // small footer, the streamed answer is the product. (A dropped FTS
+  // column silently 500'd the whole tutor here once.)
+  let hit: Awaited<ReturnType<typeof findCitation>> = null;
+  try {
+    hit = await findCitation({
+      query: body.message,
+      lessonId: lesson.id,
+    });
+  } catch (err) {
+    console.warn(
+      "[tutor.stream] citation lookup failed; using generic citation:",
+      err
+    );
+  }
   const citation = hit
     ? `Cited: ${lesson.unit.course.title}, ${lesson.unit.title}, p. ${hit.page}${
         hit.section ? ` (${hit.section})` : ""
@@ -248,10 +259,15 @@ async function streamFromClaude(args: {
   const stream = client.messages.stream({
     model: CLAUDE_MODEL,
     max_tokens: 1024,
-    // Adaptive thinking with low effort — keeps the chat snappy on
-    // straightforward follow-ups; lets Claude lean in on tricky ones.
-    thinking: { type: "adaptive", display: "summarized" },
-    output_config: { effort: "low" },
+    // No `thinking` / `output_config` here on purpose. Adaptive
+    // thinking + effort controls only exist on newer models (Opus 4.7 /
+    // Sonnet 4.6+). On the broadly-available default model
+    // (claude-sonnet-4-5, set in env.ts) the API rejects them with
+    // 400 "adaptive thinking is not supported on this model", which
+    // surfaced to students as "Couldn't reach the tutor". A plain
+    // streaming call works on every model + account tier; if you point
+    // ANTHROPIC_MODEL at a model that supports adaptive thinking and
+    // want it back, gate these params on the model name.
     system: [
       {
         type: "text",
