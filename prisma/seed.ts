@@ -731,7 +731,14 @@ async function main() {
         const lesson = await db.lesson.create({
           data: {
             unitId: unit.id,
-            slug: l.slug,
+            // Every lesson needs a slug: the student reader route is
+            // `/student/lesson/[slug]` and the curriculum only renders
+            // a lesson as a clickable link when it has one. Lessons
+            // without an explicit demo slug get a deterministic
+            // `<course>-u<unit>-l<lesson>` slug (same scheme the AI
+            // course generator uses), so a freshly seeded course is
+            // fully navigable instead of a wall of dead links.
+            slug: l.slug ?? `${c.slug}-u${u.order}-l${l.order}`,
             order: l.order,
             title: l.title,
             durationMin: l.durationMin,

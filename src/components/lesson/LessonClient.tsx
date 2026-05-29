@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -62,28 +62,53 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
     points: number;
     correctKey: string | null;
   } | null>(null);
+  // Running tallies for the end-of-lesson score card. Each Question is
+  // checked exactly once (the answer row locks after "Check answer", and
+  // the primary button flips to Next), so incrementing here can't
+  // double-count.
+  const [correctCount, setCorrectCount] = useState(0);
+  const [xpEarned, setXpEarned] = useState(0);
 
   const attempt = trpc.lesson.attempt.useMutation({
-    onSuccess: (res) => setFeedback(res),
-  });
-
-  // "Lesson complete →" on the last question used to call `next()`
-  // which clamped qIdx to the same index and reset state — students
-  // were stuck on the final question with no way to progress and no
-  // course-status update. This mutation persists the completion,
-  // recomputes Enrollment.progressPct, and returns the next lesson
-  // slug so the student is actually moved forward.
-  const router = useRouter();
-  const markComplete = trpc.lesson.markComplete.useMutation({
-    onSuccess: (data) => {
-      if (data.nextLessonSlug) {
-        router.push(`/student/lesson/${data.nextLessonSlug}`);
-      } else {
-        router.push(`/course/${data.courseSlug}`);
+    onSuccess: (res) => {
+      setFeedback(res);
+      if (res.correct) {
+        setCorrectCount((n) => n + 1);
+        setXpEarned((x) => x + res.points + (res.bonusPoints ?? 0));
       }
-      router.refresh();
     },
   });
+
+  // Completing a lesson no longer redirects on its own. The old
+  // behaviour fired `router.push` straight to the next lesson (or, when
+  // the next lesson had no slug, to the course page) — which read as
+  // "the quiz dumped me back to the course with no score". Instead we
+  // record the result and render an explicit completion card with the
+  // score + XP and a Continue action the student drives.
+  const router = useRouter();
+  const [summary, setSummary] = useState<{
+    nextLessonSlug: string | null;
+    courseSlug: string;
+    completed: boolean;
+  } | null>(null);
+  const markComplete = trpc.lesson.markComplete.useMutation({
+    onSuccess: (data) => {
+      setSummary({
+        nextLessonSlug: data.nextLessonSlug,
+        courseSlug: data.courseSlug,
+        completed: data.completed,
+      });
+    },
+  });
+
+  const goAfterLesson = () => {
+    if (summary?.nextLessonSlug) {
+      router.push(`/student/lesson/${summary.nextLessonSlug}`);
+    } else {
+      router.push(`/course/${lesson.courseSlug}`);
+    }
+    router.refresh();
+  };
 
   const initialAi = lesson.intro ?? "Let's break this down step by step.";
   const [messages, setMessages] = useState<Msg[]>([
@@ -267,7 +292,6 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
 
   const isLastQuestion = qIdx >= lesson.questions.length - 1;
   const isCorrect = feedback?.correct === true;
-  const isWrong = feedback?.correct === false;
 
   const stepStateFor = (i: number): "done" | "current" | "locked" => {
     // Until real progress tracking lands, mark first 3 done, 4 current, rest locked.
@@ -443,6 +467,16 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
 
         {/* Content */}
         <main style={{ overflow: "auto", padding: "32px 48px" }}>
+          {summary ? (
+            <LessonComplete
+              summary={summary}
+              total={lesson.questions.length}
+              correct={correctCount}
+              xp={xpEarned}
+              onContinue={goAfterLesson}
+            />
+          ) : (
+          <>
           {/* Teacher-authored blocks render first (when present). The
               existing Question flow below stays as the primary
               practice surface until Block-driven attempts ship. */}
@@ -690,9 +724,7 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
                     <Btn
                       variant="primary"
                       onClick={next}
-                      disabled={
-                        (isLastQuestion && isWrong) || markComplete.isPending
-                      }
+                      disabled={markComplete.isPending}
                     >
                       {isLastQuestion
                         ? markComplete.isPending
@@ -704,6 +736,8 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
                 </div>
               </div>
             </>
+          )}
+          </>
           )}
         </main>
 
@@ -914,6 +948,92 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
         </aside>
       </div>
     </>
+  );
+}
+
+/**
+ * End-of-lesson card. Replaces the abrupt redirect that used to fire
+ * the moment a lesson was marked complete. Shows the quiz score (when
+ * the lesson had questions) + XP earned, and hands navigation control
+ * to the student via an explicit Continue button — to the next lesson
+ * when one exists, otherwise back to the course.
+ */
+function LessonComplete({
+  summary,
+  total,
+  correct,
+  xp,
+  onContinue,
+}: {
+  summary: {
+    nextLessonSlug: string | null;
+    courseSlug: string;
+    completed: boolean;
+  };
+  total: number;
+  correct: number;
+  xp: number;
+  onContinue: () => void;
+}) {
+  const pct = total > 0 ? Math.round((correct / total) * 100) : null;
+  return (
+    <Card
+      p={32}
+      style={{ maxWidth: 480, margin: "24px auto 0", textAlign: "center" }}
+    >
+      <div style={{ fontSize: 40, marginBottom: 4 }}>
+        {summary.completed ? "🎉" : "✓"}
+      </div>
+      <Eyebrow style={{ marginBottom: 8 }}>
+        {summary.completed ? "Course complete" : "Lesson complete"}
+      </Eyebrow>
+      <h1 className="wf-h1" style={{ fontSize: 24, marginBottom: 12 }}>
+        {summary.completed ? "You finished the course!" : "Nice work!"}
+      </h1>
+      {total > 0 && (
+        <div
+          style={{
+            fontSize: 15,
+            color: "var(--wf-body)",
+            marginBottom: 6,
+          }}
+        >
+          You answered <b>{correct}</b> of <b>{total}</b> correctly
+          {pct !== null ? ` · ${pct}%` : ""}.
+        </div>
+      )}
+      {xp > 0 && (
+        <div
+          className="wf-mono"
+          style={{
+            display: "inline-block",
+            marginTop: 4,
+            marginBottom: 18,
+            fontSize: 12,
+            padding: "3px 10px",
+            borderRadius: 3,
+            background: "var(--wf-good)",
+            color: "white",
+            fontWeight: 700,
+            letterSpacing: "0.06em",
+          }}
+        >
+          +{xp} XP earned
+        </div>
+      )}
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          justifyContent: "center",
+          marginTop: 8,
+        }}
+      >
+        <Btn variant="primary" onClick={onContinue}>
+          {summary.nextLessonSlug ? "Next lesson →" : "Back to course →"}
+        </Btn>
+      </div>
+    </Card>
   );
 }
 

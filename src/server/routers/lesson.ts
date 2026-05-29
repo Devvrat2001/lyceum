@@ -827,15 +827,22 @@ export const lessonRouter = router({
         },
       });
 
-      // Find the next lesson in unit-then-lesson order. The query
-      // already ordered by `unit.order` then `lesson.order`, so the
-      // flat list is in playback sequence.
+      // Find the next *playable* lesson in unit-then-lesson order. The
+      // query already ordered by `unit.order` then `lesson.order`, so
+      // the flat list is in playback sequence. We skip any lesson
+      // without a slug: the student-facing reader route is
+      // `/student/lesson/[slug]`, so a slug-less lesson has nowhere to
+      // navigate to — stopping on one would dead-end the student (or,
+      // as the client used to do, bounce them back to the course page
+      // mid-course as if the quiz had kicked them out).
       const currentIdx = orderedLessons.findIndex(
         (l) => l.id === input.lessonId
       );
       const nextLesson =
-        currentIdx >= 0 && currentIdx + 1 < orderedLessons.length
-          ? orderedLessons[currentIdx + 1]
+        currentIdx >= 0
+          ? (orderedLessons
+              .slice(currentIdx + 1)
+              .find((l) => l.slug != null && l.slug !== "") ?? null)
           : null;
 
       return {
