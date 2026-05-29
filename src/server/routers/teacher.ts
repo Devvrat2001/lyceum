@@ -335,6 +335,17 @@ export const teacherRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Rate-limit invites the same way AI mutations are limited.
+      // The `kind` filter scopes the bucket to only count
+      // teacher.invite_student events, so AI usage and invite usage
+      // don't compete for the same allowance. Without this, a
+      // malicious teacher could spam invites to bulk-enroll students
+      // or enumerate which emails have accounts.
+      await checkAIQuota({
+        actorId: ctx.user.id,
+        kind: "teacher.invite_student",
+      });
+
       const normalizedEmail = input.email.trim().toLowerCase();
 
       // Course ownership check — a teacher can only invite to their own
@@ -381,11 +392,13 @@ export const teacherRouter = router({
       }
 
       // Branch 2: user exists but wrong role. Don't coerce — teachers
-      // and admins shouldn't be silently re-roled into students.
+      // and admins shouldn't be silently re-roled into students. The
+      // error deliberately doesn't name the role to avoid leaking
+      // "this email belongs to a teacher/admin/parent" via guesses.
       if (existing.role !== "STUDENT") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `${normalizedEmail} is registered as a ${existing.role.toLowerCase()}, not a student.`,
+          message: `That email can't be invited as a student. Ask your admin if you think this is wrong.`,
         });
       }
 
@@ -398,19 +411,34 @@ export const teacherRouter = router({
         });
       }
 
-      // Branch 4: existing student + free course → upsert enrollment.
-      // Idempotent: the @@unique([userId, courseId]) means the upsert
-      // is safe to re-run, and we treat a pre-existing row as success.
-      const enrollment = await ctx.db.enrollment.upsert({
+      // Branch 4: existing student + free course → enroll (idempotent).
+      //
+      // We probe first to know whether an Enrollment already exists,
+      // because that's what drives the "already_enrolled" vs "enrolled"
+      // response. The earlier version inferred this from the upserted
+      // row's enrolledAt timestamp (older than 5s = pre-existing) —
+      // race-prone when a parallel enroll happens in the same window.
+      // A probe-then-upsert is one extra round-trip but deterministic.
+      // The upsert itself is still atomic via @@unique([userId,
+      // courseId]) — if a parallel call races us between the probe
+      // and the upsert, the upsert's `update: {}` no-ops gracefully.
+      const preExisting = await ctx.db.enrollment.findUnique({
         where: {
           userId_courseId: { userId: existing.id, courseId: course.id },
         },
-        update: {}, // no-op when already enrolled
-        create: { userId: existing.id, courseId: course.id },
-        select: { id: true, enrolledAt: true },
+        select: { id: true },
       });
-      const wasAlreadyEnrolled =
-        Date.now() - enrollment.enrolledAt.getTime() > 5_000;
+      const wasAlreadyEnrolled = !!preExisting;
+      if (!wasAlreadyEnrolled) {
+        await ctx.db.enrollment.upsert({
+          where: {
+            userId_courseId: { userId: existing.id, courseId: course.id },
+          },
+          update: {}, // no-op when a race put a row in since the probe
+          create: { userId: existing.id, courseId: course.id },
+          select: { id: true },
+        });
+      }
 
       await audit({
         actorId: ctx.user.id,
