@@ -2,11 +2,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
-import {
-  CLAUDE_MODEL,
-  getClaude,
-  isClaudeEnabled,
-} from "@/lib/ai/claude";
+import { completeStructured, isLlmEnabled } from "@/lib/ai/llm";
 import {
   MARKETPLACE_SEARCH_SYSTEM_PROMPT,
   SearchResultSchema,
@@ -563,7 +559,7 @@ export const marketplaceRouter = router({
 
       const writeAudit = async (
         result: ReturnType<typeof buildDemoSearchResult>,
-        mode: "claude" | "demo" | "fallback"
+        mode: "openai" | "claude" | "demo" | "fallback"
       ) => {
         await audit({
           actorId: ctx.session?.user?.id ?? null,
@@ -578,7 +574,7 @@ export const marketplaceRouter = router({
         });
       };
 
-      if (!isClaudeEnabled()) {
+      if (!isLlmEnabled()) {
         const result = buildDemoSearchResult({
           query: input.query,
           courses,
@@ -600,72 +596,35 @@ export const marketplaceRouter = router({
         },
       });
 
-      const client = getClaude()!;
-      const schema = {
-        type: "object",
-        additionalProperties: false,
-        required: ["summary", "estTimeLabel", "items"],
-        properties: {
-          summary: { type: "string" },
-          estTimeLabel: { type: "string" },
-          items: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["kind", "title", "why"],
-              properties: {
-                kind: { type: "string", enum: ["course", "lesson", "tip"] },
-                slug: { type: "string" },
-                title: { type: "string" },
-                why: { type: "string" },
-              },
-            },
-          },
-        },
-      };
-
       try {
-        const res = await client.messages.create({
-          model: CLAUDE_MODEL,
-          max_tokens: 1024,
+        // Model-safe structured output: completeStructured inlines the
+        // JSON schema into the prompt for Claude (works on every model +
+        // account tier) and uses OpenAI's response_format when an OpenAI
+        // key is set. The old raw `output_config.format` call 400'd on
+        // the default claude-sonnet-4-5 ("structured outputs not
+        // supported on this model"), silently dropping every AI search
+        // to the keyword fallback below.
+        const { data, mode } = await completeStructured({
+          schema: SearchResultSchema,
           system: MARKETPLACE_SEARCH_SYSTEM_PROMPT,
-          messages: [
-            {
-              role: "user",
-              content: buildMarketplaceSearchPrompt({
-                query: input.query,
-                studentLabel: ctx.session?.user
-                  ? `Signed-in user · role=${ctx.session.user.role}`
-                  : "Anonymous visitor",
-                catalog: {
-                  courses,
-                  lessons: lessons.map((l) => ({
-                    slug: l.slug!,
-                    title: l.title,
-                    courseTitle: l.unit.course.title,
-                  })),
-                },
-              }),
+          prompt: buildMarketplaceSearchPrompt({
+            query: input.query,
+            studentLabel: ctx.session?.user
+              ? `Signed-in user · role=${ctx.session.user.role}`
+              : "Anonymous visitor",
+            catalog: {
+              courses,
+              lessons: lessons.map((l) => ({
+                slug: l.slug!,
+                title: l.title,
+                courseTitle: l.unit.course.title,
+              })),
             },
-          ],
-          output_config: { format: { type: "json_schema", schema } },
+          }),
+          maxTokens: 1024,
         });
-        const text = res.content
-          .map((b) => (b.type === "text" ? b.text : ""))
-          .join("")
-          .trim()
-          .replace(/^```(?:json)?\s*/i, "")
-          .replace(/\s*```$/i, "");
-        const parsed = SearchResultSchema.safeParse(JSON.parse(text));
-        if (!parsed.success) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `AI returned invalid search: ${parsed.error.message}`,
-          });
-        }
-        await writeAudit(parsed.data, "claude");
-        return { result: parsed.data, elapsedMs: Date.now() - t0 };
+        await writeAudit(data, mode);
+        return { result: data, elapsedMs: Date.now() - t0 };
       } catch (err) {
         // Soft-degrade to the demo path so the user always gets *something*.
         console.error("[marketplace.aiSearch]", err);

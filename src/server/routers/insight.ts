@@ -16,34 +16,13 @@ import {
   buildTeacherInsightPrompt,
   type InsightItem,
 } from "@/lib/ai/prompts/insights";
-import { CLAUDE_MODEL, getClaude, isClaudeEnabled } from "@/lib/ai/claude";
+import { completeStructured, isLlmEnabled } from "@/lib/ai/llm";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const TEACHER_KINDS = new Set(["PATTERN", "OPPORTUNITY", "AT_RISK"]);
 const ADMIN_KINDS = new Set(["STRENGTH", "WATCH", "TEACHER"]);
-
-const INSIGHT_JSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["insights"],
-  properties: {
-    insights: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["kind", "body"],
-        properties: {
-          kind: { type: "string" },
-          body: { type: "string" },
-          cta: { type: ["string", "null"] },
-        },
-      },
-    },
-  },
-} as const;
 
 export const insightRouter = router({
   /**
@@ -226,73 +205,61 @@ export const insightRouter = router({
       }
 
       let items: InsightItem[];
-      let mode: "claude" | "demo";
+      let mode: "openai" | "claude" | "demo";
 
-      if (isClaudeEnabled() && totalStudents > 0) {
-        const client = getClaude()!;
-        const res = await client.messages.create({
-          model: CLAUDE_MODEL,
-          max_tokens: 700,
-          system: TEACHER_INSIGHT_SYSTEM_PROMPT,
-          messages: [
-            {
-              role: "user",
-              content: buildTeacherInsightPrompt({
-                teacherName:
-                  ctx.session.user.name ?? ctx.session.user.email ?? "Teacher",
-                rangeDays: input.rangeDays,
-                totalStudents,
-                activeStudents,
-                avgQuizScore,
-                topCourses,
-                worstFunnel: worstNamed,
-              }),
-            },
-          ],
-          output_config: {
-            format: { type: "json_schema", schema: INSIGHT_JSON_SCHEMA },
-          },
-        });
-        const text = res.content
-          .map((b) => (b.type === "text" ? b.text : ""))
-          .join("")
-          .trim()
-          .replace(/^```(?:json)?\s*/i, "")
-          .replace(/\s*```$/i, "");
-        const parsed = InsightBatchSchema.safeParse(JSON.parse(text));
-        if (!parsed.success) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `AI returned invalid insights: ${parsed.error.message}`,
-          });
-        }
-        items = parsed.data.insights;
-        // Coerce kinds to expected set; fall back to demo for any unknowns.
-        for (const it of items) {
-          if (!TEACHER_KINDS.has(it.kind)) {
-            it.kind = it.kind.toUpperCase().replace(/[^A-Z_]/g, "");
-          }
-        }
-        if (items.filter((i) => TEACHER_KINDS.has(i.kind)).length !== 3) {
-          items = buildDemoTeacherInsights({
-            totalStudents,
-            activeStudents,
-            avgQuizScore,
-            topCourses,
-            worstFunnel: worstNamed,
-          });
-          mode = "demo";
-        } else {
-          mode = "claude";
-        }
-      } else {
-        items = buildDemoTeacherInsights({
+      const teacherDemo = () =>
+        buildDemoTeacherInsights({
           totalStudents,
           activeStudents,
           avgQuizScore,
           topCourses,
           worstFunnel: worstNamed,
         });
+
+      if (isLlmEnabled() && totalStudents > 0) {
+        try {
+          // Model-safe structured output (see llm.ts): inlines the JSON
+          // schema into the prompt for Claude (works on every model +
+          // tier) and uses OpenAI's response_format otherwise. The
+          // previous raw `output_config.format` call 400'd on the
+          // default claude-sonnet-4-5 and hard-failed this endpoint.
+          const { data, mode: llmMode } = await completeStructured({
+            schema: InsightBatchSchema,
+            system: TEACHER_INSIGHT_SYSTEM_PROMPT,
+            prompt: buildTeacherInsightPrompt({
+              teacherName:
+                ctx.session.user.name ?? ctx.session.user.email ?? "Teacher",
+              rangeDays: input.rangeDays,
+              totalStudents,
+              activeStudents,
+              avgQuizScore,
+              topCourses,
+              worstFunnel: worstNamed,
+            }),
+            maxTokens: 700,
+          });
+          items = data.insights;
+          // Coerce kinds to expected set; fall back to demo for any unknowns.
+          for (const it of items) {
+            if (!TEACHER_KINDS.has(it.kind)) {
+              it.kind = it.kind.toUpperCase().replace(/[^A-Z_]/g, "");
+            }
+          }
+          if (items.filter((i) => TEACHER_KINDS.has(i.kind)).length !== 3) {
+            items = teacherDemo();
+            mode = "demo";
+          } else {
+            mode = llmMode;
+          }
+        } catch (err) {
+          // Never hard-fail the insights endpoint on an LLM hiccup —
+          // serve the deterministic demo insights instead.
+          console.error("[insight.forTeacher] LLM failed; using demo", err);
+          items = teacherDemo();
+          mode = "demo";
+        }
+      } else {
+        items = teacherDemo();
         mode = "demo";
       }
 
@@ -433,69 +400,53 @@ export const insightRouter = router({
         .slice(0, 3);
 
       let items: InsightItem[];
-      let mode: "claude" | "demo";
+      let mode: "openai" | "claude" | "demo";
 
-      if (isClaudeEnabled() && (studentCount > 0 || teacherCount > 0)) {
-        const client = getClaude()!;
-        const res = await client.messages.create({
-          model: CLAUDE_MODEL,
-          max_tokens: 700,
-          system: ADMIN_INSIGHT_SYSTEM_PROMPT,
-          messages: [
-            {
-              role: "user",
-              content: buildAdminInsightPrompt({
-                institutionName: institution?.name ?? "the institution",
-                studentCount,
-                teacherCount,
-                classCount,
-                avgQuizScore,
-                topTeachers,
-                curriculaCount,
-              }),
-            },
-          ],
-          output_config: {
-            format: { type: "json_schema", schema: INSIGHT_JSON_SCHEMA },
-          },
-        });
-        const text = res.content
-          .map((b) => (b.type === "text" ? b.text : ""))
-          .join("")
-          .trim()
-          .replace(/^```(?:json)?\s*/i, "")
-          .replace(/\s*```$/i, "");
-        const parsed = InsightBatchSchema.safeParse(JSON.parse(text));
-        if (!parsed.success) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `AI returned invalid insights: ${parsed.error.message}`,
-          });
-        }
-        items = parsed.data.insights;
-        for (const it of items) {
-          if (!ADMIN_KINDS.has(it.kind)) {
-            it.kind = it.kind.toUpperCase().replace(/[^A-Z_]/g, "");
-          }
-        }
-        if (items.filter((i) => ADMIN_KINDS.has(i.kind)).length !== 3) {
-          items = buildDemoAdminInsights({
-            studentCount,
-            teacherCount,
-            avgQuizScore,
-            topTeachers,
-          });
-          mode = "demo";
-        } else {
-          mode = "claude";
-        }
-      } else {
-        items = buildDemoAdminInsights({
+      const adminDemo = () =>
+        buildDemoAdminInsights({
           studentCount,
           teacherCount,
           avgQuizScore,
           topTeachers,
         });
+
+      if (isLlmEnabled() && (studentCount > 0 || teacherCount > 0)) {
+        try {
+          // Model-safe structured output (see llm.ts) — replaces the raw
+          // `output_config.format` call that 400'd on claude-sonnet-4-5.
+          const { data, mode: llmMode } = await completeStructured({
+            schema: InsightBatchSchema,
+            system: ADMIN_INSIGHT_SYSTEM_PROMPT,
+            prompt: buildAdminInsightPrompt({
+              institutionName: institution?.name ?? "the institution",
+              studentCount,
+              teacherCount,
+              classCount,
+              avgQuizScore,
+              topTeachers,
+              curriculaCount,
+            }),
+            maxTokens: 700,
+          });
+          items = data.insights;
+          for (const it of items) {
+            if (!ADMIN_KINDS.has(it.kind)) {
+              it.kind = it.kind.toUpperCase().replace(/[^A-Z_]/g, "");
+            }
+          }
+          if (items.filter((i) => ADMIN_KINDS.has(i.kind)).length !== 3) {
+            items = adminDemo();
+            mode = "demo";
+          } else {
+            mode = llmMode;
+          }
+        } catch (err) {
+          console.error("[insight.forAdmin] LLM failed; using demo", err);
+          items = adminDemo();
+          mode = "demo";
+        }
+      } else {
+        items = adminDemo();
         mode = "demo";
       }
 
