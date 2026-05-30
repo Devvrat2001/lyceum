@@ -13,6 +13,10 @@ const KIND_LABELS: Record<string, { label: string; color: string }> = {
   "ai.send_nudge": { label: "AI Nudge Draft", color: "var(--wf-ai)" },
   "auth.signup": { label: "User Signup", color: "var(--wf-body)" },
   "course.publish": { label: "Course Publish", color: "var(--wf-good)" },
+  "discussion.delete_comment": {
+    label: "Discussion Moderation",
+    color: "var(--wf-accent)",
+  },
 };
 
 function timeAgo(d: Date): string {

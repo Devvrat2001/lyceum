@@ -3130,6 +3130,14 @@ function DiscussionBody({
       );
     },
   });
+  const del = trpc.lesson.deleteComment.useMutation({
+    onSuccess: (res) => {
+      utils.lesson.discussionThread.setData({ blockId }, res);
+    },
+    onError: (err) => {
+      setSubmitError(err.message ?? "Couldn't delete that comment.");
+    },
+  });
 
   const [draft, setDraft] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -3190,7 +3198,14 @@ function DiscussionBody({
           }}
         >
           {comments.map((c) => (
-            <CommentRow key={c.id} comment={c} />
+            <CommentRow
+              key={c.id}
+              comment={c}
+              onDelete={
+                c.isMine ? () => del.mutate({ commentId: c.id }) : undefined
+              }
+              deleting={del.isPending && del.variables?.commentId === c.id}
+            />
           ))}
         </div>
       )}
@@ -3261,6 +3276,8 @@ function DiscussionBody({
 
 function CommentRow({
   comment,
+  onDelete,
+  deleting,
 }: {
   comment: {
     id: string;
@@ -3269,6 +3286,8 @@ function CommentRow({
     author: { id: string; name: string; avatarUrl: string | null };
     isMine: boolean;
   };
+  onDelete?: () => void;
+  deleting?: boolean;
 }) {
   const created =
     typeof comment.createdAt === "string"
@@ -3316,6 +3335,25 @@ function CommentRow({
           <span style={{ fontSize: 10, color: "var(--wf-mute)" }}>
             {relativeTime(created)}
           </span>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={deleting}
+              title="Delete your comment"
+              style={{
+                marginLeft: "auto",
+                border: "none",
+                background: "none",
+                padding: 0,
+                fontSize: 10,
+                color: "var(--wf-mute)",
+                cursor: deleting ? "default" : "pointer",
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+          )}
         </div>
         <div
           style={{

@@ -1,8 +1,15 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure, protectedProcedure } from "../trpc";
+import {
+  router,
+  publicProcedure,
+  protectedProcedure,
+  teacherProcedure,
+  studentProcedure,
+} from "../trpc";
 import { awardCorrectAttempt } from "../services/awardForAttempt";
 import { settingsFor } from "@/lib/blocks";
+import { audit } from "@/lib/audit";
 
 /** Max poll options. Mirrors the inspector cap (2–6). */
 const MAX_POLL_OPTIONS = 9;
@@ -15,6 +22,15 @@ const XP_FLOOR = 5;
 
 function xpForCorrect(hintsUsed: number): number {
   return Math.max(XP_FLOOR, XP_PER_CORRECT - hintsUsed * XP_HINT_PENALTY);
+}
+
+/** Pull the prompt string out of a DISCUSSION block's `settings` JSON. */
+function discussionPrompt(settings: unknown): string | null {
+  if (settings && typeof settings === "object" && !Array.isArray(settings)) {
+    const p = (settings as Record<string, unknown>).prompt;
+    if (typeof p === "string" && p.trim()) return p.trim();
+  }
+  return null;
 }
 
 export const lessonRouter = router({
@@ -717,6 +733,256 @@ export const lessonRouter = router({
         total: rows.length,
       };
     }),
+
+  /**
+   * Delete a discussion comment. Allowed for the comment's author
+   * (self-delete) OR a moderator — the teacher who owns the course the
+   * comment lives in, or any admin. Every moderated delete (someone
+   * removing a post that isn't theirs) is audited for the FERPA-safe
+   * trail the admin audit log surfaces. Returns the fresh thread so the
+   * reader updates via `setData`, mirroring `postComment`.
+   */
+  deleteComment: protectedProcedure
+    .input(z.object({ commentId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const comment = await ctx.db.blockComment.findUnique({
+        where: { id: input.commentId },
+        select: {
+          id: true,
+          userId: true,
+          blockId: true,
+          block: {
+            select: {
+              lesson: {
+                select: {
+                  id: true,
+                  unit: {
+                    select: {
+                      course: { select: { id: true, authorId: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!comment) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const courseAuthorId = comment.block.lesson.unit.course.authorId;
+      const isOwner = comment.userId === ctx.user.id;
+      const isModerator =
+        courseAuthorId === ctx.user.id || ctx.user.role === "ADMIN";
+      if (!isOwner && !isModerator) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You can only delete your own comments.",
+        });
+      }
+
+      await ctx.db.blockComment.delete({ where: { id: comment.id } });
+
+      // Only a moderator removing someone else's post is audit-worthy
+      // (self-deletes are routine). The trail is what the K-12 / FERPA
+      // moderation story in the admin audit log relies on.
+      if (!isOwner) {
+        await audit({
+          actorId: ctx.user.id,
+          kind: "discussion.delete_comment",
+          payload: { commentId: comment.id, blockId: comment.blockId },
+          lessonId: comment.block.lesson.id,
+          courseId: comment.block.lesson.unit.course.id,
+        });
+      }
+
+      const rows = await ctx.db.blockComment.findMany({
+        where: { blockId: comment.blockId },
+        orderBy: { createdAt: "asc" },
+        take: 50,
+        select: {
+          id: true,
+          body: true,
+          createdAt: true,
+          user: {
+            select: { id: true, name: true, firstName: true, avatarUrl: true },
+          },
+        },
+      });
+      return {
+        comments: rows.map((c) => ({
+          id: c.id,
+          body: c.body,
+          createdAt: c.createdAt,
+          author: {
+            id: c.user.id,
+            name: c.user.firstName ?? c.user.name ?? "Student",
+            avatarUrl: c.user.avatarUrl,
+          },
+          isMine: ctx.user.id === c.user.id,
+        })),
+        total: rows.length,
+      };
+    }),
+
+  /**
+   * Moderation hub feed for a teacher: every DISCUSSION block across the
+   * courses they author, with comment counts, last-activity, and the
+   * most-recent handful of comments to moderate inline. Silent threads
+   * (0 comments) are included but sort last.
+   */
+  teacherDiscussions: teacherProcedure.query(async ({ ctx }) => {
+    const blocks = await ctx.db.block.findMany({
+      where: {
+        type: "DISCUSSION",
+        lesson: { unit: { course: { authorId: ctx.user.id } } },
+      },
+      select: {
+        id: true,
+        settings: true,
+        lesson: {
+          select: {
+            title: true,
+            slug: true,
+            unit: {
+              select: { course: { select: { title: true, slug: true } } },
+            },
+          },
+        },
+        comments: {
+          orderBy: { createdAt: "desc" },
+          take: 6,
+          select: {
+            id: true,
+            body: true,
+            createdAt: true,
+            user: {
+              select: { id: true, name: true, firstName: true, avatarUrl: true },
+            },
+          },
+        },
+        _count: { select: { comments: true } },
+      },
+      take: 200,
+    });
+
+    const threads = blocks
+      .map((b) => ({
+        blockId: b.id,
+        prompt: discussionPrompt(b.settings),
+        courseTitle: b.lesson.unit.course.title,
+        courseSlug: b.lesson.unit.course.slug,
+        lessonTitle: b.lesson.title,
+        lessonSlug: b.lesson.slug,
+        commentCount: b._count.comments,
+        lastActivity: b.comments[0]?.createdAt ?? null,
+        // Fetched newest-first; reverse to read oldest→newest like a chat.
+        recent: b.comments
+          .slice()
+          .reverse()
+          .map((c) => ({
+            id: c.id,
+            body: c.body,
+            createdAt: c.createdAt,
+            author: {
+              id: c.user.id,
+              name: c.user.firstName ?? c.user.name ?? "Student",
+              avatarUrl: c.user.avatarUrl,
+            },
+          })),
+      }))
+      .sort(
+        (a, b) =>
+          (b.lastActivity?.getTime() ?? 0) - (a.lastActivity?.getTime() ?? 0)
+      );
+
+    return {
+      threads,
+      totals: {
+        threads: threads.length,
+        comments: threads.reduce((n, t) => n + t.commentCount, 0),
+        active: threads.filter((t) => t.commentCount > 0).length,
+      },
+    };
+  }),
+
+  /**
+   * Community feed for a student: every DISCUSSION block across the
+   * courses they're enrolled in, with comment counts, last-activity, and
+   * whether they've already joined that thread. Sorted most-recently-
+   * active first so the liveliest conversations surface.
+   */
+  studentCommunity: studentProcedure.query(async ({ ctx }) => {
+    const enrollments = await ctx.db.enrollment.findMany({
+      where: { userId: ctx.user.id },
+      select: { courseId: true },
+    });
+    const courseIds = enrollments.map((e) => e.courseId);
+    if (courseIds.length === 0) {
+      return { threads: [], totals: { threads: 0, joined: 0 } };
+    }
+
+    const [blocks, myComments] = await Promise.all([
+      ctx.db.block.findMany({
+        where: {
+          type: "DISCUSSION",
+          lesson: { unit: { courseId: { in: courseIds } } },
+        },
+        select: {
+          id: true,
+          settings: true,
+          lesson: {
+            select: {
+              title: true,
+              slug: true,
+              unit: {
+                select: { course: { select: { title: true } } },
+              },
+            },
+          },
+          comments: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { createdAt: true },
+          },
+          _count: { select: { comments: true } },
+        },
+        take: 200,
+      }),
+      ctx.db.blockComment.findMany({
+        where: {
+          userId: ctx.user.id,
+          block: {
+            type: "DISCUSSION",
+            lesson: { unit: { courseId: { in: courseIds } } },
+          },
+        },
+        select: { blockId: true },
+        distinct: ["blockId"],
+      }),
+    ]);
+
+    const joined = new Set(myComments.map((c) => c.blockId));
+    const threads = blocks
+      .map((b) => ({
+        blockId: b.id,
+        prompt: discussionPrompt(b.settings),
+        courseTitle: b.lesson.unit.course.title,
+        lessonTitle: b.lesson.title,
+        lessonSlug: b.lesson.slug,
+        commentCount: b._count.comments,
+        lastActivity: b.comments[0]?.createdAt ?? null,
+        youPosted: joined.has(b.id),
+      }))
+      .sort(
+        (a, b) =>
+          (b.lastActivity?.getTime() ?? 0) - (a.lastActivity?.getTime() ?? 0)
+      );
+
+    return {
+      threads,
+      totals: { threads: threads.length, joined: joined.size },
+    };
+  }),
 
   /**
    * Mark a lesson complete for the signed-in student.
