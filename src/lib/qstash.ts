@@ -48,15 +48,45 @@ export function getQStashReceiver(): Receiver | null {
 }
 
 /**
+ * Hosts QStash can never deliver to. QStash runs in Upstash's cloud and
+ * reaches us by POSTing to `${PUBLIC_BASE_URL}/api/jobs/process-outline`;
+ * a loopback/`.local` URL is unreachable from there.
+ */
+function isUnreachableFromQStash(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname.toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "0.0.0.0" ||
+      host === "::1" ||
+      host.endsWith(".local")
+    );
+  } catch {
+    // Unparseable base URL — treat as unreachable so we don't strand
+    // jobs by enqueueing to a URL QStash can't POST to.
+    return true;
+  }
+}
+
+/**
  * True when we have everything needed to publish + verify async jobs.
  * Used by the generator router to decide between async (QStash) and
  * inline execution paths.
+ *
+ * Returns false when PUBLIC_BASE_URL is a localhost/loopback URL even if
+ * the QStash keys are set: QStash delivers by POSTing to that URL from
+ * the cloud, so on local dev the webhook would never fire and a
+ * generation job would hang at "Queued" forever. Falling back to the
+ * inline path keeps local generation working. Production (real domain)
+ * is unaffected.
  */
 export function isQStashEnabled(): boolean {
   return !!(
     env.QSTASH_TOKEN &&
     env.QSTASH_CURRENT_SIGNING_KEY &&
-    env.QSTASH_NEXT_SIGNING_KEY
+    env.QSTASH_NEXT_SIGNING_KEY &&
+    !isUnreachableFromQStash(env.PUBLIC_BASE_URL)
   );
 }
 
