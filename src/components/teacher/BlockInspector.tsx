@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Btn, Eyebrow, Icon } from "@/components/wf/primitives";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Btn, Eyebrow, Icon, Toggle } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 import { findBlockMeta, type BlockType } from "@/lib/blocks";
 
@@ -81,14 +81,61 @@ export type BlockSettingsShape = {
     body: string;
     choices: Array<{ label: string; to: string }>;
   }>;
+  // APPEARANCE — "how the block looks" (Course Builder v2 inspector).
+  // Persisted forward-compatibly; the student reader honors these as it
+  // grows. `accent` is a hex string.
+  appearance?: {
+    optionLayout?: "list" | "grid" | "inline";
+    accent?: string;
+    showLetters?: boolean;
+    cardStyle?: boolean;
+    showCorrect?: boolean;
+  };
+  // BEHAVIOR — pedagogy + gamification knobs.
+  behavior?: {
+    adaptive?: boolean;
+    aiHints?: boolean;
+    required?: boolean;
+    retake?: boolean;
+    xp?: number;
+  };
   // unknown / future
   [k: string]: unknown;
 };
+
+/** Block types that expose APPEARANCE controls (option-layout etc.). */
+const OPTION_TYPES: ReadonlySet<BlockType> = new Set<BlockType>([
+  "MCQ",
+  "QUIZ",
+  "POLL",
+  "DRAG_MATCH",
+]);
+/** Block types that expose adaptive-difficulty + AI-hint BEHAVIOR. */
+const PRACTICE_TYPES: ReadonlySet<BlockType> = new Set<BlockType>([
+  "MCQ",
+  "QUIZ",
+  "AI_QUIZ",
+  "POLL",
+  "DRAG_MATCH",
+  "SPEAK",
+  "BRANCHING",
+  "SIMULATION",
+]);
+
+const ACCENT_SWATCHES = [
+  "#ff5b1f",
+  "#2a6fdb",
+  "#1d7a4d",
+  "#6b3df5",
+  "#1f1d1a",
+] as const;
 
 export function BlockInspector({
   block,
   onSaved,
   onDeselect,
+  embedded = false,
+  onDelete,
 }: {
   block: {
     id: string;
@@ -98,6 +145,11 @@ export function BlockInspector({
   };
   onSaved: (settings: BlockSettingsShape) => void;
   onDeselect: () => void;
+  /** When true, the parent (Course Builder v2 inspector chrome) owns the
+   *  header + identity card + tabs, so we render content only. */
+  embedded?: boolean;
+  /** When provided, renders a "Delete block" action at the bottom. */
+  onDelete?: () => void;
 }) {
   const meta = findBlockMeta(block.type);
   const [draft, setDraft] = useState<BlockSettingsShape>(block.settings);
@@ -105,10 +157,19 @@ export function BlockInspector({
     { kind: "ok" | "error"; msg: string } | null
   >(null);
 
-  // Reset draft when the selected block changes underneath us.
+  // Resync the draft when the selected block (or its settings) changes
+  // underneath us — a new block is selected, a save cleans empty fields,
+  // or an AI generate writes fresh settings. Guarded against the
+  // last-synced snapshot so we don't setState on every render
+  // (react-hooks/set-state-in-effect).
+  const lastSyncedRef = useRef<string>("");
   useEffect(() => {
-    setDraft(block.settings);
-    setFeedback(null);
+    const incoming = JSON.stringify(block.settings ?? {});
+    if (incoming !== lastSyncedRef.current) {
+      lastSyncedRef.current = incoming;
+      setDraft(block.settings);
+      setFeedback(null);
+    }
   }, [block.id, block.settings]);
 
   const updateBlock = trpc.teacher.updateBlock.useMutation({
@@ -146,71 +207,76 @@ export function BlockInspector({
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 10,
-        }}
-      >
-        <Eyebrow>Inspector · Block</Eyebrow>
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          onClick={onDeselect}
-          aria-label="Close inspector"
-          title="Deselect block"
-          style={{
-            border: "none",
-            background: "transparent",
-            color: "var(--wf-mute)",
-            cursor: "pointer",
-            fontSize: 16,
-            lineHeight: 1,
-            padding: 2,
-          }}
-        >
-          ×
-        </button>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "8px 10px",
-          border: "1px solid var(--wf-hairline)",
-          borderRadius: 3,
-          background: "var(--wf-fillsoft)",
-          marginBottom: 14,
-        }}
-      >
-        <Icon
-          name={meta.icon as "play"}
-          size={14}
-          color={meta.ai ? "var(--wf-ai)" : "var(--wf-body)"}
-        />
-        <div style={{ flex: 1, minWidth: 0 }}>
+      {!embedded && (
+        <>
           <div
             style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: meta.ai ? "var(--wf-ai)" : "var(--wf-ink)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 10,
             }}
           >
-            {meta.label}
+            <Eyebrow>Inspector · Block</Eyebrow>
+            <div style={{ flex: 1 }} />
+            <button
+              type="button"
+              onClick={onDeselect}
+              aria-label="Close inspector"
+              title="Deselect block"
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--wf-mute)",
+                cursor: "pointer",
+                fontSize: 16,
+                lineHeight: 1,
+                padding: 2,
+              }}
+            >
+              ×
+            </button>
           </div>
-          <div
-            className="wf-mono"
-            style={{ fontSize: 9, color: "var(--wf-mute)", marginTop: 2 }}
-          >
-            #{block.order} · {block.type}
-          </div>
-        </div>
-      </div>
 
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 10px",
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 3,
+              background: "var(--wf-fillsoft)",
+              marginBottom: 14,
+            }}
+          >
+            <Icon
+              name={meta.icon as "play"}
+              size={14}
+              color={meta.ai ? "var(--wf-ai)" : "var(--wf-body)"}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: meta.ai ? "var(--wf-ai)" : "var(--wf-ink)",
+                }}
+              >
+                {meta.label}
+              </div>
+              <div
+                className="wf-mono"
+                style={{ fontSize: 9, color: "var(--wf-mute)", marginTop: 2 }}
+              >
+                #{block.order} · {block.type}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <SectionLabel>CONTENT</SectionLabel>
       <TextField
         label="LABEL"
         value={draft.label ?? ""}
@@ -231,6 +297,11 @@ export function BlockInspector({
         maxLength={2000}
       />
 
+      {OPTION_TYPES.has(block.type) && (
+        <AppearanceSection draft={draft} update={update} />
+      )}
+      <BehaviorSection type={block.type} draft={draft} update={update} />
+
       <Btn
         full
         variant="primary"
@@ -243,6 +314,28 @@ export function BlockInspector({
             ? "Save block"
             : "Saved"}
       </Btn>
+
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          style={{
+            width: "100%",
+            marginTop: 10,
+            padding: "8px",
+            borderRadius: 7,
+            border: "1px solid var(--wf-hairline)",
+            background: "white",
+            color: "var(--wf-accent)",
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          Delete block
+        </button>
+      )}
 
       {feedback && (
         <div
@@ -1958,6 +2051,240 @@ function SectionFields({
         placeholder="One-line description of what this section covers"
         maxLength={200}
       />
+    </>
+  );
+}
+
+/* ── APPEARANCE / BEHAVIOR sections (Course Builder v2) ─────────── */
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="wf-mono"
+      style={{
+        fontSize: 9,
+        letterSpacing: "0.08em",
+        color: "var(--wf-mute)",
+        margin: "18px 0 8px",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  on,
+  onChange,
+  divider = true,
+}: {
+  label: string;
+  on: boolean;
+  onChange: (on: boolean) => void;
+  divider?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px 0",
+        borderBottom: divider ? "1px solid var(--wf-hairline)" : "none",
+      }}
+    >
+      <span style={{ fontSize: 12, color: "var(--wf-body)" }}>{label}</span>
+      <Toggle on={on} onChange={onChange} />
+    </div>
+  );
+}
+
+type UpdateFn = <K extends keyof BlockSettingsShape>(
+  key: K,
+  value: BlockSettingsShape[K]
+) => void;
+
+function AppearanceSection({
+  draft,
+  update,
+}: {
+  draft: BlockSettingsShape;
+  update: UpdateFn;
+}) {
+  const a = draft.appearance ?? {};
+  const setA = (patch: Partial<NonNullable<BlockSettingsShape["appearance"]>>) =>
+    update("appearance", { ...a, ...patch });
+  const layout = a.optionLayout ?? "list";
+  const accent = a.accent ?? ACCENT_SWATCHES[0];
+  return (
+    <>
+      <SectionLabel>APPEARANCE</SectionLabel>
+      <div
+        style={{ fontSize: 10.5, color: "var(--wf-mute)", marginBottom: 6 }}
+      >
+        Option layout
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        {(["list", "grid", "inline"] as const).map((opt) => {
+          const on = layout === opt;
+          const txt =
+            opt === "list" ? "List" : opt === "grid" ? "Grid 2×2" : "Inline";
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setA({ optionLayout: opt })}
+              style={{
+                flex: 1,
+                padding: "7px 4px",
+                borderRadius: 7,
+                fontSize: 11,
+                fontWeight: on ? 600 : 500,
+                border: `1.5px solid ${on ? "var(--wf-ink)" : "var(--wf-hairline)"}`,
+                background: on ? "var(--wf-ink)" : "white",
+                color: on ? "white" : "var(--wf-body)",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {txt}
+            </button>
+          );
+        })}
+      </div>
+      <div
+        style={{ fontSize: 10.5, color: "var(--wf-mute)", marginBottom: 6 }}
+      >
+        Accent
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+        {ACCENT_SWATCHES.map((c) => {
+          const on = accent.toLowerCase() === c.toLowerCase();
+          return (
+            <button
+              key={c}
+              type="button"
+              aria-label={`Accent ${c}`}
+              onClick={() => setA({ accent: c })}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: "50%",
+                background: c,
+                border: on
+                  ? "2px solid var(--wf-ink)"
+                  : "1px solid var(--wf-hairline)",
+                boxShadow: on ? "0 0 0 2px white inset" : "none",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            />
+          );
+        })}
+      </div>
+      <ToggleRow
+        label="Show option letters (A–D)"
+        on={a.showLetters ?? true}
+        onChange={(v) => setA({ showLetters: v })}
+      />
+      <ToggleRow
+        label="Card style"
+        on={a.cardStyle ?? true}
+        onChange={(v) => setA({ cardStyle: v })}
+      />
+      <ToggleRow
+        label="Show correct after submit"
+        on={a.showCorrect ?? true}
+        onChange={(v) => setA({ showCorrect: v })}
+        divider={false}
+      />
+    </>
+  );
+}
+
+function BehaviorSection({
+  type,
+  draft,
+  update,
+}: {
+  type: BlockType;
+  draft: BlockSettingsShape;
+  update: UpdateFn;
+}) {
+  const b = draft.behavior ?? {};
+  const setB = (patch: Partial<NonNullable<BlockSettingsShape["behavior"]>>) =>
+    update("behavior", { ...b, ...patch });
+  const isPractice = PRACTICE_TYPES.has(type);
+  const xp = typeof b.xp === "number" ? b.xp : 20;
+  return (
+    <>
+      <SectionLabel>BEHAVIOR</SectionLabel>
+      {isPractice && (
+        <>
+          <ToggleRow
+            label="Adaptive difficulty"
+            on={b.adaptive ?? true}
+            onChange={(v) => setB({ adaptive: v })}
+          />
+          <ToggleRow
+            label="Allow AI tutor hints"
+            on={b.aiHints ?? true}
+            onChange={(v) => setB({ aiHints: v })}
+          />
+        </>
+      )}
+      <ToggleRow
+        label="Required to pass"
+        on={b.required ?? isPractice}
+        onChange={(v) => setB({ required: v })}
+      />
+      <ToggleRow
+        label="Allow retake"
+        on={b.retake ?? true}
+        onChange={(v) => setB({ retake: v })}
+        divider={false}
+      />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 0 2px",
+        }}
+      >
+        <span style={{ fontSize: 12, color: "var(--wf-body)" }}>XP reward</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="number"
+            min={0}
+            max={500}
+            step={5}
+            value={xp}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10);
+              if (Number.isFinite(n) && n >= 0 && n <= 500) setB({ xp: n });
+            }}
+            style={{
+              width: 64,
+              padding: "3px 8px",
+              fontSize: 12,
+              textAlign: "right",
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 6,
+              background: "white",
+              fontFamily: "var(--font-mono-stack)",
+              color: "var(--wf-ink)",
+            }}
+          />
+          <span
+            className="wf-mono"
+            style={{ fontSize: 11, color: "var(--wf-mute)" }}
+          >
+            XP
+          </span>
+        </div>
+      </div>
     </>
   );
 }

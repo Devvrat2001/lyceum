@@ -1189,6 +1189,160 @@ export const teacherRouter = router({
     }),
 
   /**
+   * Append a new unit to a course. Used by the builder's outline rail
+   * "+ Add unit". order = (max existing unit order) + 1 so it lands at
+   * the bottom. Title defaults to "Unit N" when not supplied — the
+   * teacher renames it inline afterward.
+   */
+  addUnit: teacherProcedure
+    .input(
+      z.object({
+        courseId: z.string(),
+        title: z.string().max(120).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const course = await ctx.db.course.findUnique({
+        where: { id: input.courseId },
+        select: {
+          id: true,
+          authorId: true,
+          units: {
+            orderBy: { order: "desc" },
+            take: 1,
+            select: { order: true },
+          },
+        },
+      });
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "ADMIN" && course.authorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const nextOrder = (course.units[0]?.order ?? 0) + 1;
+      const unit = await ctx.db.unit.create({
+        data: {
+          courseId: course.id,
+          order: nextOrder,
+          title: input.title?.trim() || `Unit ${nextOrder}`,
+        },
+        select: { id: true, order: true, title: true, estLabel: true },
+      });
+      return { ok: true as const, unit };
+    }),
+
+  /**
+   * Append a new lesson to a unit. Used by the builder's outline rail
+   * "+ Add lesson". order = (max existing lesson order) + 1.
+   *
+   * Every lesson MUST carry a `slug` — the student reader route is
+   * `/student/lesson/[slug]` and a NULL-slug lesson is unreachable (see
+   * the CLAUDE.md gotcha). We mint `<course-slug>-u<unit-order>-l<order>`
+   * to match the seed + AI-generator convention, and fall back to a
+   * random suffix on the (rare) chance that slug is already taken — the
+   * column is `@unique`, so a collision would otherwise throw.
+   */
+  addLesson: teacherProcedure
+    .input(
+      z.object({
+        unitId: z.string(),
+        title: z.string().max(160).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const unit = await ctx.db.unit.findUnique({
+        where: { id: input.unitId },
+        select: {
+          id: true,
+          order: true,
+          course: { select: { slug: true, authorId: true } },
+          lessons: {
+            orderBy: { order: "desc" },
+            take: 1,
+            select: { order: true },
+          },
+        },
+      });
+      if (!unit) throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "ADMIN" && unit.course.authorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const nextOrder = (unit.lessons[0]?.order ?? 0) + 1;
+      const base = `${unit.course.slug}-u${unit.order}-l${nextOrder}`;
+      const taken = await ctx.db.lesson.findUnique({
+        where: { slug: base },
+        select: { id: true },
+      });
+      const slug = taken
+        ? `${base}-${crypto.randomUUID().slice(0, 5)}`
+        : base;
+      const lesson = await ctx.db.lesson.create({
+        data: {
+          unitId: unit.id,
+          order: nextOrder,
+          title: input.title?.trim() || `Lesson ${nextOrder}`,
+          slug,
+        },
+        select: { id: true, slug: true, title: true, durationMin: true },
+      });
+      return { ok: true as const, lesson: { ...lesson, blocks: [] } };
+    }),
+
+  /**
+   * Rename a lesson and/or set its estimated duration. Used by the
+   * builder's editable lesson header + Lesson inspector tab. Partial:
+   * only provided fields change. `durationMin: null` clears the
+   * estimate. The `slug` is never rewritten by a rename — it's the
+   * permanent student-reader URL.
+   */
+  updateLesson: teacherProcedure
+    .input(
+      z.object({
+        lessonId: z.string(),
+        title: z.string().max(160).optional(),
+        durationMin: z.number().int().min(0).max(600).nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const lesson = await ctx.db.lesson.findUnique({
+        where: { id: input.lessonId },
+        select: {
+          id: true,
+          unit: { select: { course: { select: { authorId: true } } } },
+        },
+      });
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const data: Prisma.LessonUpdateInput = {};
+      if (input.title !== undefined) {
+        const title = input.title.trim();
+        if (title.length === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Lesson title can't be empty.",
+          });
+        }
+        data.title = title;
+      }
+      if (input.durationMin !== undefined) {
+        data.durationMin = input.durationMin;
+      }
+      if (Object.keys(data).length === 0) {
+        return { ok: true as const, changed: false };
+      }
+      const updated = await ctx.db.lesson.update({
+        where: { id: lesson.id },
+        data,
+        select: { id: true, title: true, durationMin: true, slug: true },
+      });
+      return { ok: true as const, changed: true, lesson: updated };
+    }),
+
+  /**
    * Persist a new block ordering within a single lesson. Same shape
    * as reorderUnits/reorderLessons — rewrites Block.order to 1..N
    * inside a $transaction. Rejects partial reorders (caller must
