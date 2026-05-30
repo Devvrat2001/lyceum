@@ -41,9 +41,19 @@ test("teacher course builder renders the v2 outline rail + WYSIWYG canvas", asyn
   await expect(teacherBtn).toBeVisible({ timeout: 15_000 });
 
   await Promise.all([
-    // Teacher quick-login redirects straight into a course builder.
-    page.waitForURL(/\/teacher\/courses\/.+\/edit/, { timeout: 20_000 }),
+    // Teacher quick-login lands on /teacher — the course list.
+    page.waitForURL(/\/teacher\/?$/, { timeout: 20_000 }),
     teacherBtn.click(),
+  ]);
+
+  // `/teacher` is the teacher's course list now (it used to hard-redirect
+  // to a single seeded editor, which 404'd for teachers who didn't own
+  // it). Open the first owned course's builder via its "Edit →" link.
+  const editLink = page.getByRole("link", { name: /Edit/ }).first();
+  await expect(editLink).toBeVisible({ timeout: 15_000 });
+  await Promise.all([
+    page.waitForURL(/\/teacher\/courses\/.+\/edit/, { timeout: 20_000 }),
+    editLink.click(),
   ]);
 
   // The builder canvas is a <section> (the page's only <main> is the

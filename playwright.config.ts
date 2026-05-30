@@ -52,6 +52,18 @@ export default defineConfig({
     // machine routinely takes 30-60s. Generous timeout, but no retry.
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
+    // Force demo-mode payments so buy-flow.spec is deterministic
+    // regardless of whether the developer has live Stripe test keys in
+    // .env.local. An empty STRIPE_SECRET_KEY shadows the .env.local
+    // value (@next/env won't override an already-set env var, even to
+    // ""), so isStripeEnabled() is false and createCheckoutSession uses
+    // the demo path the spec drives. NB: a *reused* server must already
+    // be in demo mode — stop a Stripe-mode dev server before e2e.
+    env: {
+      ...(process.env as Record<string, string>),
+      STRIPE_SECRET_KEY: "",
+      STRIPE_WEBHOOK_SECRET: "",
+    },
     // Surface dev-server stdout/stderr in the Playwright output so
     // route-level errors are debuggable from the test log.
     stdout: "pipe",

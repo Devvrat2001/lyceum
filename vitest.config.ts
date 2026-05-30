@@ -54,6 +54,14 @@ export default defineConfig({
  */
 function loadDotEnv(): Record<string, string> {
   const out: Record<string, string> = {};
+  // Keep live Stripe secrets out of the automated suite so payments run
+  // in deterministic demo mode. `isStripeEnabled()` is keyed on
+  // STRIPE_SECRET_KEY; if a developer has live test-mode keys in
+  // .env.local, `payment.createCheckoutSession` would mint a `stripe`
+  // order and the demo-path tests (demoConfirm / refundOrder) would
+  // fail with "Only demo orders can be confirmed". Real-Stripe flows are
+  // covered by the manual smoke test, not this suite.
+  const SKIP_KEYS = new Set(["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"]);
   for (const name of [".env", ".env.local"]) {
     const url = new URL(`./${name}`, import.meta.url);
     let text: string;
@@ -69,6 +77,7 @@ function loadDotEnv(): Record<string, string> {
       const eq = trimmed.indexOf("=");
       if (eq < 0) continue;
       const key = trimmed.slice(0, eq).trim();
+      if (SKIP_KEYS.has(key)) continue;
       let value = trimmed.slice(eq + 1).trim();
       if (
         (value.startsWith(`"`) && value.endsWith(`"`)) ||
