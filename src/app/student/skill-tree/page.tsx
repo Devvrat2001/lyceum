@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { StudentChrome } from "@/components/layouts/StudentChrome";
 import { Annot, Btn, Eyebrow, Icon } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
@@ -52,9 +53,11 @@ export default async function SkillTreePage() {
           <h1 className="wf-h1" style={{ fontSize: 24 }}>
             Your skill journey
           </h1>
-          <Annot ai>AI re-routes path nightly based on quiz performance</Annot>
+          <Annot ai>Your next skill advances as you answer questions correctly</Annot>
           <div style={{ flex: 1 }} />
-          <Btn variant="ghost">Year overview</Btn>
+          <Link href="/student/library" style={{ textDecoration: "none" }}>
+            <Btn variant="ghost">Continue learning →</Btn>
+          </Link>
           <WhyPathButton />
         </div>
         <div
@@ -240,7 +243,7 @@ export default async function SkillTreePage() {
                   letterSpacing: "0.04em",
                 }}
               >
-                ↑ AI selected this branch · stronger geometry signal
+                ↑ Up next — correct answers move this toward mastery
               </div>
             );
           })()}

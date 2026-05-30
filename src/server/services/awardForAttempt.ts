@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { bumpStreak } from "./streakEngine";
+import { nudgeCurrentSkill } from "./skillProgress";
 
 const STREAK_BONUS_XP = 25;
 
@@ -31,6 +32,14 @@ export async function awardCorrectAttempt(
   await db.xPEvent.create({
     data: { userId, points, source, refId },
   });
+
+  // Advance the student's current skill-tree node. Best-effort: a
+  // skill-progress hiccup must never break the XP/streak/badge award.
+  try {
+    await nudgeCurrentSkill(db, userId);
+  } catch (err) {
+    console.error("[skillProgress] nudge failed", err);
+  }
 
   const { current, milestoneHit } = await bumpStreak(db, userId);
   const streak = { current, milestone: milestoneHit };

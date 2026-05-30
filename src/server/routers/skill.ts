@@ -3,10 +3,10 @@ import { router, protectedProcedure } from "../trpc";
 import { CLAUDE_MODEL, getClaude, isClaudeEnabled } from "@/lib/ai/claude";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
-
-const MASTERY_THRESHOLD = 0.8;
-
-type NodeState = "done" | "now" | "unlocked" | "locked";
+import {
+  computeSkillStates,
+  MASTERY_THRESHOLD,
+} from "../services/skillProgress";
 
 export const skillRouter = router({
   /**
@@ -33,38 +33,14 @@ export const skillRouter = router({
       const masteryById = new Map(
         mastery.map((m) => [m.skillId, m.level] as const)
       );
-      const prereqsByTo = new Map<string, string[]>();
-      for (const e of edges) {
-        const list = prereqsByTo.get(e.toId) ?? [];
-        list.push(e.fromId);
-        prereqsByTo.set(e.toId, list);
-      }
-
-      const stateOf = (skillId: string): NodeState => {
-        const level = masteryById.get(skillId) ?? 0;
-        if (level >= MASTERY_THRESHOLD) return "done";
-        if (level > 0) return "now";
-        const prereqs = prereqsByTo.get(skillId) ?? [];
-        const allPrereqsDone = prereqs.every(
-          (pid) => (masteryById.get(pid) ?? 0) >= MASTERY_THRESHOLD
-        );
-        if (prereqs.length === 0 || allPrereqsDone) return "unlocked";
-        return "locked";
-      };
-
-      // The "current" node is the highest-progress non-done node, or the first
-      // unlocked one if there's nothing in progress.
-      const candidates = skills.filter(
-        (s) => stateOf(s.id) === "now" || stateOf(s.id) === "unlocked"
+      const { stateOf, currentId: current } = computeSkillStates(
+        skills,
+        edges,
+        masteryById
       );
-      const current =
-        candidates.sort((a, b) => {
-          const la = masteryById.get(a.id) ?? 0;
-          const lb = masteryById.get(b.id) ?? 0;
-          return lb - la;
-        })[0]?.id ?? null;
-
-      const masteredCount = skills.filter((s) => stateOf(s.id) === "done").length;
+      const masteredCount = skills.filter(
+        (s) => stateOf(s.id) === "done"
+      ).length;
 
       const xpTotal =
         (
@@ -124,8 +100,12 @@ export const skillRouter = router({
         }),
       ]);
 
-      const masteredCount = mastery.filter((m) => m.level >= 0.8).length;
-      const inProgress = mastery.filter((m) => m.level > 0 && m.level < 0.8);
+      const masteredCount = mastery.filter(
+        (m) => m.level >= MASTERY_THRESHOLD
+      ).length;
+      const inProgress = mastery.filter(
+        (m) => m.level > 0 && m.level < MASTERY_THRESHOLD
+      );
       const correctRate =
         recentAttempts.length === 0
           ? null
