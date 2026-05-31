@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { Btn, Eyebrow, Icon, Toggle } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 import { findBlockMeta, type BlockType } from "@/lib/blocks";
@@ -35,6 +36,16 @@ export type BlockSettingsShape = {
   // VIDEO, SLIDES, PDF (all use a single share/embed URL + optional caption)
   url?: string;
   caption?: string;
+  // VIDEO upload (Mux) — `source` flips the block from embed-URL to an
+  // uploaded video; `mux` holds the upload/asset state.
+  source?: "url" | "mux";
+  mux?: {
+    uploadId?: string;
+    assetId?: string;
+    playbackId?: string;
+    status?: "waiting" | "preparing" | "ready" | "errored";
+    aspectRatio?: string;
+  };
   // READING
   body?: string;
   // MCQ
@@ -384,7 +395,14 @@ function renderTypeFields(
 ) {
   switch (type) {
     case "VIDEO":
-      return <VideoFields draft={draft} update={update} />;
+      return (
+        <VideoFields
+          blockId={blockId}
+          draft={draft}
+          update={update}
+          onSaved={onSaved}
+        />
+      );
     case "READING":
       return <ReadingFields draft={draft} update={update} />;
     case "MCQ":
@@ -439,25 +457,41 @@ function renderTypeFields(
   }
 }
 
+// Mux's chunked uploader widget. ssr:false because it registers a custom
+// element that can't render on the server.
+const MuxUploader = dynamic(() => import("@mux/mux-uploader-react"), {
+  ssr: false,
+});
+
 function VideoFields({
+  blockId,
   draft,
   update,
+  onSaved,
 }: {
+  blockId: string;
   draft: BlockSettingsShape;
   update: <K extends keyof BlockSettingsShape>(
     key: K,
     value: BlockSettingsShape[K]
   ) => void;
+  onSaved: (settings: BlockSettingsShape) => void;
 }) {
   return (
     <>
+      <MuxVideoField
+        blockId={blockId}
+        draft={draft}
+        update={update}
+        onSaved={onSaved}
+      />
       <TextField
-        label="VIDEO URL"
+        label="OR PASTE A VIDEO LINK"
         value={typeof draft.url === "string" ? draft.url : ""}
         onChange={(v) => update("url", v)}
-        placeholder="https://… (YouTube, Vimeo, Mux)"
+        placeholder="https://… (YouTube or Vimeo)"
         maxLength={500}
-        hint="Paste the share link. Embed rendering ships later."
+        hint="Used when you haven't uploaded a video."
       />
       <TextField
         label="CAPTION (OPTIONAL)"
@@ -467,6 +501,228 @@ function VideoFields({
         maxLength={200}
       />
     </>
+  );
+}
+
+/**
+ * In-builder video upload. The browser uploads straight to Mux via a
+ * one-time URL minted by `teacher.createVideoUpload`; while Mux transcodes
+ * we poll `teacher.videoStatus` until the asset is "ready". All settings
+ * writes happen server-side (the mutations merge `source`/`mux` into the
+ * block) and propagate to the builder + draft via `onSaved`.
+ */
+function MuxVideoField({
+  blockId,
+  draft,
+  update,
+  onSaved,
+}: {
+  blockId: string;
+  draft: BlockSettingsShape;
+  update: <K extends keyof BlockSettingsShape>(
+    key: K,
+    value: BlockSettingsShape[K]
+  ) => void;
+  onSaved: (settings: BlockSettingsShape) => void;
+}) {
+  const mux = draft.mux;
+  const status = draft.source === "mux" ? mux?.status : undefined;
+  const [uploadUrl, setUploadUrl] = useState<string | null>(null);
+  const [uploaded, setUploaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const applySettings = (settings: BlockSettingsShape) => {
+    update("source", settings.source);
+    update("mux", settings.mux);
+    onSaved(settings);
+  };
+
+  const createUpload = trpc.teacher.createVideoUpload.useMutation({
+    onSuccess: (res) => {
+      setError(null);
+      setUploaded(false);
+      setUploadUrl(res.uploadUrl);
+      applySettings(res.settings as BlockSettingsShape);
+    },
+    onError: (e) =>
+      setError(
+        e.data?.code === "PRECONDITION_FAILED"
+          ? e.message
+          : "Couldn't start the upload. Try again."
+      ),
+  });
+
+  const statusMut = trpc.teacher.videoStatus.useMutation({
+    onSuccess: (res) => applySettings(res.settings as BlockSettingsShape),
+  });
+  // React Query's `mutate` is referentially stable, so depending on it
+  // doesn't churn the interval — and calling it (not setState) inside the
+  // effect keeps us clear of react-hooks/set-state-in-effect.
+  const pollStatus = statusMut.mutate;
+
+  useEffect(() => {
+    const active =
+      draft.source === "mux" &&
+      status !== undefined &&
+      status !== "ready" &&
+      status !== "errored";
+    if (!active) return;
+    const id = setInterval(() => pollStatus({ blockId }), 3000);
+    return () => clearInterval(id);
+  }, [blockId, draft.source, status, pollStatus]);
+
+  const reset = () => {
+    setUploadUrl(null);
+    setUploaded(false);
+    setError(null);
+    update("source", "url");
+    update("mux", undefined);
+    const cleared: BlockSettingsShape = { ...draft, source: "url" };
+    delete cleared.mux;
+    onSaved(cleared);
+  };
+
+  if (status === "ready" && mux?.playbackId) {
+    return (
+      <VideoFieldShell label="UPLOADED VIDEO">
+        <StatusRow tone="good" text="Ready — plays in the lesson." />
+        <Btn variant="ghost" sm onClick={reset}>
+          Replace video
+        </Btn>
+      </VideoFieldShell>
+    );
+  }
+  if (status === "errored") {
+    return (
+      <VideoFieldShell label="UPLOADED VIDEO">
+        <StatusRow tone="bad" text="Processing failed. Try another file." />
+        <Btn variant="ghost" sm onClick={reset}>
+          Try again
+        </Btn>
+      </VideoFieldShell>
+    );
+  }
+  if (draft.source === "mux" && (uploaded || status === "preparing")) {
+    return (
+      <VideoFieldShell label="UPLOADED VIDEO">
+        <StatusRow
+          tone="mute"
+          text="Processing… this can take a minute. You can keep editing — it'll go live once ready."
+        />
+        <Btn variant="ghost" sm onClick={reset}>
+          Cancel
+        </Btn>
+      </VideoFieldShell>
+    );
+  }
+  if (uploadUrl) {
+    return (
+      <VideoFieldShell label="UPLOAD A VIDEO">
+        <div style={{ width: "100%" }}>
+          <MuxUploader
+            endpoint={uploadUrl}
+            onSuccess={() => setUploaded(true)}
+            onUploadError={() => setError("Upload failed. Try again.")}
+          />
+        </div>
+        {error && <StatusRow tone="bad" text={error} />}
+        <Btn variant="ghost" sm onClick={reset}>
+          Cancel
+        </Btn>
+      </VideoFieldShell>
+    );
+  }
+  return (
+    <VideoFieldShell label="UPLOAD A VIDEO">
+      <Btn
+        sm
+        onClick={() =>
+          createUpload.mutate({
+            blockId,
+            origin:
+              typeof window !== "undefined"
+                ? window.location.origin
+                : undefined,
+          })
+        }
+        disabled={createUpload.isPending}
+      >
+        {createUpload.isPending ? "Starting…" : "Choose a video to upload"}
+      </Btn>
+      {error && <StatusRow tone="bad" text={error} />}
+    </VideoFieldShell>
+  );
+}
+
+function VideoFieldShell({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div
+        className="wf-mono"
+        style={{
+          fontSize: 10,
+          color: "var(--wf-mute)",
+          letterSpacing: "0.06em",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          alignItems: "flex-start",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function StatusRow({
+  tone,
+  text,
+}: {
+  tone: "good" | "bad" | "mute";
+  text: string;
+}) {
+  const color =
+    tone === "good"
+      ? "var(--wf-good)"
+      : tone === "bad"
+        ? "var(--wf-accent)"
+        : "var(--wf-mute)";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 12,
+        color,
+        lineHeight: 1.4,
+      }}
+    >
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: "50%",
+          background: color,
+          flexShrink: 0,
+        }}
+      />
+      {text}
+    </div>
   );
 }
 

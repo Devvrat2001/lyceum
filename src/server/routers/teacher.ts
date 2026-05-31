@@ -13,6 +13,12 @@ import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
 import { findBlockTemplate } from "@/lib/blockTemplates";
 import { refreshCourseEmbedding } from "@/lib/jobs/refreshCourseEmbedding";
+import {
+  isMuxEnabled,
+  createDirectUpload,
+  getMuxState,
+  type MuxState,
+} from "@/lib/video/mux";
 
 export const teacherRouter = router({
   /** Anyone can check follow state of a teacher (signed-in only). */
@@ -1445,6 +1451,120 @@ export const teacherRouter = router({
         select: { id: true, settings: true },
       });
       return { ok: true as const, block: updated };
+    }),
+
+  /**
+   * Mint a Mux direct-upload URL for a VIDEO block. The browser PUTs the
+   * file straight to Mux (bypassing the serverless body limit); we stamp
+   * `source: "mux"` + the upload id into the block settings so the reader
+   * and builder know this is an uploaded video. `passthrough` carries the
+   * blockId for future webhook correlation.
+   */
+  createVideoUpload: teacherProcedure
+    .input(z.object({ blockId: z.string(), origin: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isMuxEnabled()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Video upload isn't set up yet — an admin needs to add Mux keys (MUX_TOKEN_ID / MUX_TOKEN_SECRET).",
+        });
+      }
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: {
+          id: true,
+          type: true,
+          settings: true,
+          lesson: {
+            select: {
+              unit: { select: { course: { select: { authorId: true } } } },
+            },
+          },
+        },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "VIDEO") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not a VIDEO block.",
+        });
+      }
+      if (
+        ctx.user.role !== "ADMIN" &&
+        block.lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const { uploadId, uploadUrl } = await createDirectUpload(
+        block.id,
+        input.origin ?? "*"
+      );
+
+      const prev = (block.settings ?? {}) as Record<string, unknown>;
+      const settings = {
+        ...prev,
+        source: "mux",
+        mux: { uploadId, status: "waiting" } satisfies MuxState,
+      };
+      const updated = await ctx.db.block.update({
+        where: { id: block.id },
+        data: { settings: settings as Prisma.InputJsonValue },
+        select: { settings: true },
+      });
+      return { uploadUrl, settings: updated.settings };
+    }),
+
+  /**
+   * Poll Mux for the processing status of a VIDEO block's upload and fold
+   * the result back into the block settings. The builder calls this on a
+   * timer after an upload until status is "ready"/"errored". Short-circuits
+   * once the stored status is terminal so we don't hammer the Mux API.
+   */
+  videoStatus: teacherProcedure
+    .input(z.object({ blockId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isMuxEnabled()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Mux isn't configured.",
+        });
+      }
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: {
+          id: true,
+          settings: true,
+          lesson: {
+            select: {
+              unit: { select: { course: { select: { authorId: true } } } },
+            },
+          },
+        },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        block.lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const prev = (block.settings ?? {}) as Record<string, unknown>;
+      const prevMux = (prev.mux ?? {}) as MuxState;
+      if (prevMux.status === "ready" || prevMux.status === "errored") {
+        return { status: prevMux.status, settings: block.settings };
+      }
+
+      const next = await getMuxState(prevMux);
+      const settings = { ...prev, source: "mux", mux: next };
+      const updated = await ctx.db.block.update({
+        where: { id: block.id },
+        data: { settings: settings as Prisma.InputJsonValue },
+        select: { settings: true },
+      });
+      return { status: next.status, settings: updated.settings };
     }),
 
   /**

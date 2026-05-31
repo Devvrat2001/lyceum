@@ -62,6 +62,13 @@ const Schema = z.object({
   QSTASH_CURRENT_SIGNING_KEY: z.string().optional(),
   QSTASH_NEXT_SIGNING_KEY: z.string().optional(),
 
+  // Video uploads — Mux. Optional; absence keeps the VIDEO block on
+  // paste-a-URL only (no in-app upload). Create an access token in the
+  // Mux dashboard (Settings → Access Tokens) with "Mux Video" read+write
+  // permission, then set both vars in .env.local + Vercel.
+  MUX_TOKEN_ID: z.string().optional(),
+  MUX_TOKEN_SECRET: z.string().optional(),
+
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),

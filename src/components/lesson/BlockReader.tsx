@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   DndContext,
   PointerSensor,
@@ -196,10 +197,16 @@ function renderBody(block: BlockReaderProps) {
 /* ── VIDEO ───────────────────────────────────────────────── */
 
 function VideoBody({ settings }: { settings: Record<string, unknown> }) {
-  const rawUrl =
-    typeof settings.url === "string" ? settings.url.trim() : "";
   const caption =
     typeof settings.caption === "string" ? settings.caption.trim() : "";
+
+  // An uploaded (Mux) video takes precedence over a pasted URL.
+  if (settings.source === "mux") {
+    return <MuxVideoBody settings={settings} caption={caption} />;
+  }
+
+  const rawUrl =
+    typeof settings.url === "string" ? settings.url.trim() : "";
 
   if (!rawUrl) {
     return (
@@ -280,6 +287,106 @@ function VideoBody({ settings }: { settings: Record<string, unknown> }) {
           {caption}
         </div>
       )}
+    </div>
+  );
+}
+
+// Mux's adaptive player. ssr:false because it registers a custom element
+// that can't render on the server. Playback only needs the public
+// playbackId — no API key — so this works on any deploy.
+const MuxPlayer = dynamic(() => import("@mux/mux-player-react"), {
+  ssr: false,
+});
+
+function MuxVideoBody({
+  settings,
+  caption,
+}: {
+  settings: Record<string, unknown>;
+  caption: string;
+}) {
+  const mux = (settings.mux ?? {}) as {
+    playbackId?: string;
+    status?: string;
+    aspectRatio?: string;
+  };
+
+  if (mux.status === "ready" && mux.playbackId) {
+    return (
+      <div>
+        <div
+          style={{
+            borderRadius: 4,
+            overflow: "hidden",
+            border: "1px solid var(--wf-hairline)",
+            background: "#000",
+          }}
+        >
+          <MuxPlayer
+            playbackId={mux.playbackId}
+            streamType="on-demand"
+            accentColor="#ff5b1f"
+            style={{
+              width: "100%",
+              aspectRatio: mux.aspectRatio
+                ? mux.aspectRatio.replace(":", " / ")
+                : "16 / 9",
+            }}
+          />
+        </div>
+        {caption && <VideoCaption text={caption} />}
+      </div>
+    );
+  }
+
+  if (mux.status === "errored") {
+    return (
+      <EmptyBlockHint message="This video couldn't be processed. Ask your teacher to re-upload it." />
+    );
+  }
+
+  // waiting / preparing — Mux is still transcoding.
+  return (
+    <div>
+      <div
+        style={{
+          position: "relative",
+          paddingTop: "56.25%",
+          background: "var(--wf-fill)",
+          border: "1px solid var(--wf-hairline)",
+          borderRadius: 4,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 13,
+            color: "var(--wf-mute)",
+          }}
+        >
+          Video is processing…
+        </div>
+      </div>
+      {caption && <VideoCaption text={caption} />}
+    </div>
+  );
+}
+
+function VideoCaption({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        fontSize: 12,
+        color: "var(--wf-body)",
+        lineHeight: 1.5,
+      }}
+    >
+      {text}
     </div>
   );
 }

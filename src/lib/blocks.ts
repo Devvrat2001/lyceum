@@ -137,6 +137,19 @@ type CommonSettings = {
 export type VideoSettings = CommonSettings & {
   url?: string;
   caption?: string;
+  /** "url" embeds a YouTube/Vimeo link (default); "mux" is a video the
+   *  teacher uploaded, served by Mux. */
+  source?: "url" | "mux";
+  /** Mux upload/asset state, written by teacher.createVideoUpload +
+   *  videoStatus. Playback needs only `playbackId` once `status` is
+   *  "ready". */
+  mux?: {
+    uploadId?: string;
+    assetId?: string;
+    playbackId?: string;
+    status?: "waiting" | "preparing" | "ready" | "errored";
+    aspectRatio?: string;
+  };
 };
 export type ReadingSettings = CommonSettings & {
   body?: string;
