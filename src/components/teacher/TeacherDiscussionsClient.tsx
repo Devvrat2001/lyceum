@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Avatar, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
@@ -66,9 +67,9 @@ export function TeacherDiscussionsClient() {
             lineHeight: 1.5,
           }}
         >
-          Every discussion thread across your courses. Remove any comment
-          that breaks class rules — moderated deletes are recorded in the
-          institution audit log.
+          Every discussion thread across your courses. Reply as the
+          instructor, or remove any comment that breaks class rules —
+          moderated deletes are recorded in the institution audit log.
         </p>
 
         {/* Stat strip */}
@@ -260,6 +261,9 @@ export function TeacherDiscussionsClient() {
                     )}
                   </div>
                 )}
+
+                {/* Instructor reply composer */}
+                <ThreadComposer blockId={t.blockId} />
               </Card>
             ))}
           </div>
@@ -292,5 +296,86 @@ function StatCard({ label, value }: { label: string; value: number }) {
         {value.toLocaleString()}
       </div>
     </Card>
+  );
+}
+
+/**
+ * Inline composer that lets the teacher post a reply to a thread as the
+ * instructor. Posts through `lesson.postComment` (a protectedProcedure —
+ * any signed-in user can post to a DISCUSSION block) and invalidates the
+ * hub feed so the new reply shows up in the thread's recent comments.
+ */
+function ThreadComposer({ blockId }: { blockId: string }) {
+  const utils = trpc.useUtils();
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const post = trpc.lesson.postComment.useMutation({
+    onSuccess: () => {
+      setDraft("");
+      setError(null);
+      utils.lesson.teacherDiscussions.invalidate();
+    },
+    onError: (err) =>
+      setError(err.message ?? "Couldn't post your reply. Try again."),
+  });
+
+  const trimmed = draft.trim();
+  const canPost = trimmed.length > 0 && !post.isPending;
+
+  return (
+    <div
+      style={{
+        padding: "10px 18px 12px",
+        borderTop: "1px solid var(--wf-hairline)",
+        background: "var(--wf-fillsoft)",
+      }}
+    >
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Reply as the instructor…"
+          rows={1}
+          maxLength={2000}
+          disabled={post.isPending}
+          style={{
+            flex: 1,
+            padding: "8px 10px",
+            fontSize: 13,
+            border: "1px solid var(--wf-hairline)",
+            borderRadius: 4,
+            background: "white",
+            fontFamily: "inherit",
+            resize: "vertical",
+            color: "var(--wf-ink)",
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            if (canPost) post.mutate({ blockId, body: trimmed });
+          }}
+          disabled={!canPost}
+          style={{
+            padding: "8px 14px",
+            fontSize: 12,
+            fontWeight: 600,
+            border: "none",
+            borderRadius: 3,
+            background: canPost ? "var(--wf-ink)" : "var(--wf-fill)",
+            color: canPost ? "white" : "var(--wf-mute)",
+            cursor: canPost ? "pointer" : "default",
+            alignSelf: "stretch",
+          }}
+        >
+          {post.isPending ? "Posting…" : "Reply"}
+        </button>
+      </div>
+      {error && (
+        <div style={{ marginTop: 6, fontSize: 11, color: "var(--wf-accent)" }}>
+          {error}
+        </div>
+      )}
+    </div>
   );
 }
