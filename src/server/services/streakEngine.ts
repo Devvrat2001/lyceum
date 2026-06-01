@@ -63,6 +63,35 @@ export async function bumpStreak(
   return { current, longest, milestoneHit };
 }
 
+/**
+ * Daily rollover sweep. Streaks advance lazily — `bumpStreak` only runs when
+ * a user *does* something, so an absent user keeps a stale "14 day streak" on
+ * the dashboard + leaderboard until they next act. This breaks those streaks
+ * at the UTC day boundary so the displayed number is honest.
+ *
+ * A streak stays alive while the user was active **yesterday** (they still
+ * have all of today to continue it — `bumpStreak` would treat that as
+ * `dayDiff === 1`). It's broken only once they've missed a full day, i.e.
+ * `lastDay` is before yesterday's UTC midnight. We zero `current` (not
+ * `longest`, which is the all-time best); the next activity restarts at 1.
+ *
+ * One `updateMany` — cheap and idempotent (a second run the same day matches
+ * nothing new). Returns how many streaks were broken. Intended to run just
+ * after 00:00 UTC via `/api/cron/streak-rollover`.
+ */
+export async function expireStaleStreaks(
+  db: PrismaClient,
+  now: Date = new Date()
+): Promise<number> {
+  const today = startOfDayUTC(now);
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  const res = await db.streak.updateMany({
+    where: { current: { gt: 0 }, lastDay: { lt: yesterday } },
+    data: { current: 0 },
+  });
+  return res.count;
+}
+
 function startOfDayUTC(d: Date): Date {
   return new Date(
     Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
