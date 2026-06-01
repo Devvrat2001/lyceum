@@ -13,6 +13,7 @@ const { auth } = NextAuth(authConfig);
  * - /teacher/*  →  any signed-in TEACHER or ADMIN
  * - /admin/*    →  any signed-in ADMIN only
  * - /parent/*   →  any signed-in PARENT or ADMIN
+ * - /settings   →  any signed-in user (role-agnostic account page)
  *
  * Public: /, /login, /course/*, /api/* (auth handlers etc.)
  */
@@ -25,7 +26,8 @@ export default auth((req) => {
     pathname.startsWith("/student") ||
     pathname.startsWith("/teacher") ||
     pathname.startsWith("/admin") ||
-    pathname.startsWith("/parent");
+    pathname.startsWith("/parent") ||
+    pathname.startsWith("/settings");
 
   if (!requiresAuth) return NextResponse.next();
 
@@ -36,6 +38,9 @@ export default auth((req) => {
   }
 
   const allowed =
+    // /settings is role-agnostic — any signed-in user may manage their
+    // own account (the page + tRPC scope every write to ctx.user.id).
+    pathname.startsWith("/settings") ||
     (pathname.startsWith("/student") &&
       (role === "STUDENT" || role === "ADMIN")) ||
     (pathname.startsWith("/teacher") &&

@@ -51,6 +51,10 @@ model User {
   name           String?
   firstName      String?
   avatarUrl      String?
+  // Auth.js standard field. The Prisma adapter writes `image` on OAuth
+  // first sign-in (createUser); without this column Google/SSO sign-in
+  // 500s. App UI prefers `avatarUrl ?? image` for the display avatar.
+  image          String?
   // Teacher storefront — public profile presentation. Both optional;
   // a teacher who hasn't customized their storefront falls back to
   // just their name + published course list.
@@ -63,6 +67,16 @@ model User {
   class          Class?      @relation("ClassStudents", fields: [classId], references: [id])
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+
+  // Phase 6 — self-serve account settings (/settings page).
+  // Transactional mail (receipts) always sends; this gates the optional
+  // weekly digest + re-engagement nudges.
+  emailOptOut    Boolean     @default(false)
+  // COPPA/FERPA: when set, the AI tutor does NOT persist conversation
+  // content (the session shell + rate-limit accounting still work).
+  tutorLogOptOut Boolean     @default(false)
+  // When the user acknowledged data / AI-processing consent (self-serve).
+  coppaConsentAt DateTime?
 
   // Auth.js relations
   accounts       Account[]

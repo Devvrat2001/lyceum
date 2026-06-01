@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { auth, isGoogleAuthEnabled } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
@@ -129,7 +129,7 @@ export default async function LoginPage({
           </div>
         )}
 
-        <LoginForm next={sp.next} />
+        <LoginForm next={sp.next} googleEnabled={isGoogleAuthEnabled()} />
       </div>
 
       {/* Right: dev-only demo accounts panel — hidden entirely in production */}

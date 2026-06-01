@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { Icon } from "@/components/wf/primitives";
 
@@ -82,6 +83,21 @@ export function SidebarUserMenu({ dark = false }: { dark?: boolean }) {
           </div>
         </div>
       </div>
+      <Link
+        href="/settings"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 6px",
+          fontSize: 11,
+          color: subtle,
+          textDecoration: "none",
+        }}
+      >
+        <Icon name="cog" size={12} color="currentColor" />
+        Settings
+      </Link>
       <button
         onClick={() => signOut({ callbackUrl: "/login" })}
         style={{

@@ -93,6 +93,16 @@ export async function POST(req: Request) {
     });
   }
 
+  // Respect the per-user "don't store my tutor chats" privacy setting
+  // (COPPA/FERPA, toggled on /settings). When opted out the tutor still
+  // runs live and rate-limit accounting (the audit row) still happens, but
+  // we persist no message text — nothing about the conversation is kept.
+  const me = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { tutorLogOptOut: true },
+  });
+  const logTutor = !me?.tutorLogOptOut;
+
   // Get or create the tutor session.
   const tutorSession = body.sessionId
     ? await db.tutorSession.findFirst({
@@ -110,14 +120,17 @@ export async function POST(req: Request) {
     }));
 
   // Persist user message BEFORE we start streaming, so a dropped client
-  // doesn't lose the input.
-  await db.tutorMessage.create({
-    data: {
-      sessionId: sessionRow.id,
-      role: "user",
-      content: body.message,
-    },
-  });
+  // doesn't lose the input. Skipped entirely when the user opted out of
+  // tutor logging.
+  if (logTutor) {
+    await db.tutorMessage.create({
+      data: {
+        sessionId: sessionRow.id,
+        role: "user",
+        content: body.message,
+      },
+    });
+  }
 
   const firstQ = lesson.questions[0];
   const answers = (firstQ?.answers ?? []) as Array<{
@@ -192,23 +205,26 @@ export async function POST(req: Request) {
 
         emit({ type: "cite", citation });
 
-        // Persist assistant message.
-        await db.tutorMessage.create({
-          data: {
-            sessionId: sessionRow.id,
-            role: "assistant",
-            content: assistantText,
-            citations: hit
-              ? {
-                  page: hit.page,
-                  section: hit.section,
-                  snippet: hit.snippet,
-                  score: hit.score,
-                  source: "lesson_chunk_fts",
-                }
-              : { value: citation, source: "fallback" },
-          },
-        });
+        // Persist assistant message (skipped when the user opted out of
+        // tutor logging — the live answer above still streamed normally).
+        if (logTutor) {
+          await db.tutorMessage.create({
+            data: {
+              sessionId: sessionRow.id,
+              role: "assistant",
+              content: assistantText,
+              citations: hit
+                ? {
+                    page: hit.page,
+                    section: hit.section,
+                    snippet: hit.snippet,
+                    score: hit.score,
+                    source: "lesson_chunk_fts",
+                  }
+                : { value: citation, source: "fallback" },
+            },
+          });
+        }
 
         await audit({
           actorId: session.user.id,
@@ -222,6 +238,9 @@ export async function POST(req: Request) {
             citationPage: hit?.page ?? null,
             citationScore: hit?.score ?? null,
             mode: process.env.ANTHROPIC_API_KEY ? "claude" : "demo",
+            // Audit records that a chat happened (for rate-limit + the
+            // FERPA "tutor usage" trail) even when content wasn't stored.
+            tutorLoggingOptOut: !logTutor,
           },
           lessonId: lesson.id,
         });

@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -11,12 +12,15 @@ import { authConfig } from "@/lib/auth.config";
  * Full Auth.js v5 config — uses Prisma + Credentials.
  * Lives in the Node runtime only.
  *
- * Phase 1 dev strategy: a single Credentials provider that takes an email
- * and looks up the seeded user. No password — DEV_ONLY quick-login so we
- * can demo all roles without spinning up Resend / SMTP.
+ * Phase 1 dev strategy: a Credentials provider that takes an email and
+ * looks up the seeded user. No password — DEV_ONLY quick-login so we can
+ * demo all roles without spinning up Resend / SMTP.
  *
- * Production TODO: replace Credentials with Email magic-link (Resend) and/or
- * Google + Clever SSO. Search "DEV_ONLY" to find the swap point.
+ * Phase 6: Google OAuth is wired below, gated on GOOGLE_CLIENT_ID/SECRET
+ * (the app runs identically without them). Still TODO: Email magic-link
+ * (Resend) and the K-12 rostering SSO (Clever / ClassLink) — those also
+ * carry role data, so new users aren't all defaulted to STUDENT the way a
+ * bare Google sign-in is.
  */
 export const { auth, handlers, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -60,15 +64,46 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         };
       },
     }),
+    // Google OAuth — registered only when both creds exist, so the app
+    // behaves identically without them (the login button is hidden too).
+    // `allowDangerousEmailAccountLinking` is safe here because Google
+    // verifies email ownership: a teacher who signed up with a password
+    // and later clicks "Continue with Google" links to the same account
+    // (and keeps their role) instead of hitting OAuthAccountNotLinked.
+    // Brand-new Google users are created with the schema-default STUDENT
+    // role; an admin upgrades teachers/admins (role-carrying SSO is a
+    // later step — see the header TODO).
+    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? [
+          Google({
+            clientId: env.GOOGLE_CLIENT_ID,
+            clientSecret: env.GOOGLE_CLIENT_SECRET,
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
   ],
   callbacks: {
     ...authConfig.callbacks,
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as { role: Role }).role;
+        // Credentials returns {role}; the Prisma adapter (OAuth) returns the
+        // full User row, which also has `role` (default STUDENT for a brand
+        // new Google user). Either way we stamp it onto the JWT.
+        token.role = (user as { role?: Role }).role ?? "STUDENT";
       }
       return token;
     },
   },
 });
+
+/**
+ * Whether Google OAuth is configured. The login page reads this to decide
+ * whether to render the "Continue with Google" button — mirrors the lazy
+ * gating used for Stripe / Mux / Resend, so the feature is dormant (not
+ * broken) until the credentials are added.
+ */
+export function isGoogleAuthEnabled(): boolean {
+  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+}
