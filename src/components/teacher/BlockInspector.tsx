@@ -147,6 +147,8 @@ export function BlockInspector({
   onDeselect,
   embedded = false,
   onDelete,
+  moveTargets,
+  onMove,
 }: {
   block: {
     id: string;
@@ -161,6 +163,10 @@ export function BlockInspector({
   embedded?: boolean;
   /** When provided, renders a "Delete block" action at the bottom. */
   onDelete?: () => void;
+  /** Other lessons in the course. When non-empty, renders a
+   *  "Move to lesson" control above Delete. */
+  moveTargets?: { id: string; label: string }[];
+  onMove?: (toLessonId: string) => void;
 }) {
   const meta = findBlockMeta(block.type);
   const [draft, setDraft] = useState<BlockSettingsShape>(block.settings);
@@ -325,6 +331,47 @@ export function BlockInspector({
             ? "Save block"
             : "Saved"}
       </Btn>
+
+      {moveTargets && moveTargets.length > 0 && onMove && (
+        <div style={{ marginTop: 10 }}>
+          <label
+            className="wf-mono"
+            style={{
+              fontSize: 10,
+              color: "var(--wf-mute)",
+              letterSpacing: "0.06em",
+              display: "block",
+              marginBottom: 4,
+            }}
+          >
+            MOVE TO LESSON
+          </label>
+          <select
+            value=""
+            onChange={(e) => {
+              if (e.target.value) onMove(e.target.value);
+            }}
+            style={{
+              width: "100%",
+              padding: "8px 10px",
+              borderRadius: 7,
+              border: "1px solid var(--wf-hairline)",
+              background: "white",
+              fontSize: 12,
+              color: "var(--wf-ink)",
+              fontFamily: "inherit",
+              cursor: "pointer",
+            }}
+          >
+            <option value="">Move this block to…</option>
+            {moveTargets.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {onDelete && (
         <button

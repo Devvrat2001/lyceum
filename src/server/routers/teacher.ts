@@ -1602,6 +1602,95 @@ export const teacherRouter = router({
     }),
 
   /**
+   * Move a block to a different lesson *in the same course*. Appends it to
+   * the end of the target lesson (order = max + 1). Like deleteBlock, the
+   * source lesson keeps its sparse ordering — the gap left behind is
+   * harmless (blocks sort by `order`, and reorderBlocks compacts to 1..N on
+   * the next manual rearrange). Ownership is verified on BOTH the source
+   * block and the target lesson; cross-course moves are rejected (the
+   * builder only ever offers lessons within the current course).
+   */
+  moveBlock: teacherProcedure
+    .input(z.object({ blockId: z.string(), toLessonId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: {
+          id: true,
+          lessonId: true,
+          lesson: {
+            select: {
+              unit: {
+                select: {
+                  courseId: true,
+                  course: { select: { authorId: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        block.lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      // Same-lesson "move" is a no-op (the UI never offers the current lesson
+      // as a target). Return early before touching the DB.
+      if (input.toLessonId === block.lessonId) {
+        return { ok: true as const, moved: false, blockId: block.id };
+      }
+
+      const target = await ctx.db.lesson.findUnique({
+        where: { id: input.toLessonId },
+        select: {
+          id: true,
+          unit: {
+            select: {
+              courseId: true,
+              course: { select: { authorId: true } },
+            },
+          },
+          blocks: { orderBy: { order: "desc" }, take: 1, select: { order: true } },
+        },
+      });
+      if (!target) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Target lesson not found.",
+        });
+      }
+      if (
+        ctx.user.role !== "ADMIN" &&
+        target.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      if (target.unit.courseId !== block.lesson.unit.courseId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A block can only move to a lesson in the same course.",
+        });
+      }
+
+      const nextOrder = (target.blocks[0]?.order ?? 0) + 1;
+      await ctx.db.block.update({
+        where: { id: block.id },
+        data: { lessonId: target.id, order: nextOrder },
+      });
+      return {
+        ok: true as const,
+        moved: true,
+        blockId: block.id,
+        toLessonId: target.id,
+        order: nextOrder,
+      };
+    }),
+
+  /**
    * Persist a new lesson ordering within a single unit. Same shape as
    * reorderUnits — rewrites Lesson.order to 1..N. Ownership check
    * resolves the unit → course → authorId chain in one query.

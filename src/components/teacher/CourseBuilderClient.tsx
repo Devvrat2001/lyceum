@@ -183,6 +183,12 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       setUnits(course.units);
     },
   });
+  const moveBlockM = trpc.teacher.moveBlock.useMutation({
+    onError: (e) => {
+      setErr(`Failed to move block: ${e.message}`);
+      setUnits(course.units);
+    },
+  });
   const setCourseStatus = trpc.teacher.setCourseStatus.useMutation({
     onSuccess: () => router.refresh(),
     onError: (e) => setErr(`Failed to update course status: ${e.message}`),
@@ -209,6 +215,18 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     if (!selectedBlockId || !selectedLesson) return null;
     return selectedLesson.blocks.find((b) => b.id === selectedBlockId) ?? null;
   }, [selectedBlockId, selectedLesson]);
+
+  // Other lessons in the course — targets for the inspector's "Move to
+  // lesson" control. Excludes the block's current lesson.
+  const moveTargets = useMemo(() => {
+    if (!selectedLesson) return [] as { id: string; label: string }[];
+    const out: { id: string; label: string }[] = [];
+    for (const u of units)
+      for (const l of u.lessons)
+        if (l.id !== selectedLesson.id)
+          out.push({ id: l.id, label: `${u.title} · ${l.title}` });
+    return out;
+  }, [units, selectedLesson]);
 
   // `selectedBlock` (a useMemo) already resolves to null when the id no
   // longer points at a block in the open lesson, and every lesson/block
@@ -365,6 +383,36 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       )
     );
     deleteBlock.mutate({ blockId });
+    markSaved();
+  };
+
+  // Move the selected block to another lesson. Optimistically drops it from
+  // the source lesson and appends it to the target (order = max+1), mirroring
+  // the server. On error we reset to the last server snapshot (same recovery
+  // as reorderBlocks).
+  const moveBlockTo = (toLessonId: string) => {
+    if (!selectedLesson || !selectedBlock) return;
+    const fromLessonId = selectedLesson.id;
+    const blk = selectedBlock;
+    if (toLessonId === fromLessonId) return;
+    setSelectedBlockId(null);
+    setUnits((prev) =>
+      prev.map((u) => ({
+        ...u,
+        lessons: u.lessons.map((l) => {
+          if (l.id === fromLessonId) {
+            return { ...l, blocks: l.blocks.filter((b) => b.id !== blk.id) };
+          }
+          if (l.id === toLessonId) {
+            const nextOrder =
+              l.blocks.reduce((m, b) => Math.max(m, b.order ?? 0), 0) + 1;
+            return { ...l, blocks: [...l.blocks, { ...blk, order: nextOrder }] };
+          }
+          return l;
+        }),
+      }))
+    );
+    moveBlockM.mutate({ blockId: blk.id, toLessonId });
     markSaved();
   };
 
@@ -573,6 +621,8 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
             selectedBlock &&
             removeBlock(selectedLesson.id, selectedBlock.id)
           }
+          moveTargets={moveTargets}
+          onMoveBlock={moveBlockTo}
           onRenameLesson={renameLessonH}
           onSetDuration={setLessonDurationH}
         />
@@ -2599,6 +2649,8 @@ function ContextInspector({
   onBlockSaved,
   onDeselect,
   onDeleteBlock,
+  moveTargets,
+  onMoveBlock,
   onRenameLesson,
   onSetDuration,
 }: {
@@ -2614,6 +2666,8 @@ function ContextInspector({
   onBlockSaved: (blockId: string, settings: BlockSettings) => void;
   onDeselect: () => void;
   onDeleteBlock: () => void;
+  moveTargets: { id: string; label: string }[];
+  onMoveBlock: (toLessonId: string) => void;
   onRenameLesson: (lessonId: string, title: string) => void;
   onSetDuration: (lessonId: string, durationMin: number | null) => void;
 }) {
@@ -2743,6 +2797,8 @@ function ContextInspector({
               onSaved={(settings) => onBlockSaved(selectedBlock.id, settings)}
               onDeselect={onDeselect}
               onDelete={onDeleteBlock}
+              moveTargets={moveTargets}
+              onMove={onMoveBlock}
             />
           </>
         ) : tab === "lesson" ? (
