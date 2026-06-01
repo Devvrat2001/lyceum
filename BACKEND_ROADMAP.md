@@ -346,6 +346,79 @@ Rough order to make the prototype feel real without trying to build everything a
 
 ---
 
+## Phase 6 — Launch Readiness & Growth (current)
+
+> Phases 1–5 delivered the product itself — authoring, student reader, marketplace,
+> Stripe payments, institution admin, and most Phase-5 polish. **Phase 6 is the path
+> from "feature-complete on a dev box" to "safe to put real K-12 students and real
+> money through it," then growth breadth.** Sub-phases are ordered by launch-criticality:
+> **6.1–6.3 gate a real launch; 6.4–6.5 are post-launch growth, pickable à la carte.**
+
+### 6.1 Activate built-but-dark features (credentials & accounts) · ~1 session
+
+*Each item below is already wired and gated behind a missing credential — flipping the
+key turns the feature on. Highest value-to-effort in the whole phase.*
+
+- **Resend** (`npm i resend` + `RESEND_API_KEY`) → invoice emails, parent self-invite token flow, weekly digests. Code lives in `lib/email.ts` (lazy client; logs-and-skips until the key exists).
+- **`ANTHROPIC_API_KEY` (prod / Vercel)** → real AI tutor, quiz-gen, course generator, marketplace AI search. Without it every AI surface silently serves its demo fallback. Watch the empty-string-shadows-`.env` gotcha (`@next/env` won't override an already-set empty var).
+- **Stripe go-live** → activate the test account (`charges_enabled=false` today) + enable Connect so teacher payouts actually move money. Test-card charges already work end-to-end; this is Dashboard activation, not code.
+- **Mux (in-flight)** → keys are added; remaining: verify the upload→transcode→play loop, then build `/api/mux/webhook` (instant finish if the teacher closes the tab) + **signed playback** (protect paid-course video). Hooks in `src/lib/video/mux.ts`.
+- *Exit criteria:* a real receipt lands in an inbox · a prod tutor reply is non-canned · a test payout reaches a Connect account · an uploaded video plays back from Mux.
+
+### 6.2 Production hardening (launch blockers) · ~1 session
+
+*Can't responsibly take real traffic / PII without these.*
+
+- **Error monitoring** — wire Sentry (server + tRPC + edge). ~1 hr; Next.js has first-class integration.
+- **Rate limiting** — Upstash on the AI endpoints; **start with `src/app/api/tutor/stream/route.ts`**, which has no limiter today (direct, unbounded LLM-cost exposure).
+- **DB backups** — nightly `pg_dump` of managed Postgres → object storage + one rehearsed restore drill.
+- **TLS smell** — chase the recurring prod `Warning: SECURITY …` emitted on every request (likely `NODE_TLS_REJECT_UNAUTHORIZED=0` disabling cert verification app-wide). Find the source, scope it narrowly or remove it.
+- *(Vercel deploy — ✅ **already done**; live on `lyceum-kappa.vercel.app` with managed Postgres. Tier 3.4 in `AGENT_NOTES.md` is stale on this point.)*
+- *Exit criteria:* an induced error appears in Sentry · tutor spam returns 429 past the limit · a restore boots clean · prod request logs are warning-free.
+
+### 6.3 Compliance & trust (K-12 critical) · ~1–2 sessions
+
+*This is a children's-data product — these gate institutional adoption, not just polish.*
+
+- **SSO** — Google + **Clever / ClassLink** (the K-12 rostering standards). `auth.ts` is credentials-only with an explicit `// Production TODO` (search `DEV_ONLY` for the swap point); the admin "compliance" card is currently just a label, not a real connection.
+- **Settings page** (`/settings` — does not exist yet) — profile, password change, email preferences, **COPPA consent**, and AI-tutor-log opt-out. Per-role variants (student / teacher / admin / parent).
+- *(Audit log is already real — `audit.ts` / the closed `AuditKind` union.)*
+- *Exit criteria:* a Clever test login provisions a session · a user can view + change consent and opt out of tutor logging.
+
+### 6.4 Reach & polish (growth breadth) · ongoing
+
+- **Mobile** — the app is desktop-first (grid layouts, fixed widths). Build the wireframe's mobile dashboard / lesson / marketplace screens + hamburger / bottom-tab nav. Audit before committing; ~1–2 sessions.
+- **i18n** — `next-intl` scaffold; en + es first (Spanish course content is already surfaced in the UI). No internationalization exists today — every string is en-US.
+- **True offline lesson reading** — the PWA install shell is done (`public/sw.js`, network-first nav → `offline.html`). Remaining: precache lesson/block JSON + an attempt-sync queue (IndexedDB → replay on reconnect).
+- **Admin Branding** (`src/app/admin/branding/page.tsx` — the lone remaining `ComingSoon` stub) — accent-color + institution name are buildable now; logo upload / sign-in background / vanity domain need asset storage (S3 / R2) + DNS wiring first (overlaps 6.5's PDF/asset pipeline).
+- *Exit criteria:* a lesson is usable at 375px · a locale toggle flips a page · an airplane-mode lesson reads and syncs its attempts on reconnect.
+
+### 6.5 Rich media & content tooling · ongoing
+
+*Block types that render but have no backend, plus document export.*
+
+- **Live sessions** — Zoom / Daily.co integration behind the `LIVE` block (room create + join + recording link).
+- **Speech practice** — Whisper transcription + pronunciation scoring behind the `SPEAK` block.
+- **PDF generation** — printable worksheet packs (promised on course detail) + the admin **Board report** (KPIs + mastery heatmap + insights for trustees). react-pdf or Puppeteer; also unblocks the Branding asset pipeline in 6.4.
+- *Exit criteria:* a LIVE block launches a real room · a SPEAK attempt returns a score · a Board report downloads as a PDF.
+
+### 6.6 Engineering debt & deferred refactors · opportunistic
+
+*Not launch-blocking — fold each into the feature work that already touches the same
+surface, rather than running it as a standalone sprint. All small; most are trigger-driven.*
+
+- **Block reorder across lessons** (Tier 4.2 · ~1 session) — today reorder is within-lesson only. Add a `teacher.moveBlock({ blockId, toLessonId, position })` mutation (mirror the `addBlock` ownership check) + a "Move to lesson…" affordance in the builder. *Do alongside any other CourseBuilder work.*
+- **Drag-template-from-library v2** (Tier 4.1 · ~1 session · low priority) — click-to-insert already covers the workflow; this adds dragging a template card straight onto a lesson row. Requires collapsing the 3 nested `DndContext`s (units / lessons / blocks) into one top-level context with prefixed draggable ids + a master `onDragEnd`. *Defer until a teacher actually asks.*
+- **`BlockSettingsShape` → discriminated union** (Tier 4.5 · ~1 session · ⚠ partially mitigated) — the compile-time *correctness* pain is already handled by `SettingsFor<T>` + `settingsFor()`; what remains is the structural cleanup of the ~20-optional-field union into a `Block.type`-keyed discriminated union. Pure type-level, no data migration. *Low urgency — do during a typing pass.*
+- **Real `chosenIndex` / `subIndex` columns** (Tier 5.3 · ~1 session incl. backfill) — `Attempt.chosenKey` is one string overloaded across 5 encodings (`"subIdx:choiceIdx"`, `"drag:N/M"`, `"branch:<nodeId>"`, …). **Trigger:** the first analytics query that needs structured access (e.g. "% correct on Q3 of AI_QUIZ X"); then add the typed columns + a one-shot backfill. *Don't pre-build — wait for the query that needs it.*
+- **Background-job crons** (mixed sizes) — only the embeddings sweep is scheduled (Vercel Cron, hourly). Still unscheduled: **streak rollover** (midnight break/rollover — engine exists in `services/streakEngine.ts`, just needs a trigger), **weekly progress emails** (⛓ gated on 6.1 Resend), **nightly skill-tree re-route** (the personalization layer), **AI-insight generation** (⛓ gated on 6.1 `ANTHROPIC_API_KEY`). *Schedule each when its dependency lands — two ride along with 6.1.*
+
+### Sequencing
+
+**6.1 → 6.2 → 6.3 are the launch gate** — do these before any real-student cohort touches the platform. **6.4 and 6.5 are post-launch growth**, parallelizable and pickable in any order once the gate is cleared. **6.6 is opportunistic / continuous** — each item is cheapest done while you're already in that surface (and two of its crons ride along with 6.1's credential activation), so there's no standalone "do 6.6" milestone.
+
+---
+
 ## Quick fixes that make it feel less fake without backend
 
 If you want some immediate "feels real" improvements before building backend:
