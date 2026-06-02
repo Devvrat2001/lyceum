@@ -154,6 +154,10 @@ model Institution {
   name      String
   plan      String  @default("FREE")
   seats     Int     @default(0)
+  // Phase 6 — institution branding. Hex like "#2563eb"; null = the
+  // default Lyceum accent. Drives a per-institution `--wf-accent` override
+  // on the admin surface (app/admin/layout.tsx).
+  brandColor String? @db.VarChar(7)
   users     User[]
   classes   Class[]
   createdAt DateTime @default(now())

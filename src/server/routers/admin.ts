@@ -35,6 +35,72 @@ function trendOf(
 
 export const adminRouter = router({
   /**
+   * Institution branding (name + accent colour) for the admin's own
+   * institution. `brandColor` is a hex like "#2563eb" (null = the default
+   * Lyceum accent); it drives a per-institution `--wf-accent` override on
+   * the admin surface (app/admin/layout.tsx).
+   */
+  branding: adminProcedure.query(async ({ ctx }) => {
+    const me = await ctx.db.user.findUnique({
+      where: { id: ctx.user.id },
+      select: { institutionId: true },
+    });
+    const institutionId =
+      me?.institutionId ??
+      (await ctx.db.institution.findFirst({ select: { id: true } }))?.id ??
+      null;
+    const inst = institutionId
+      ? await ctx.db.institution.findUnique({
+          where: { id: institutionId },
+          select: { id: true, name: true, brandColor: true },
+        })
+      : null;
+    return {
+      institutionId: inst?.id ?? null,
+      name: inst?.name ?? "",
+      brandColor: inst?.brandColor ?? null,
+    };
+  }),
+
+  updateBranding: adminProcedure
+    .input(
+      z.object({
+        name: z.string().trim().min(1).max(120).optional(),
+        // Hex like "#2563eb", or null to clear back to the default accent.
+        brandColor: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/, "Use a 6-digit hex colour like #2563eb")
+          .nullish(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const me = await ctx.db.user.findUnique({
+        where: { id: ctx.user.id },
+        select: { institutionId: true },
+      });
+      const institutionId =
+        me?.institutionId ??
+        (await ctx.db.institution.findFirst({ select: { id: true } }))?.id ??
+        null;
+      if (!institutionId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No institution to brand.",
+        });
+      }
+      const data: Prisma.InstitutionUpdateInput = {};
+      if (input.name !== undefined) data.name = input.name;
+      if (input.brandColor !== undefined) data.brandColor = input.brandColor;
+      if (Object.keys(data).length === 0) return { ok: true as const };
+      const institution = await ctx.db.institution.update({
+        where: { id: institutionId },
+        data,
+        select: { id: true, name: true, brandColor: true },
+      });
+      return { ok: true as const, institution };
+    }),
+
+  /**
    * List a given PARENT user's linked STUDENT children. Used by the
    * admin people page's per-parent expander panel.
    *
