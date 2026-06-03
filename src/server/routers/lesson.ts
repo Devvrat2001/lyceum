@@ -10,6 +10,11 @@ import {
 import { awardCorrectAttempt } from "../services/awardForAttempt";
 import { settingsFor } from "@/lib/blocks";
 import { audit } from "@/lib/audit";
+import {
+  isMuxSignedPlaybackEnabled,
+  signMuxPlaybackToken,
+  type MuxState,
+} from "@/lib/video/mux";
 
 /** Max poll options. Mirrors the inspector cap (2–6). */
 const MAX_POLL_OPTIONS = 9;
@@ -34,6 +39,83 @@ function discussionPrompt(settings: unknown): string | null {
 }
 
 export const lessonRouter = router({
+  /**
+   * Mint a signed-playback token for a VIDEO block's Mux video, gated on
+   * access. Only "signed"-policy videos (paid courses, when signing keys are
+   * configured) need a token; public videos return `{ token: null }` and play
+   * from the playbackId directly. Access = course owner / admin, a free
+   * course, or an enrolled student — anyone else gets FORBIDDEN. This is what
+   * actually keeps paid-course video from being hot-linked.
+   */
+  videoPlaybackToken: protectedProcedure
+    .input(z.object({ blockId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: {
+          id: true,
+          type: true,
+          settings: true,
+          lesson: {
+            select: {
+              unit: {
+                select: {
+                  course: {
+                    select: { id: true, authorId: true, priceCents: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!block || block.type !== "VIDEO") {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const mux = ((block.settings as Record<string, unknown>)?.mux ??
+        {}) as MuxState;
+
+      // Public (or not-yet-ready) videos never need a token.
+      if (
+        mux.policy !== "signed" ||
+        mux.status !== "ready" ||
+        !mux.playbackId
+      ) {
+        return { token: null as string | null };
+      }
+
+      const course = block.lesson.unit.course;
+      const isOwner =
+        ctx.user.role === "ADMIN" || course.authorId === ctx.user.id;
+      let allowed = isOwner || (course.priceCents ?? 0) === 0;
+      if (!allowed) {
+        const enrollment = await ctx.db.enrollment.findUnique({
+          where: {
+            userId_courseId: { userId: ctx.user.id, courseId: course.id },
+          },
+          select: { id: true },
+        });
+        allowed = Boolean(enrollment);
+      }
+      if (!allowed) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Enroll in this course to watch its videos.",
+        });
+      }
+
+      if (!isMuxSignedPlaybackEnabled()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Signed video playback isn't configured.",
+        });
+      }
+
+      const token = await signMuxPlaybackToken(mux.playbackId);
+      return { token: token as string | null };
+    }),
+
   bySlug: publicProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }) => {

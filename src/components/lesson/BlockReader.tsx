@@ -108,7 +108,12 @@ function renderBody(block: BlockReaderProps) {
   // caught at compile time here, not at first render.
   switch (block.type) {
     case "VIDEO":
-      return <VideoBody settings={settingsFor("VIDEO", block.settings)} />;
+      return (
+        <VideoBody
+          settings={settingsFor("VIDEO", block.settings)}
+          blockId={block.id}
+        />
+      );
     case "READING":
       return <ReadingBody settings={settingsFor("READING", block.settings)} />;
     case "MCQ":
@@ -196,13 +201,21 @@ function renderBody(block: BlockReaderProps) {
 
 /* ── VIDEO ───────────────────────────────────────────────── */
 
-function VideoBody({ settings }: { settings: Record<string, unknown> }) {
+function VideoBody({
+  settings,
+  blockId,
+}: {
+  settings: Record<string, unknown>;
+  blockId: string;
+}) {
   const caption =
     typeof settings.caption === "string" ? settings.caption.trim() : "";
 
   // An uploaded (Mux) video takes precedence over a pasted URL.
   if (settings.source === "mux") {
-    return <MuxVideoBody settings={settings} caption={caption} />;
+    return (
+      <MuxVideoBody settings={settings} caption={caption} blockId={blockId} />
+    );
   }
 
   const rawUrl =
@@ -301,17 +314,43 @@ const MuxPlayer = dynamic(() => import("@mux/mux-player-react"), {
 function MuxVideoBody({
   settings,
   caption,
+  blockId,
 }: {
   settings: Record<string, unknown>;
   caption: string;
+  blockId: string;
 }) {
   const mux = (settings.mux ?? {}) as {
     playbackId?: string;
     status?: string;
     aspectRatio?: string;
+    policy?: "public" | "signed";
   };
 
-  if (mux.status === "ready" && mux.playbackId) {
+  const ready = mux.status === "ready" && !!mux.playbackId;
+  const isSigned = mux.policy === "signed";
+
+  // Signed (paid-course) videos need a short-lived token, minted per viewer
+  // and gated on enrollment server-side; public videos play straight from the
+  // playbackId. The hook runs unconditionally (rules of hooks) but only
+  // fetches for signed, ready videos.
+  const tokenQuery = trpc.lesson.videoPlaybackToken.useQuery(
+    { blockId },
+    { enabled: ready && isSigned, retry: false, staleTime: 5 * 60_000 }
+  );
+
+  if (ready) {
+    if (isSigned && tokenQuery.isLoading) {
+      return <EmptyBlockHint message="Loading video…" />;
+    }
+    if (isSigned && (tokenQuery.isError || !tokenQuery.data?.token)) {
+      return (
+        <EmptyBlockHint message="This video is locked — enroll in the course to watch it." />
+      );
+    }
+    const playbackToken = isSigned
+      ? tokenQuery.data?.token ?? undefined
+      : undefined;
     return (
       <div>
         <div
@@ -324,6 +363,7 @@ function MuxVideoBody({
         >
           <MuxPlayer
             playbackId={mux.playbackId}
+            tokens={playbackToken ? { playback: playbackToken } : undefined}
             streamType="on-demand"
             accentColor="#ff5b1f"
             style={{

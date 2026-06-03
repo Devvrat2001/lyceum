@@ -15,6 +15,7 @@ import { findBlockTemplate } from "@/lib/blockTemplates";
 import { refreshCourseEmbedding } from "@/lib/jobs/refreshCourseEmbedding";
 import {
   isMuxEnabled,
+  isMuxSignedPlaybackEnabled,
   createDirectUpload,
   getMuxState,
   type MuxState,
@@ -1478,7 +1479,11 @@ export const teacherRouter = router({
           settings: true,
           lesson: {
             select: {
-              unit: { select: { course: { select: { authorId: true } } } },
+              unit: {
+                select: {
+                  course: { select: { authorId: true, priceCents: true } },
+                },
+              },
             },
           },
         },
@@ -1497,16 +1502,27 @@ export const teacherRouter = router({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
+      // Paid-course videos get signed playback when signing keys are present;
+      // everything else stays public (no token needed).
+      const signed =
+        isMuxSignedPlaybackEnabled() &&
+        (block.lesson.unit.course.priceCents ?? 0) > 0;
+
       const { uploadId, uploadUrl } = await createDirectUpload(
         block.id,
-        input.origin ?? "*"
+        input.origin ?? "*",
+        signed
       );
 
       const prev = (block.settings ?? {}) as Record<string, unknown>;
       const settings = {
         ...prev,
         source: "mux",
-        mux: { uploadId, status: "waiting" } satisfies MuxState,
+        mux: {
+          uploadId,
+          status: "waiting",
+          policy: signed ? "signed" : "public",
+        } satisfies MuxState,
       };
       const updated = await ctx.db.block.update({
         where: { id: block.id },

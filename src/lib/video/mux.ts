@@ -44,6 +44,9 @@ export type MuxState = {
   playbackId?: string;
   status?: MuxStatus;
   aspectRatio?: string;
+  /** "signed" → playback needs a short-lived JWT (paid courses). Absent or
+   *  "public" → the playbackId streams directly. */
+  policy?: "public" | "signed";
 };
 
 /**
@@ -53,12 +56,15 @@ export type MuxState = {
  */
 export async function createDirectUpload(
   blockId: string,
-  corsOrigin: string
+  corsOrigin: string,
+  signed: boolean = false
 ): Promise<{ uploadId: string; uploadUrl: string }> {
   const upload = await getMux().video.uploads.create({
     cors_origin: corsOrigin || "*",
     new_asset_settings: {
-      playback_policies: ["public"],
+      // Signed playback (paid courses) locks streaming to a short-lived JWT;
+      // public is the default and needs no token.
+      playback_policies: [signed ? "signed" : "public"],
       passthrough: blockId,
     },
   });
@@ -112,6 +118,7 @@ export async function getMuxState(prev: MuxState): Promise<MuxState> {
     playbackId: asset.playback_ids?.[0]?.id ?? prev.playbackId,
     status,
     aspectRatio: asset.aspect_ratio ?? prev.aspectRatio,
+    policy: prev.policy,
   };
 }
 
@@ -169,6 +176,7 @@ export function muxStateFromEvent(
       playbackId: playbackIds[0]?.id ?? prev.playbackId,
       status: "ready",
       aspectRatio: aspect ?? prev.aspectRatio,
+      policy: prev.policy,
     };
   }
   if (type === "video.asset.errored") {
@@ -211,4 +219,29 @@ export async function applyMuxEventToBlock(
     data: { settings: settings as Prisma.InputJsonValue },
   });
   return nextMux.status ?? null;
+}
+
+// ── Signed playback (paid courses) ───────────────────────────────────────
+
+/**
+ * Whether signed playback is configured. Requires the Mux signing key pair
+ * (Mux dashboard → Settings → Signing Keys) on top of the upload keys. When
+ * false, new uploads stay public and no playback token is ever minted, so
+ * the whole video feature keeps working without these keys.
+ */
+export function isMuxSignedPlaybackEnabled(): boolean {
+  return isMuxEnabled() && Boolean(env.MUX_SIGNING_KEY && env.MUX_PRIVATE_KEY);
+}
+
+/**
+ * Mint a short-lived signed-playback JWT for a `signed`-policy playbackId.
+ * The Mux client reads the signing key pair from MUX_SIGNING_KEY /
+ * MUX_PRIVATE_KEY; this token is what the player passes as `tokens.playback`.
+ * Only call when `isMuxSignedPlaybackEnabled()` — it throws without the keys.
+ */
+export async function signMuxPlaybackToken(playbackId: string): Promise<string> {
+  return getMux().jwt.signPlaybackId(playbackId, {
+    type: "video",
+    expiration: "6h",
+  });
 }

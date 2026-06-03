@@ -73,6 +73,11 @@ const Schema = z.object({
   // for instant completion. Without it the route refuses (we never process an
   // unverified body) — the builder's client polling still finishes uploads.
   MUX_WEBHOOK_SECRET: z.string().optional(),
+  // Mux signing keys (Mux dashboard → Settings → Signing Keys), for signed
+  // playback on PAID-course videos. Both optional; absent → all videos stay
+  // public (no token needed). MUX_PRIVATE_KEY is the base64 RSA private key.
+  MUX_SIGNING_KEY: z.string().optional(),
+  MUX_PRIVATE_KEY: z.string().optional(),
 
   NODE_ENV: z
     .enum(["development", "test", "production"])
