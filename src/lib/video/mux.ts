@@ -1,5 +1,6 @@
 import "server-only";
 import Mux from "@mux/mux-node";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { env } from "@/lib/env";
 
 /**
@@ -112,4 +113,102 @@ export async function getMuxState(prev: MuxState): Promise<MuxState> {
     status,
     aspectRatio: asset.aspect_ratio ?? prev.aspectRatio,
   };
+}
+
+// ── Webhook (instant completion) ─────────────────────────────────────────
+
+/**
+ * Whether the Mux webhook is configured. `/api/mux/webhook` refuses to
+ * process anything unless this is true — we never act on an unverified body.
+ * Requires the upload keys too (the webhook only fires for a project that has
+ * them).
+ */
+export function isMuxWebhookEnabled(): boolean {
+  return isMuxEnabled() && Boolean(env.MUX_WEBHOOK_SECRET);
+}
+
+/**
+ * Verify a Mux webhook's signature against MUX_WEBHOOK_SECRET and return the
+ * parsed event. Throws if the signature is missing/invalid (the SDK does the
+ * timing-safe HMAC check). Pass the RAW request body — not a re-serialized
+ * JSON object, or the signature won't match.
+ */
+export async function unwrapMuxWebhook(
+  rawBody: string,
+  headers: Headers
+): Promise<{ type: string; data: Record<string, unknown> }> {
+  const event = await getMux().webhooks.unwrap(
+    rawBody,
+    headers,
+    env.MUX_WEBHOOK_SECRET
+  );
+  return event as unknown as { type: string; data: Record<string, unknown> };
+}
+
+/**
+ * Map a Mux asset event onto the next persisted `MuxState`. Pure (no I/O) so
+ * it's unit-testable. Returns null for events we don't persist (the polling
+ * path covers the rest). The event's `data` is the Mux Asset object, which
+ * carries our `passthrough` (the blockId).
+ */
+export function muxStateFromEvent(
+  prev: MuxState,
+  type: string,
+  data: Record<string, unknown>
+): MuxState | null {
+  const id = typeof data.id === "string" ? data.id : undefined;
+  if (type === "video.asset.ready") {
+    const playbackIds = Array.isArray(data.playback_ids)
+      ? (data.playback_ids as Array<{ id?: string }>)
+      : [];
+    const aspect =
+      typeof data.aspect_ratio === "string" ? data.aspect_ratio : undefined;
+    return {
+      uploadId: prev.uploadId,
+      assetId: id ?? prev.assetId,
+      playbackId: playbackIds[0]?.id ?? prev.playbackId,
+      status: "ready",
+      aspectRatio: aspect ?? prev.aspectRatio,
+    };
+  }
+  if (type === "video.asset.errored") {
+    return { ...prev, assetId: id ?? prev.assetId, status: "errored" };
+  }
+  return null;
+}
+
+/**
+ * Apply a verified Mux event to the VIDEO block named by its `passthrough`.
+ * Merges the new `MuxState` into the block's settings (the same shape the
+ * builder polling writes). Idempotent: terminal states (ready/errored) are
+ * sticky, so a retried/duplicate delivery is a no-op. Returns the resulting
+ * status, or null when the block is unknown or the event isn't persisted.
+ */
+export async function applyMuxEventToBlock(
+  db: PrismaClient,
+  blockId: string,
+  type: string,
+  data: Record<string, unknown>
+): Promise<MuxStatus | null> {
+  const block = await db.block.findUnique({
+    where: { id: blockId },
+    select: { id: true, settings: true },
+  });
+  if (!block) return null;
+
+  const prev = (block.settings ?? {}) as Record<string, unknown>;
+  const prevMux = (prev.mux ?? {}) as MuxState;
+  if (prevMux.status === "ready" || prevMux.status === "errored") {
+    return prevMux.status; // terminal — ignore late/duplicate deliveries
+  }
+
+  const nextMux = muxStateFromEvent(prevMux, type, data);
+  if (!nextMux) return null;
+
+  const settings = { ...prev, source: "mux", mux: nextMux };
+  await db.block.update({
+    where: { id: block.id },
+    data: { settings: settings as Prisma.InputJsonValue },
+  });
+  return nextMux.status ?? null;
 }

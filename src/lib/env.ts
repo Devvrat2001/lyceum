@@ -68,6 +68,11 @@ const Schema = z.object({
   // permission, then set both vars in .env.local + Vercel.
   MUX_TOKEN_ID: z.string().optional(),
   MUX_TOKEN_SECRET: z.string().optional(),
+  // Signing secret for the Mux webhook (Mux dashboard → Settings → Webhooks).
+  // When set, /api/mux/webhook verifies + applies `video.asset.ready` events
+  // for instant completion. Without it the route refuses (we never process an
+  // unverified body) — the builder's client polling still finishes uploads.
+  MUX_WEBHOOK_SECRET: z.string().optional(),
 
   NODE_ENV: z
     .enum(["development", "test", "production"])
