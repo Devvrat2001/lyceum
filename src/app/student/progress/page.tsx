@@ -2,6 +2,7 @@ import { StudentChrome } from "@/components/layouts/StudentChrome";
 import { ComingSoon } from "@/components/ui/ComingSoon";
 import { getServerCaller } from "@/lib/trpc/server";
 import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
+import { PdfDownloadButton } from "@/components/ui/PdfDownloadButton";
 
 export default async function StudentProgressPage() {
   const trpc = await getServerCaller();
@@ -10,10 +11,29 @@ export default async function StudentProgressPage() {
   return (
     <StudentChrome active="progress">
       <div style={{ overflow: "auto", padding: "24px 28px 40px" }}>
-        <Eyebrow>Progress</Eyebrow>
-        <h1 className="wf-h1" style={{ fontSize: 28, margin: "6px 0 14px" }}>
-          Your learning, at a glance
-        </h1>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 16,
+          }}
+        >
+          <div>
+            <Eyebrow>Progress</Eyebrow>
+            <h1 className="wf-h1" style={{ fontSize: 28, margin: "6px 0 14px" }}>
+              Your learning, at a glance
+            </h1>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <PdfDownloadButton
+              href="/api/student/report"
+              downloadName="progress-report.pdf"
+              label="Download report"
+              icon={<Icon name="download" size={12} />}
+            />
+          </div>
+        </div>
 
         {dashboard && (
           <div
@@ -77,13 +97,12 @@ export default async function StudentProgressPage() {
         <ComingSoon
           eyebrow="Detailed reports"
           title="Per-strand progress reports"
-          description="Drill into individual skills, see week-over-week mastery changes, export a printable parent report, and compare your trajectory to the class average. The aggregate stats above are real today — the per-strand breakdown is Phase 2."
+          description="Drill into individual skills, see week-over-week mastery changes, and compare your trajectory to the class average. The aggregate stats above are real today — and downloadable as a parent-friendly PDF via “Download report.” The per-strand breakdown is Phase 2."
           icon="chart"
           phase="Phase 2"
           bullets={[
             "Per-skill mastery history with confidence intervals",
             "Weekly XP/streak summary with trend lines",
-            "Exportable parent-friendly PDF report",
             "Compare against anonymized class median",
           ]}
           backHref="/student"
