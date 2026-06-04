@@ -9,6 +9,7 @@ import {
 } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
 import { AdminInsights } from "@/components/admin/AdminInsights";
+import { BoardReportButton } from "@/components/admin/BoardReportButton";
 
 export default async function AdminDashboardPage() {
   const trpc = await getServerCaller();
@@ -33,9 +34,7 @@ export default async function AdminDashboardPage() {
             : "Institution overview"}
         </span>
         <div style={{ flex: 1 }} />
-        <Btn variant="ghost" sm icon={<Icon name="download" size={12} />}>
-          Board report
-        </Btn>
+        <BoardReportButton />
         <Btn
           variant="primary"
           sm
