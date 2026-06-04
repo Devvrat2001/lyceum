@@ -79,6 +79,19 @@ const Schema = z.object({
   MUX_SIGNING_KEY: z.string().optional(),
   MUX_PRIVATE_KEY: z.string().optional(),
 
+  // Phase 6.2 — Sentry error monitoring. All optional; absence makes every
+  // Sentry surface a no-op (the SDK inits with `enabled:false`, and the
+  // next.config wrapper is skipped entirely so dormant builds are unchanged).
+  // SENTRY_DSN gates the server/edge runtimes; NEXT_PUBLIC_SENTRY_DSN gates
+  // the browser (must be NEXT_PUBLIC_ to be inlined client-side). The auth
+  // token + org/project only matter for build-time source-map upload — set
+  // them on Vercel (not needed in local dev).
+  SENTRY_DSN: z.string().optional(),
+  NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
+  SENTRY_AUTH_TOKEN: z.string().optional(),
+  SENTRY_ORG: z.string().optional(),
+  SENTRY_PROJECT: z.string().optional(),
+
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),

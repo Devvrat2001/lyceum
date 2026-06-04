@@ -1,4 +1,5 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import * as Sentry from "@sentry/nextjs";
 import { appRouter } from "@/server/routers/_app";
 import { createContext } from "@/server/context";
 
@@ -27,6 +28,16 @@ const handler = (req: Request) =>
             ? { name: error.cause.name, message: error.cause.message }
             : error.cause,
       });
+      // Phase 6.2 — report genuine server faults to Sentry (no-op until a DSN
+      // is set). Only INTERNAL_SERVER_ERROR: expected client errors (auth,
+      // validation, not-found) are noise in an error tracker. Prefer the
+      // underlying cause (the real Anthropic/OpenAI/Prisma error) over the
+      // TRPCError wrapper.
+      if (error.code === "INTERNAL_SERVER_ERROR") {
+        Sentry.captureException(error.cause ?? error, {
+          tags: { trpcPath: path ?? "<no-path>" },
+        });
+      }
     },
   });
 
