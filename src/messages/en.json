@@ -1,0 +1,16 @@
+{
+  "Progress": {
+    "eyebrow": "Progress",
+    "title": "Your learning, at a glance",
+    "downloadReport": "Download report",
+    "totalXp": "TOTAL XP",
+    "dayStreak": "DAY STREAK",
+    "level": "LEVEL",
+    "badges": "BADGES"
+  },
+  "Language": {
+    "label": "Language",
+    "english": "English",
+    "spanish": "Español"
+  }
+}

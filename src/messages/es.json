@@ -1,0 +1,16 @@
+{
+  "Progress": {
+    "eyebrow": "Progreso",
+    "title": "Tu aprendizaje, de un vistazo",
+    "downloadReport": "Descargar informe",
+    "totalXp": "XP TOTAL",
+    "dayStreak": "RACHA DE DÍAS",
+    "level": "NIVEL",
+    "badges": "INSIGNIAS"
+  },
+  "Language": {
+    "label": "Idioma",
+    "english": "English",
+    "spanish": "Español"
+  }
+}

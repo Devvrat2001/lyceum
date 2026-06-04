@@ -1,12 +1,17 @@
+import { getTranslations } from "next-intl/server";
 import { StudentChrome } from "@/components/layouts/StudentChrome";
 import { ComingSoon } from "@/components/ui/ComingSoon";
 import { getServerCaller } from "@/lib/trpc/server";
 import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { PdfDownloadButton } from "@/components/ui/PdfDownloadButton";
+import { LocaleToggle } from "@/components/i18n/LocaleToggle";
 
 export default async function StudentProgressPage() {
   const trpc = await getServerCaller();
-  const dashboard = await trpc.student.dashboard();
+  const [dashboard, t] = await Promise.all([
+    trpc.student.dashboard(),
+    getTranslations("Progress"),
+  ]);
 
   return (
     <StudentChrome active="progress">
@@ -20,16 +25,19 @@ export default async function StudentProgressPage() {
           }}
         >
           <div>
-            <Eyebrow>Progress</Eyebrow>
+            <Eyebrow>{t("eyebrow")}</Eyebrow>
             <h1 className="wf-h1" style={{ fontSize: 28, margin: "6px 0 14px" }}>
-              Your learning, at a glance
+              {t("title")}
             </h1>
           </div>
-          <div style={{ marginTop: 8 }}>
+          <div
+            style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}
+          >
+            <LocaleToggle />
             <PdfDownloadButton
               href="/api/student/report"
               downloadName="progress-report.pdf"
-              label="Download report"
+              label={t("downloadReport")}
               icon={<Icon name="download" size={12} />}
             />
           </div>
@@ -47,22 +55,22 @@ export default async function StudentProgressPage() {
           >
             {[
               {
-                l: "TOTAL XP",
+                l: t("totalXp"),
                 v: dashboard.stats.xp.toLocaleString(),
                 color: "var(--wf-ink)",
               },
               {
-                l: "DAY STREAK",
+                l: t("dayStreak"),
                 v: dashboard.stats.streak.toString(),
                 color: "var(--wf-accent)",
               },
               {
-                l: "LEVEL",
+                l: t("level"),
                 v: `L${dashboard.stats.level}`,
                 color: "var(--wf-ink)",
               },
               {
-                l: "BADGES",
+                l: t("badges"),
                 v: dashboard.badges.length.toString(),
                 color: "var(--wf-ink)",
               },

@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import createNextIntlPlugin from "next-intl/plugin";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -9,7 +10,7 @@ const nextConfig: NextConfig = {
 // without Sentry provisioned is byte-for-byte the current build (zero risk to
 // the live deploy). When set, this injects the release + uploads source maps
 // (needs SENTRY_AUTH_TOKEN + org/project on Vercel) for readable stack traces.
-export default process.env.SENTRY_DSN
+const withSentry: NextConfig = process.env.SENTRY_DSN
   ? withSentryConfig(nextConfig, {
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
@@ -20,3 +21,10 @@ export default process.env.SENTRY_DSN
       sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
     })
   : nextConfig;
+
+// Phase 6.4 — i18n (next-intl, no routing). The locale comes from a cookie
+// (src/i18n/request.ts), so this just registers the request config; it doesn't
+// touch routing or the build shape.
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
+export default withNextIntl(withSentry);
