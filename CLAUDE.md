@@ -35,6 +35,7 @@ npm run db:reset      # Wipes DB — destructive
 ## Companion docs
 - `AGENT_NOTES.md` — session-to-session scratchpad (phase status, last commit, new gotchas). **Update every session.**
 - `BACKEND_ROADMAP.md` — longer-horizon planning.
+- `KNOWN_ISSUES.md` — audited latent risks / tech debt (lint errors, unvalidated `Json` casts, structural debt) that compile today but fail later. Refresh after big sweeps; don't let S2/S3 rot into S1.
 
 ## Key paths
 - `src/server/routers/` — tRPC routers (lesson, teacher, marketplace, payment)
