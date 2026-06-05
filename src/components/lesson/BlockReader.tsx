@@ -23,6 +23,7 @@ import {
   type SettingsFor,
 } from "@/lib/blocks";
 import { trpc } from "@/lib/trpc/react";
+import { queueAttempt } from "@/lib/offline/attemptStore";
 
 /**
  * Student-facing render of a single Block from a Lesson. Mirrors the
@@ -655,6 +656,9 @@ function McqBody({
   const [selected, setSelected] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<McqFeedback | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Set when the answer was captured while offline (queued for replay on
+  // reconnect) instead of submitted live.
+  const [offlineSaved, setOfflineSaved] = useState(false);
 
   const attempt = trpc.lesson.attemptBlock.useMutation({
     onSuccess: (res) => {
@@ -683,12 +687,19 @@ function McqBody({
   // `correct: true/false` per option in settings, but UI shouldn't
   // colour anything until the student commits an answer).
   const correctIdx = feedback ? feedback.correctIndex : -1;
-  const checked = feedback !== null;
+  const checked = feedback !== null || offlineSaved;
   const pending = attempt.isPending;
 
   const onCheck = () => {
     if (selected === null || pending) return;
     setSubmitError(null);
+    // Offline: capture the answer locally and replay it on reconnect (we can't
+    // show server-authoritative correctness/XP until then).
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setOfflineSaved(true);
+      void queueAttempt({ blockId, chosenIndex: selected });
+      return;
+    }
     attempt.mutate({ blockId, chosenIndex: selected });
   };
 
@@ -696,6 +707,7 @@ function McqBody({
     setSelected(null);
     setFeedback(null);
     setSubmitError(null);
+    setOfflineSaved(false);
   };
 
   return (
@@ -883,6 +895,11 @@ function McqBody({
             }}
           >
             🏅 {feedback.badgeAwarded}
+          </span>
+        )}
+        {offlineSaved && (
+          <span style={{ fontSize: 12, color: "var(--wf-mute)", fontWeight: 600 }}>
+            ✓ Saved offline — syncs when you reconnect
           </span>
         )}
       </div>

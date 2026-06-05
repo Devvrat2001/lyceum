@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type WF as _WF } from "@/components/wf/primitives";
 import { SidebarUserMenu } from "@/components/layouts/SidebarUserMenu";
 import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombobox";
+import { OfflineSync } from "@/components/offline/OfflineSync";
 
 const NAV = [
   { id: "home", icon: "home" as const, label: "Home", href: "/student" },
@@ -62,6 +63,7 @@ export function StudentChrome({
         background: "var(--wf-bg)",
       }}
     >
+      <OfflineSync />
       <aside
         style={{
           borderRight: "1px solid var(--wf-hairline)",
