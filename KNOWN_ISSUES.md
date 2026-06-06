@@ -14,7 +14,7 @@
 
 The codebase is clean on the usual rot metrics:
 
-- **ESLint: 9 problems total** across all of `src` (5 errors, 4 warnings) — all catalogued below.
+- **ESLint: 8 problems total** across all of `src` (5 errors, 3 warnings) — all catalogued below. *(was 9; on 2026-06-06 the AI-generator page moved to `new/ai/` and the video player was extracted out of BlockReader, shifting its lines ~−248 — line refs below updated.)*
 - **0** `@ts-ignore` / `@ts-expect-error` in `src`.
 - **2** TODO/FIXME (both the same Email-magic-link note in `auth.ts`).
 - **0** truly-empty `catch {}` (the bindless `catch {` blocks all have bodies).
@@ -41,7 +41,7 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **Effort:** ~30 min.
 
 ### S1-3 · Ref mutation flagged by React Compiler (SPEAK block)
-- **Where:** `src/components/lesson/BlockReader.tsx:2006` — `recognitionRef.current = r` (`react-hooks/immutability`, **error**).
+- **Where:** `src/components/lesson/BlockReader.tsx:1758` — `recognitionRef.current = r` (`react-hooks/immutability`, **error**).
 - **Risk:** React Compiler treats mutating a ref that was passed to a hook as illegal. Today it's "just a lint error"; under the compiler's memoization it can mis-optimize the SpeechRecognition setup so the SPEAK block's mic handler binds stale state or stops firing. This is the one lint error that is also a latent *runtime* bug.
 - **Fix:** Assign the recognition instance before the hook boundary, or move the SpeechRecognition lifecycle into a dedicated effect that owns the ref.
 - **Effort:** ~30–45 min (careful — risky file).
@@ -51,7 +51,7 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 ## S2 — Latent / will bite as code & deps evolve
 
 ### S2-1 · `setState` called synchronously inside effects (×4)
-- **Where:** `BlockReader.tsx:1346` (time ticker), `:1603` (BRANCHING terminal complete), `:1929` (SPEAK feature-detect); `src/app/teacher/courses/new/page.tsx:121` (`react-hooks/set-state-in-effect`, **errors**).
+- **Where:** `BlockReader.tsx:1098` (time ticker), `:1355` (BRANCHING terminal complete), `:1681` (SPEAK feature-detect); `src/app/teacher/courses/new/ai/page.tsx:121` (`react-hooks/set-state-in-effect`, **errors**). *(The manual form is now `new/page.tsx`; the AI generator — which carries this lint error — moved to `new/ai/page.tsx` on 2026-06-06.)*
 - **Risk:** Cascading re-renders today (perf). The real bite: this rule is on track to become a hard error in stricter React/Next; when it does, the build breaks in four places at once. Two of these (1346, 1929) are genuine "you might not need an effect" patterns.
 - **Fix:** Lazy `useState` initializers for one-shot detection (1929); event-driven setState for completion (1603); keep the ticker but acknowledge it's a legit external-sync effect (or disable the rule narrowly with a reason).
 - **Effort:** ~1 hr for all four.
@@ -69,13 +69,13 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **Effort:** ~1 session incl. backfill.
 
 ### S2-4 · `react-hooks/exhaustive-deps` disabled in 6 effects
-- **Where:** `AdminInsights.tsx:17`, `BlockReader.tsx:1609` & `:2433`, `AnalyticsInsights.tsx:20`, `BlockInspector.tsx:1467` & `:1850`.
+- **Where:** `AdminInsights.tsx:17`, `BlockReader.tsx:1361` & `:2185`, `AnalyticsInsights.tsx:20`, `BlockInspector.tsx:1467` & `:1850`.
 - **Risk:** Each suppressed dep array is a stale-closure waiting to happen — the effect captures an old prop/state and silently uses outdated values after the dependency changes. They're correct *today* by construction, but fragile to edits.
 - **Fix:** Per-site review; prefer refs or `useCallback` deps over blanket disables. At minimum, each disable should carry a one-line "why this is safe" comment (some already do).
 - **Effort:** ~1–2 hr to review all six.
 
 ### S2-5 · Error-swallowing `catch {` blocks without logging
-- **Where:** `BlockReader.tsx:447, 1033, 1059, 2248` (plus the SpeechRecognition try/catches at 1949/2010/2018, which are legitimately defensive).
+- **Where:** `BlockReader.tsx:785, 1059, 2000` (plus the SpeechRecognition try/catches, legitimately defensive). *(The former `:447` `toEmbedUrl` catch moved to `components/video/LessonVideoPlayer.tsx` in the 2026-06-06 video extraction; the rest shifted ~−248.)*
 - **Risk:** Bindless `catch {` discards the error. Several are safe (feature-detection), but the non-detection ones swallow genuine failures with no console trail — the exact "invisible 200 with no error context" failure mode the tRPC handler was fixed for.
 - **Fix:** Audit each; for anything that isn't pure feature-detection, log the error (even `console.debug`) so it's traceable.
 - **Effort:** ~30 min.
@@ -85,7 +85,7 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 ## S3 — Hygiene / low risk
 
 ### S3-1 · Unused variables (×3)
-- `BlockReader.tsx:2546` (`correctCount`), `processOutlineJob.ts:420` (`_`), `generator.ts:400` (`settings`). *(Was ×4 — `StudentChrome.tsx`'s dead `_WF` import was removed 2026-06-06 with the responsive-chrome work.)*
+- `BlockReader.tsx:2298` (`correctCount`), `processOutlineJob.ts:420` (`_`), `generator.ts:400` (`settings`). *(Was ×4 — `StudentChrome.tsx`'s dead `_WF` import was removed 2026-06-06 with the responsive-chrome work.)*
 - **Note:** `correctCount` being computed-but-unused smells like a **half-dropped feature** (a score that's calculated then thrown away) — worth confirming intent, not just deleting.
 
 ### S3-2 · Direct `process.env` reads outside `lib/env.ts`
