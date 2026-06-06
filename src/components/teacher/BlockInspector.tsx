@@ -106,8 +106,6 @@ export type BlockSettingsShape = {
     retake?: boolean;
     xp?: number;
   };
-  // unknown / future
-  [k: string]: unknown;
 };
 
 // ---------------------------------------------------------------------------

@@ -2692,7 +2692,14 @@ function BlockBody({ block }: { block: LessonBlock }) {
       // here in the builder; the course owner is authorized for the
       // signed-playback token server-side, so it no longer shows a dead
       // placeholder after upload.
-      return <LessonVideoPlayer settings={s} blockId={block.id} />;
+      // `s` is the typed settings bag; LessonVideoPlayer takes the looser
+      // `Record<string, unknown>` it shares with the student reader.
+      return (
+        <LessonVideoPlayer
+          settings={s as Record<string, unknown>}
+          blockId={block.id}
+        />
+      );
 
     case "SLIDES":
     case "SIMULATION": {
