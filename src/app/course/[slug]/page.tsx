@@ -13,6 +13,7 @@ import { auth } from "@/lib/auth";
 import { TRPCError } from "@trpc/server";
 import { CurriculumAccordion } from "@/components/course/CurriculumAccordion";
 import { EnrollPanel } from "@/components/course/EnrollPanel";
+import { CourseReviewForm } from "@/components/course/CourseReviewForm";
 import { estimateCourseMinutes, formatDuration } from "@/lib/courseLength";
 
 export default async function CourseDetailPage({
@@ -202,6 +203,18 @@ export default async function CourseDetailPage({
                 })),
               }))}
             />
+
+            {myStatus.isEnrolled && (
+              <>
+                <h2
+                  className="wf-h2"
+                  style={{ fontSize: 18, margin: "28px 0 12px" }}
+                >
+                  Review this course
+                </h2>
+                <CourseReviewForm courseId={course.id} />
+              </>
+            )}
 
             {reviews.length > 0 && (
               <>

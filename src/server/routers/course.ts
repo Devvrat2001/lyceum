@@ -77,6 +77,99 @@ export const courseRouter = router({
     ),
 
   /**
+   * The signed-in viewer's own review for a course (or null) — lets the
+   * detail page pre-fill the review form with their existing rating/text.
+   */
+  myReview: protectedProcedure
+    .input(z.object({ courseId: z.string().min(1) }))
+    .query(({ ctx, input }) =>
+      ctx.db.review.findFirst({
+        where: { userId: ctx.user.id, courseId: input.courseId },
+        orderBy: { createdAt: "desc" },
+      })
+    ),
+
+  /**
+   * Submit (or update) the viewer's review for a course they're enrolled
+   * in, then recompute the course's denormalized `ratingAvg`/`ratingCount`
+   * from all reviews — in one transaction so the aggregates never drift
+   * from the rows. One review per student per course (find-then-update, so
+   * no unique constraint / migration needed). Enrollment-gated: you can
+   * only rate a course you actually own.
+   */
+  submitReview: protectedProcedure
+    .input(
+      z.object({
+        courseId: z.string().min(1),
+        rating: z.number().int().min(1).max(5),
+        body: z.string().trim().min(1).max(2000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      const enrollment = await ctx.db.enrollment.findFirst({
+        where: { userId, courseId: input.courseId },
+        select: { id: true },
+      });
+      if (!enrollment) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Enroll in this course before reviewing it.",
+        });
+      }
+      // Denormalized reviewer identity so the public reviews list never has
+      // to join User (and survives the user later changing their name).
+      const reviewer = await ctx.db.user.findUnique({
+        where: { id: userId },
+        select: { name: true, firstName: true, role: true },
+      });
+      const reviewerName = reviewer?.name ?? reviewer?.firstName ?? "Student";
+      const reviewerRole = reviewer?.role
+        ? reviewer.role.charAt(0) + reviewer.role.slice(1).toLowerCase()
+        : "Student";
+
+      return ctx.db.$transaction(async (tx) => {
+        const existing = await tx.review.findFirst({
+          where: { userId, courseId: input.courseId },
+          select: { id: true },
+        });
+        const saved = existing
+          ? await tx.review.update({
+              where: { id: existing.id },
+              data: {
+                rating: input.rating,
+                body: input.body,
+                reviewerName,
+                reviewerRole,
+              },
+            })
+          : await tx.review.create({
+              data: {
+                userId,
+                courseId: input.courseId,
+                rating: input.rating,
+                body: input.body,
+                reviewerName,
+                reviewerRole,
+              },
+            });
+        const agg = await tx.review.aggregate({
+          where: { courseId: input.courseId },
+          _avg: { rating: true },
+          _count: true,
+        });
+        await tx.course.update({
+          where: { id: input.courseId },
+          data: {
+            ratingAvg: agg._avg.rating ?? 0,
+            ratingCount: agg._count,
+          },
+        });
+        return saved;
+      });
+    }),
+
+  /**
    * Return the set of course ids the current viewer is enrolled in.
    * Used by list surfaces (marketplace homepage, search results) to
    * badge cards the student already owns so we never invite them to
