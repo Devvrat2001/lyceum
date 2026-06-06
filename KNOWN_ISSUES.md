@@ -84,8 +84,8 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 
 ## S3 — Hygiene / low risk
 
-### S3-1 · Unused variables (×4)
-- `StudentChrome.tsx:5` (`_WF` — aliased import never used), `BlockReader.tsx:2546` (`correctCount`), `processOutlineJob.ts:420` (`_`), `generator.ts:400` (`settings`).
+### S3-1 · Unused variables (×3)
+- `BlockReader.tsx:2546` (`correctCount`), `processOutlineJob.ts:420` (`_`), `generator.ts:400` (`settings`). *(Was ×4 — `StudentChrome.tsx`'s dead `_WF` import was removed 2026-06-06 with the responsive-chrome work.)*
 - **Note:** `correctCount` being computed-but-unused smells like a **half-dropped feature** (a score that's calculated then thrown away) — worth confirming intent, not just deleting.
 
 ### S3-2 · Direct `process.env` reads outside `lib/env.ts`
