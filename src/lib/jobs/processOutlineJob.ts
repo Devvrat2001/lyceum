@@ -473,12 +473,12 @@ async function markFailed(jobId: string, message: string): Promise<void> {
 }
 
 function buildDemoSkeleton(
-  brief: string,
+  _brief: string,
   settings: GeneratorSettings
 ): OutlineSkeleton {
   // Minimal honest stub — same shape, no real content. Used only when
-  // both ANTHROPIC_API_KEY and OPENAI_API_KEY are missing.
-  const _ = brief;
+  // both ANTHROPIC_API_KEY and OPENAI_API_KEY are missing. `_brief` is
+  // unused in demo mode (kept for signature parity with the real path).
   return {
     title: `Course · ${settings.grade}`,
     tagline: "Demo outline — no AI provider configured.",

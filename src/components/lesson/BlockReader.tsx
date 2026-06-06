@@ -2417,6 +2417,20 @@ function DragMatchBody({
           {pending ? "Checking…" : "Check matches"}
         </button>
         {checked && (
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color:
+                correctCount === rawPairs.length
+                  ? "var(--wf-good)"
+                  : "var(--wf-body)",
+            }}
+          >
+            {correctCount} of {rawPairs.length} correct
+          </span>
+        )}
+        {checked && (
           <button
             type="button"
             onClick={onReset}

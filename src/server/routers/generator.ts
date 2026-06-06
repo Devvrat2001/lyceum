@@ -397,7 +397,8 @@ export const generatorRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await checkAIQuota({ actorId: ctx.user.id });
-      const settings = SettingsSchema.parse(input.settings ?? {});
+      // input.settings is already validated by the procedure's Zod input
+      // (SettingsSchema.optional()); regenerateUnit doesn't read it.
       if (input.unitIndex < 0 || input.unitIndex >= input.outline.units.length) {
         throw new TRPCError({
           code: "BAD_REQUEST",

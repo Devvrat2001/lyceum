@@ -85,11 +85,9 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **Fix:** Per-site review; prefer refs or `useCallback` deps over blanket disables. At minimum, each disable should carry a one-line "why this is safe" comment (some already do).
 - **Effort:** ~1–2 hr to review all six.
 
-### S2-5 · Error-swallowing `catch {` blocks without logging
-- **Where:** `BlockReader.tsx:785, 1059, 2000` (plus the SpeechRecognition try/catches, legitimately defensive). *(The former `:447` `toEmbedUrl` catch moved to `components/video/LessonVideoPlayer.tsx` in the 2026-06-06 video extraction; the rest shifted ~−248.)*
-- **Risk:** Bindless `catch {` discards the error. Several are safe (feature-detection), but the non-detection ones swallow genuine failures with no console trail — the exact "invisible 200 with no error context" failure mode the tRPC handler was fixed for.
-- **Fix:** Audit each; for anything that isn't pure feature-detection, log the error (even `console.debug`) so it's traceable.
-- **Effort:** ~30 min.
+### S2-5 · Error-swallowing `catch {` blocks — ✅ REASSESSED + RESOLVED 2026-06-06
+- **Audit finding:** the original suspicion was largely a false alarm. Every bindless `catch {` in `src` is one of: **feature-detection** (`new URL()` validity in BlockReader SLIDES/PDF/SIMULATION + `LessonVideoPlayer` + CourseBuilderClient `hostOf`; the `stripe`/Mux dynamic-import probes), a **defensive no-op** (SpeechRecognition abort/stop, clipboard-blocked, the SSE partial-line skip in `LessonClient`, the offline-queue retry path), or **input validation that returns a meaningful HTTP error** (the `/api/*` route bodies → 400/401/503). None of those should log — it would be noise (e.g. "user pasted an invalid URL").
+- **Fix shipped:** the one genuine "handles the failure but loses the cause" case — `PdfDownloadButton`'s download `catch` (it set the error/retry UI but discarded the fetch/blob error) — now binds the error and `console.debug`s it, so a failed report download is traceable.
 
 ---
 

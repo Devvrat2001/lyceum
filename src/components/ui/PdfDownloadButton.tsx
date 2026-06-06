@@ -45,7 +45,10 @@ export function PdfDownloadButton({
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      // Surface to the UI (retry state) AND log the cause so a failed
+      // report download is traceable — not just a silent red button.
+      console.debug("PdfDownloadButton: download failed", err);
       setError(true);
     } finally {
       setBusy(false);
