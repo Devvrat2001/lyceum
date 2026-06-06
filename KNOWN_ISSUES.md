@@ -34,11 +34,11 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **Fix:** Remove the var; redeploy; if managed-Postgres then complains about its cert, scope the trust narrowly with `?sslmode=require` on `DATABASE_URL` instead of disabling globally. Watch runtime logs after removal.
 - **Effort:** 10 min + a watchful redeploy. *(Already diagnosed; task chip spawned earlier.)*
 
-### S1-2 · Unvalidated `Json`-column cast in the AI generator worker
-- **Where:** `src/lib/jobs/processOutlineJob.ts:99` — `const partial = job.partial as unknown as Outline | null` (and the write-side casts at :292, :357–358, :370). `generator.ts:294` casts job input in.
-- **Risk:** The `partial`/`output` JSON columns are trusted without a Zod parse. The *input* blob is defended (runtime check at :63–67 + `SettingsSchema.parse`), but `partial` is not — a drifted schema or a half-written blob from an interrupted chunk surfaces as a **deep worker crash mid-generation**, not a clean error at the boundary. The teacher just sees a job stuck/failed with no signal.
-- **Fix:** `OutlineSchema.safeParse(job.partial)` on read; on failure, fail the job cleanly with a message instead of casting blind.
-- **Effort:** ~30 min.
+### S1-2 · Unvalidated `Json`-column cast in the AI generator worker — ✅ RESOLVED 2026-06-06
+- **Where:** `src/lib/jobs/processOutlineJob.ts:99` — was `const partial = job.partial as unknown as Outline | null`.
+- **Fix shipped:** `validatePartialOutline()` structurally validates the persisted `partial` on read; a drifted/half-written blob now fails the job cleanly (clear message) instead of crashing deep at `partial.units[unitIdx]`. Covered by `test/processOutlineJob.partial.test.ts` (7 cases). The write-side casts (:292/:357–358/:370) and the `generator.ts` input cast remain (input is already defended at :63–67 + `SettingsSchema.parse`).
+- **⚠️ Why NOT `OutlineSchema.safeParse` (the original recommendation):** that would have **broken generation**. The partial deliberately holds ~110-char placeholder readings between chunks (below `readingContent.min(120)`) and the skeleton's unit/lesson counts aren't bound by `OutlineSchema`'s `min(3)` authoring rules — so the strict schema rejects every valid in-flight blob. The fix uses a **lenient structural schema** (shape only) and returns the *original* object so accumulated `lessons[].blocks` survive.
+- **Discovered while fixing → see S3-5:** that placeholder is 110 chars, not ≥120 as its comment claims.
 
 ### S1-3 · Ref mutation flagged by React Compiler (SPEAK block)
 - **Where:** `src/components/lesson/BlockReader.tsx:1758` — `recognitionRef.current = r` (`react-hooks/immutability`, **error**).
@@ -85,7 +85,7 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 ## S3 — Hygiene / low risk
 
 ### S3-1 · Unused variables (×3)
-- `BlockReader.tsx:2298` (`correctCount`), `processOutlineJob.ts:420` (`_`), `generator.ts:400` (`settings`). *(Was ×4 — `StudentChrome.tsx`'s dead `_WF` import was removed 2026-06-06 with the responsive-chrome work.)*
+- `BlockReader.tsx:2298` (`correctCount`), `processOutlineJob.ts:472` (`_`), `generator.ts:400` (`settings`). *(Was ×4 — `StudentChrome.tsx`'s dead `_WF` import was removed 2026-06-06 with the responsive-chrome work.)*
 - **Note:** `correctCount` being computed-but-unused smells like a **half-dropped feature** (a score that's calculated then thrown away) — worth confirming intent, not just deleting.
 
 ### S3-2 · Direct `process.env` reads outside `lib/env.ts`
@@ -102,6 +102,11 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **Where:** Postgres in Docker (`lyceum-postgres`, `:5433`).
 - **Risk:** If Docker Desktop isn't running, every Prisma call `ECONNREFUSED`s and the whole DB-backed test suite fails in `beforeAll` — looking like a code regression when it isn't. (Hit this 2026-06-04.) Already in `CLAUDE.md`; restated here because it masquerades as a code failure.
 - **Fix:** Operational — start Docker Desktop; `docker start lyceum-postgres`.
+
+### S3-5 · Skeleton placeholder reading is 110 chars; comment claims ≥120
+- **Where:** `processOutlineJob.ts` `advanceAfterSkeleton` — the `"(reading not yet generated …)"` placeholder is **110 chars**, but the comment says "Long enough to pass OutlineLessonSchema's min(120) on save." (Found 2026-06-06 while fixing S1-2.)
+- **Risk:** A generation that **fails partway** leaves a partial whose lessons carry 110-char placeholder readings; saving that partial via `saveAsCourse` 400s on `OutlineSchema` (`readingContent.min(120)`). Low — most generations complete; only the fail-midway-then-save path bites, and the chunk-read path is now defended (S1-2) so partials rarely persist broken.
+- **Fix:** Pad the placeholder to ≥120 chars (makes the comment true + partials saveable), or relax the save-time schema for placeholder rows.
 
 ---
 
