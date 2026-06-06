@@ -67,11 +67,11 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
   - **time-ticker** + **AI-page job sync** — genuinely-correct external-sync effects (the wall clock; an async job result → editable local state) that the heuristic over-flags; each carries a one-line `eslint-disable-next-line react-hooks/set-state-in-effect` **with a reason**, which survives a future hard-error promotion of the rule.
 - **Result:** ESLint **0 errors** (verified `tsc` + vitest 140/140 + `next build`). The remaining 3 problems are unused-var warnings (S3-1).
 
-### S2-2 · `BlockSettingsShape` wide bag — ✅ SUBSTANTIALLY RESOLVED 2026-06-06
-- **What was already done:** the canonical `Block.type`-keyed discriminated union lives in `lib/blocks.ts` — `SettingsMap` + `SettingsFor<T>` + `settingsFor()` + a compile-time `_ExhaustivenessCheck`. The **data/runtime layer is sound**: server (`lesson.ts`, `generator.ts`) and the reader (`BlockReader.tsx`) already narrow per type.
-- **What shipped this pass (the inspector drift):** `BlockInspector.tsx` now **imports** `McqOption` / `QuizQuestion` / `BranchingNode` / `DragMatchPair` from `blocks.ts` instead of re-declaring them (two sources of truth → one — they can no longer drift), and the one named `as unknown as` cast (POLL's `options`, formerly `:1041`) is **gone**: `options` is typed `McqOption[] | string[]`, so the POLL editor writes its `string[]` arm directly and MCQ keeps its narrowing read.
-- **What remains (smaller, lower-value):** the inspector's polymorphic *draft* is still one wide `BlockSettingsShape` with a `[k: string]: unknown` index signature, so **within the editor form** a VIDEO sub-editor could still read `.options` and compile. The cross-type-read risk is now confined to that single file; removing the index signature + narrowing each of the ~15 `*Fields` editors to `SettingsFor<T>` is the remaining step. *(Roadmap §6.6 / Tier 4.5.)*
-- **Effort remaining:** ~½ session (per-editor narrowing).
+### S2-2 · `BlockSettingsShape` wide bag — ✅ SUBSTANTIALLY RESOLVED 2026-06-06 (2 passes)
+- **Canonical union (already done):** `lib/blocks.ts` holds the `Block.type`-keyed discriminated union — `SettingsMap` + `SettingsFor<T>` + `settingsFor()` + a compile-time `_ExhaustivenessCheck`. Server (`lesson.ts`, `generator.ts`) + reader (`BlockReader.tsx`) narrow per type.
+- **Pass 1 — inspector drift + cast:** `BlockInspector` imports `McqOption`/`QuizQuestion`/`BranchingNode`/`DragMatchPair` from `blocks.ts` (was re-declaring → two sources of truth), and the named `as unknown as` cast (POLL `options`, formerly `:1041`) is gone (`options: McqOption[] | string[]`).
+- **Pass 2 — third dup + drift guard:** `CourseBuilderClient`'s separate `BlockSettings` is now an **alias of `BlockSettingsShape`** (builder + inspector share one settings type; the bag's `generated` reuses canonical `QuizQuestion`). Added a **type-level drift guard** (`_BagCoversCanonical`) asserting every `SettingsFor<T>` stays assignable to the bag — adding a field in `blocks.ts` now forces the bag to mirror it or `tsc` fails.
+- **What remains (mapped — ~½ session, warrants a browser pass):** the inspector *draft* is still one wide bag with a `[k: string]: unknown` index signature. Removing it cascades through **(a)** `CourseBuilderClient.BlockSettings` (also carries the index sig) + its `LessonVideoPlayer` boundary (`Record<string, unknown>`), and **(b)** narrowing the ~15 `*Fields` editors to `SettingsFor<T>` (incl. reconciling AI_QUIZ `generated`). All pure type-level, but it touches 3 files + 15 editors — deliberately deferred to its own focused, browser-verified pass rather than rushed. *(Roadmap §6.6 / Tier 4.5.)*
 
 ### S2-3 · `Attempt.chosenKey` overloads 5 encodings in one string column
 - **Where:** `Attempt.chosenKey` (schema) — encodes `"subIdx:choiceIdx"`, `"drag:N/M"`, `"branch:<nodeId>"`, etc.
@@ -96,10 +96,10 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 ### S3-1 · Unused variables — ✅ RESOLVED 2026-06-06
 - Was `BlockReader.tsx` `correctCount` (turned out **redundant** with the existing DRAG_MATCH feedback score line → local var removed, not duplicated), `processOutlineJob.ts` `_` (dead `const _ = brief` → `_brief` param), `generator.ts` `settings` (redundant `SettingsSchema.parse` — input already Zod-validated → deleted). ESLint is now at **0 problems**. *(`StudentChrome.tsx`'s dead `_WF` import was removed earlier the same day.)*
 
-### S3-2 · Direct `process.env` reads outside `lib/env.ts`
-- **Where:** `src/app/api/tutor/stream/route.ts:240` (`ANTHROPIC_API_KEY` for a mode flag), `src/lib/trpc/react.tsx:14` (`PORT`). Also the new cron/Sentry bootstrap files read `process.env` directly (acceptable for boot-time, but technically the same break).
-- **Risk:** `env.ts` says "never read `process.env` directly outside this file" precisely so validation + the empty-string-shadow gotcha live in one place. Each direct read can drift (e.g. tutor/stream's `ANTHROPIC_API_KEY` check could disagree with `env`'s view).
-- **Fix:** Route through the validated `env` object where it's not boot-time.
+### S3-2 · Direct `process.env` reads outside `lib/env.ts` — ✅ RESOLVED 2026-06-06
+- **`tutor/stream/route.ts`** — the `mode` audit flag now reads `env.ANTHROPIC_API_KEY` (was `process.env.…`), so the FERPA tutor-usage trail agrees with `env`'s validated view (incl. the empty-string-shadow handling).
+- **`trpc/react.tsx` (`PORT`)** — **deliberately left a direct read, now documented:** it's a client module (`"use client"`), and `lib/env` eagerly validates the whole *server* env at import and throws on a miss — importing it into the client bundle would be wrong. `PORT` is only consulted in the SSR base-URL branch; a comment records the exception.
+- **Boot-time files** (cron/Sentry bootstrap) read `process.env` by necessity (they run before/around `env` init) — acceptable, as the original audit noted.
 
 ### S3-3 · Test isolation depends on shared-dev-DB hacks
 - **Where:** `test/streakRollover.test.ts` (year-2001 `now`), `weeklyDigest.test.ts` & `studentReport.test.ts` (year-2002 `now`), `test/helpers.ts` (prefix cleanup), `insightEngine.test.ts` & `boardReport.test.ts` (manual `Insight`/`Institution` cleanup — those rows have **no FK cascade**).
