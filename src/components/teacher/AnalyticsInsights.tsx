@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Btn, Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
@@ -13,12 +13,16 @@ export function AnalyticsInsights() {
     onSuccess: () => utils.insight.forTeacher.invalidate(),
   });
 
-  // Auto-generate on first load if nothing cached.
+  // Auto-generate on first load if nothing cached. `firedRef` latches the
+  // one-shot so the effect can carry its real deps (`regen` is a fresh
+  // object every render) without a lint disable and without re-firing.
+  const firedRef = useRef(false);
   const needsFirstGen = !regen.isPending && !cached.isLoading && !cached.data;
   useEffect(() => {
-    if (needsFirstGen) regen.mutate({ rangeDays: 30 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsFirstGen]);
+    if (firedRef.current || !needsFirstGen) return;
+    firedRef.current = true;
+    regen.mutate({ rangeDays: 30 });
+  }, [needsFirstGen, regen]);
 
   const insights = regen.data?.insights ?? cached.data?.insights ?? null;
   const generatedAt =

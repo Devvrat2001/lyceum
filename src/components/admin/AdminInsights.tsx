@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Btn } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
@@ -11,11 +11,16 @@ export function AdminInsights() {
     onSuccess: () => utils.insight.forAdmin.invalidate(),
   });
 
+  // Auto-generate on first load if nothing cached. `firedRef` latches the
+  // one-shot so the effect can carry its real deps (`regen` is a fresh
+  // object every render) without a lint disable and without re-firing.
+  const firedRef = useRef(false);
   const needsFirstGen = !regen.isPending && !cached.isLoading && !cached.data;
   useEffect(() => {
-    if (needsFirstGen) regen.mutate({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsFirstGen]);
+    if (firedRef.current || !needsFirstGen) return;
+    firedRef.current = true;
+    regen.mutate({});
+  }, [needsFirstGen, regen]);
 
   const insights = regen.data?.insights ?? cached.data?.insights ?? null;
   const generatedAt =
