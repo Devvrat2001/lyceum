@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { LessonVideoPlayer } from "@/components/video/LessonVideoPlayer";
 import {
   DndContext,
@@ -100,6 +106,11 @@ export function BlockReader({ block }: { block: BlockReaderProps }) {
     </Card>
   );
 }
+
+// A no-op subscribe for useSyncExternalStore reads that never change
+// after mount (one-shot browser-capability detection). Module-level so
+// its identity is stable across renders.
+const noopSubscribe = () => () => {};
 
 function renderBody(block: BlockReaderProps) {
   // settingsFor narrows the raw JSON column into the per-type Settings
@@ -1095,6 +1106,7 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
   // entirely client-side.
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot post-mount clock init; a legit external-sync effect (the wall clock). Reading Date.now() during render would desync the SSR and first client render.
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
@@ -1321,9 +1333,9 @@ function BranchingBody({
   // student bouncing back to the same terminal via restart-and-walk
   // doesn't double-fire the mutation. New terminals (alt paths) DO
   // re-fire — exploratory XP rewards alt-route discovery.
-  const [completedTerminals, setCompletedTerminals] = useState<
-    Set<string>
-  >(new Set());
+  // Dedup tracker only (never rendered) — a ref, so marking a terminal
+  // complete doesn't setState inside the effect below.
+  const completedTerminalsRef = useRef<Set<string>>(new Set());
   const [terminalFeedback, setTerminalFeedback] = useState<{
     nodeId: string;
     points: number;
@@ -1351,13 +1363,11 @@ function BranchingBody({
   useEffect(() => {
     const cur = currentId ? byId.get(currentId) : null;
     if (!cur || cur.choices.length !== 0) return;
-    if (completedTerminals.has(cur.id)) return;
-    setCompletedTerminals((prev) => new Set(prev).add(cur.id));
+    if (completedTerminalsRef.current.has(cur.id)) return;
+    completedTerminalsRef.current.add(cur.id);
     complete.mutate({ blockId, terminalNodeId: cur.id });
-    // We intentionally exclude `complete` and `completedTerminals`
-    // from deps — both change on success / state-update and would
-    // cause spurious re-fires. We re-fire only when currentId changes
-    // to a not-yet-completed terminal.
+    // Re-fire only when currentId changes to a not-yet-completed
+    // terminal; `complete` is intentionally excluded from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
 
@@ -1665,24 +1675,22 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
   const [typedFallback, setTypedFallback] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Browser-capability detection must not affect the first render:
-  // doing it in useMemo yields null/false on the server and the real
-  // values in the browser, so the SSR HTML and the first client
-  // render structurally disagree (a hydration mismatch). Both passes
-  // start from the no-capability state; the effect upgrades it
-  // post-mount.
-  const [recognitionCtor, setRecognitionCtor] = useState<{
-    new (): SpeechRecognitionLike;
-  } | null>(null);
-  const [ttsAvailable, setTtsAvailable] = useState(false);
-  useEffect(() => {
-    // Updater form — getSpeechRecognitionCtor returns a constructor,
-    // which a bare setState(fn) would mistake for a state updater.
-    setRecognitionCtor(() => getSpeechRecognitionCtor());
-    setTtsAvailable(
-      typeof window !== "undefined" && "speechSynthesis" in window
-    );
-  }, []);
+  // SSR-safe browser-capability detection via useSyncExternalStore: the
+  // server snapshot is no-capability, the client resolves the real value
+  // on mount — no effect, no setState, no hydration mismatch (the same
+  // primitive as useMediaQuery). getSpeechRecognitionCtor returns a
+  // stable constructor reference, so getSnapshot stays referentially
+  // stable (no re-render loop).
+  const recognitionCtor = useSyncExternalStore(
+    noopSubscribe,
+    () => getSpeechRecognitionCtor(),
+    () => null
+  );
+  const ttsAvailable = useSyncExternalStore(
+    noopSubscribe,
+    () => typeof window !== "undefined" && "speechSynthesis" in window,
+    () => false
+  );
 
   // A real ref: `.current` is mutable by contract, so assigning the live
   // SpeechRecognition instance to it (in startListening) is allowed under

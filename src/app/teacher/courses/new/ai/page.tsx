@@ -118,6 +118,7 @@ export default function AIGeneratorPage() {
     const job = jobQuery.data;
     if (!job) return;
     if (job.status === "succeeded" && job.output) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the async job result (an external system) into editable local state; runs once on the success transition.
       setOutline(job.output as Outline);
       if (jobStartedAt) setElapsedMs(Date.now() - jobStartedAt);
     } else if (job.status === "failed") {

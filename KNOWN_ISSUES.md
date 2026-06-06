@@ -14,7 +14,7 @@
 
 The codebase is clean on the usual rot metrics:
 
-- **ESLint: 7 problems total** across all of `src` (4 errors, 3 warnings) — all catalogued below. *(2026-06-06: down from 9 — **S1-3 resolved** (−1 error); also the AI-generator page moved to `new/ai/` and the video player was extracted out of BlockReader, shifting its lines ~−248 — refs below updated.)*
+- **ESLint: 3 problems total** across all of `src` (**0 errors**, 3 warnings) — all catalogued below. *(2026-06-06: down from 9 — **S1-3 + the S2-1 ×4 cluster resolved**, so the tree has **zero lint errors for the first time**. The 3 remaining are unused-var warnings (S3-1). Also this day: the AI-generator page moved to `new/ai/` and the video player was extracted out of BlockReader.)*
 - **0** `@ts-ignore` / `@ts-expect-error` in `src`.
 - **2** TODO/FIXME (both the same Email-magic-link note in `auth.ts`).
 - **0** truly-empty `catch {}` (the bindless `catch {` blocks all have bodies).
@@ -49,11 +49,13 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 
 ## S2 — Latent / will bite as code & deps evolve
 
-### S2-1 · `setState` called synchronously inside effects (×4)
-- **Where:** `BlockReader.tsx:1098` (time ticker), `:1355` (BRANCHING terminal complete), `:1681` (SPEAK feature-detect); `src/app/teacher/courses/new/ai/page.tsx:121` (`react-hooks/set-state-in-effect`, **errors**). *(The manual form is now `new/page.tsx`; the AI generator — which carries this lint error — moved to `new/ai/page.tsx` on 2026-06-06.)*
-- **Risk:** Cascading re-renders today (perf). The real bite: this rule is on track to become a hard error in stricter React/Next; when it does, the build breaks in four places at once. Two of these (1346, 1929) are genuine "you might not need an effect" patterns.
-- **Fix:** Lazy `useState` initializers for one-shot detection (1929); event-driven setState for completion (1603); keep the ticker but acknowledge it's a legit external-sync effect (or disable the rule narrowly with a reason).
-- **Effort:** ~1 hr for all four.
+### S2-1 · `setState` called synchronously inside effects (×4) — ✅ RESOLVED 2026-06-06
+- **Where (was):** `BlockReader.tsx` time-ticker / BRANCHING terminal-complete / SPEAK feature-detect; `new/ai/page.tsx` job-status sync.
+- **Fix shipped (per-site, not a blanket suppression):**
+  - **BRANCHING completion** — `completedTerminals` was a dedup tracker never read in render, so it became a **`useRef`**: the effect now mutates the ref + fires the mutation (no setState). `terminalFeedback` from the mutation's `onSuccess` drives the real re-render.
+  - **SPEAK feature-detect** — the `recognitionCtor`/`ttsAvailable` `useState`+effect became two **`useSyncExternalStore`** reads (server snapshot = no-capability, client resolves on mount) — the SSR-safe primitive, no effect/setState/hydration mismatch.
+  - **time-ticker** + **AI-page job sync** — genuinely-correct external-sync effects (the wall clock; an async job result → editable local state) that the heuristic over-flags; each carries a one-line `eslint-disable-next-line react-hooks/set-state-in-effect` **with a reason**, which survives a future hard-error promotion of the rule.
+- **Result:** ESLint **0 errors** (verified `tsc` + vitest 140/140 + `next build`). The remaining 3 problems are unused-var warnings (S3-1).
 
 ### S2-2 · `BlockSettingsShape` is a 20-optional-field bag, not a discriminated union
 - **Where:** type in `src/lib/blocks.ts`; symptom cast at `src/components/teacher/BlockInspector.tsx:1041` — `next as unknown as BlockSettingsShape["options"]`.
@@ -84,7 +86,7 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 ## S3 — Hygiene / low risk
 
 ### S3-1 · Unused variables (×3)
-- `BlockReader.tsx:2298` (`correctCount`), `processOutlineJob.ts:472` (`_`), `generator.ts:400` (`settings`). *(Was ×4 — `StudentChrome.tsx`'s dead `_WF` import was removed 2026-06-06 with the responsive-chrome work.)*
+- `BlockReader.tsx:2306` (`correctCount`), `processOutlineJob.ts:481` (`_`), `generator.ts:400` (`settings`). *(Was ×4 — `StudentChrome.tsx`'s dead `_WF` import was removed 2026-06-06 with the responsive-chrome work.)*
 - **Note:** `correctCount` being computed-but-unused smells like a **half-dropped feature** (a score that's calculated then thrown away) — worth confirming intent, not just deleting.
 
 ### S3-2 · Direct `process.env` reads outside `lib/env.ts`
