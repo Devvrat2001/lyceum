@@ -78,6 +78,17 @@ export function validatePartialOutline(blob: unknown): Outline | null {
 }
 
 /**
+ * Placeholder reading stored for each lesson after the skeleton chunk,
+ * before its real reading is generated. MUST be ≥120 chars so a course
+ * whose generation fails midway is still saveable via `saveAsCourse`
+ * (which validates `OutlineSchema`, where `readingContent.min(120)`).
+ * Guarded by a test. (Was 110 chars — the bug logged as KNOWN_ISSUES
+ * S3-5; padded 2026-06-06.)
+ */
+export const SKELETON_READING_PLACEHOLDER =
+  "(Reading not yet generated — the next chunk will replace this placeholder with a real 80-to-180 word reading passage written for this lesson.)";
+
+/**
  * Process exactly ONE chunk of an outline job, then save progress and
  * either enqueue the next chunk (QStash path) or return so the caller
  * can loop (inline path).
@@ -328,11 +339,9 @@ async function advanceAfterSkeleton(
         (l): OutlineLesson => ({
           title: l.title,
           summary: l.summary,
-          // Long enough to pass OutlineLessonSchema's min(120) on save
-          // if a chunk fails midway — the user can still ship a course
-          // with these placeholders + edit them.
-          readingContent:
-            "(reading not yet generated — the next chunk will replace this with a real 80-180 word reading for this lesson)",
+          // ≥120 chars so a fail-midway partial still passes
+          // OutlineLessonSchema on save (see SKELETON_READING_PLACEHOLDER).
+          readingContent: SKELETON_READING_PLACEHOLDER,
         })
       ),
     })),

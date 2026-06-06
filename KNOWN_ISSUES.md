@@ -103,10 +103,9 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **Risk:** If Docker Desktop isn't running, every Prisma call `ECONNREFUSED`s and the whole DB-backed test suite fails in `beforeAll` — looking like a code regression when it isn't. (Hit this 2026-06-04.) Already in `CLAUDE.md`; restated here because it masquerades as a code failure.
 - **Fix:** Operational — start Docker Desktop; `docker start lyceum-postgres`.
 
-### S3-5 · Skeleton placeholder reading is 110 chars; comment claims ≥120
-- **Where:** `processOutlineJob.ts` `advanceAfterSkeleton` — the `"(reading not yet generated …)"` placeholder is **110 chars**, but the comment says "Long enough to pass OutlineLessonSchema's min(120) on save." (Found 2026-06-06 while fixing S1-2.)
-- **Risk:** A generation that **fails partway** leaves a partial whose lessons carry 110-char placeholder readings; saving that partial via `saveAsCourse` 400s on `OutlineSchema` (`readingContent.min(120)`). Low — most generations complete; only the fail-midway-then-save path bites, and the chunk-read path is now defended (S1-2) so partials rarely persist broken.
-- **Fix:** Pad the placeholder to ≥120 chars (makes the comment true + partials saveable), or relax the save-time schema for placeholder rows.
+### S3-5 · Skeleton placeholder reading was 110 chars (comment claimed ≥120) — ✅ RESOLVED 2026-06-06
+- **Where:** `processOutlineJob.ts` — now the exported `SKELETON_READING_PLACEHOLDER` (142 chars), used by `advanceAfterSkeleton`.
+- **Fix shipped:** padded to ≥120 so a generation that **fails partway** leaves a partial that's still saveable via `saveAsCourse` (`OutlineSchema` `readingContent.min(120)`). Guarded by a test asserting length ≥120 + `OutlineLessonSchema.safeParse` success. (Found 2026-06-06 while fixing S1-2.)
 
 ---
 

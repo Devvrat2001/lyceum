@@ -11,7 +11,11 @@
  * pin that contract: real in-flight shapes pass, malformed ones fail.
  */
 import { describe, expect, it } from "vitest";
-import { validatePartialOutline } from "@/lib/jobs/processOutlineJob";
+import {
+  validatePartialOutline,
+  SKELETON_READING_PLACEHOLDER,
+} from "@/lib/jobs/processOutlineJob";
+import { OutlineLessonSchema } from "@/lib/ai/prompts/courseGenerator";
 
 // The exact placeholder advanceAfterSkeleton writes (110 chars — below
 // OutlineSchema's readingContent.min(120), which is the whole point).
@@ -113,5 +117,17 @@ describe("validatePartialOutline", () => {
         ],
       })
     ).toBeNull();
+  });
+});
+
+describe("SKELETON_READING_PLACEHOLDER", () => {
+  it("is >=120 chars and passes OutlineLessonSchema (fail-midway partials stay saveable)", () => {
+    expect(SKELETON_READING_PLACEHOLDER.length).toBeGreaterThanOrEqual(120);
+    const res = OutlineLessonSchema.safeParse({
+      title: "Warm up",
+      summary: "Meet variables and what they stand for.",
+      readingContent: SKELETON_READING_PLACEHOLDER,
+    });
+    expect(res.success).toBe(true);
   });
 });
