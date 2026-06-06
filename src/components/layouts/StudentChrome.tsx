@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Icon, type WF as _WF } from "@/components/wf/primitives";
+import { Icon } from "@/components/wf/primitives";
 import { SidebarUserMenu } from "@/components/layouts/SidebarUserMenu";
 import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombobox";
 import { OfflineSync } from "@/components/offline/OfflineSync";
+import { useIsMobile } from "@/lib/useMediaQuery";
 
 const NAV = [
   { id: "home", icon: "home" as const, label: "Home", href: "/student" },
@@ -36,6 +38,49 @@ const NAV = [
   },
 ];
 
+function LyceumMark() {
+  return (
+    <Link
+      href="/"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        textDecoration: "none",
+        color: "inherit",
+      }}
+    >
+      <div
+        style={{
+          width: 22,
+          height: 22,
+          background: "var(--wf-ink)",
+          borderRadius: 4,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--wf-bg)",
+          fontFamily: "var(--font-serif-stack)",
+          fontSize: 14,
+          fontWeight: 700,
+        }}
+      >
+        L
+      </div>
+      <span
+        style={{
+          fontFamily: "var(--font-serif-stack)",
+          fontSize: 17,
+          fontWeight: 600,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        Lyceum
+      </span>
+    </Link>
+  );
+}
+
 export function StudentChrome({
   children,
   active,
@@ -44,6 +89,8 @@ export function StudentChrome({
   active?: string;
 }) {
   const pathname = usePathname() ?? "";
+  const isMobile = useIsMobile();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const computedActive =
     active ??
     (pathname.startsWith("/student/skill-tree")
@@ -54,6 +101,87 @@ export function StudentChrome({
       ? "browse"
       : "home");
 
+  const navLinks = NAV.map((item) => (
+    <Link
+      key={item.id}
+      href={item.href}
+      className="wf-nav-item"
+      data-active={item.id === computedActive}
+      onClick={() => setDrawerOpen(false)}
+    >
+      <Icon name={item.icon} size={16} color="currentColor" />
+      {item.label}
+    </Link>
+  ));
+
+  // ---- Mobile: top bar + slide-down drawer, full-width content ----
+  if (isMobile) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          background: "var(--wf-bg)",
+        }}
+      >
+        <OfflineSync />
+        <header
+          style={{
+            height: 52,
+            flexShrink: 0,
+            borderBottom: "1px solid var(--wf-hairline)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 14px",
+          }}
+        >
+          <LyceumMark />
+          <button
+            type="button"
+            aria-label={drawerOpen ? "Close menu" : "Open menu"}
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen((o) => !o)}
+            style={{
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 6,
+              background: "white",
+              width: 34,
+              height: 34,
+              fontSize: 16,
+              cursor: "pointer",
+              color: "var(--wf-ink)",
+            }}
+          >
+            {drawerOpen ? "✕" : "☰"}
+          </button>
+        </header>
+        {drawerOpen && (
+          <div
+            style={{
+              flexShrink: 0,
+              borderBottom: "1px solid var(--wf-hairline)",
+              padding: "12px 14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              background: "var(--wf-bg)",
+            }}
+          >
+            <HeaderSearchCombobox compact />
+            <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {navLinks}
+            </nav>
+            <SidebarUserMenu />
+          </div>
+        )}
+        <main style={{ flex: 1, overflow: "auto" }}>{children}</main>
+      </div>
+    );
+  }
+
+  // ---- Desktop: fixed sidebar + content (unchanged) ----
   return (
     <div
       style={{
@@ -74,66 +202,13 @@ export function StudentChrome({
           overflowY: "auto",
         }}
       >
-        <Link
-          href="/"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "0 6px 14px",
-            textDecoration: "none",
-            color: "inherit",
-          }}
-        >
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              background: "var(--wf-ink)",
-              borderRadius: 4,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--wf-bg)",
-              fontFamily: "var(--font-serif-stack)",
-              fontSize: 14,
-              fontWeight: 700,
-            }}
-          >
-            L
-          </div>
-          <span
-            style={{
-              fontFamily: "var(--font-serif-stack)",
-              fontSize: 17,
-              fontWeight: 600,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Lyceum
-          </span>
-        </Link>
+        <div style={{ padding: "0 6px 14px" }}>
+          <LyceumMark />
+        </div>
         <HeaderSearchCombobox compact />
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV.map((item) => (
-            <Link
-              key={item.id}
-              href={item.href}
-              className="wf-nav-item"
-              data-active={item.id === computedActive}
-            >
-              <Icon name={item.icon} size={16} color="currentColor" />
-              {item.label}
-            </Link>
-          ))}
+          {navLinks}
         </nav>
-        {/* The hardcoded "Class · Mrs. Reyes · 6B" widget that used to
-            sit here showed the same fake teacher to every student. We
-            don't have a clean way to thread real `class` info into a
-            client component without prop-drilling through every page
-            that uses StudentChrome, so the widget is gone for now —
-            the dashboard's greeting already names the user's class
-            and teacher when they exist. */}
         <div style={{ marginTop: "auto" }}>
           <SidebarUserMenu />
         </div>
