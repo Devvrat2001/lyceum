@@ -31,8 +31,18 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 ### S1-1 · Prod TLS verification is disabled app-wide
 - **Where:** Vercel **Production** env var `NODE_TLS_REJECT_UNAUTHORIZED=0` (not in code — confirmed absent from `src`, config, `.env*`).
 - **Risk:** Disables *all* TLS certificate validation in the Node runtime → MITM exposure on every outbound HTTPS call (DB, Stripe, Mux, Anthropic) and it silently masks real cert errors. On a children's-data product this is a compliance problem, not just hygiene.
-- **Fix:** Remove the var; redeploy; if managed-Postgres then complains about its cert, scope the trust narrowly with `?sslmode=require` on `DATABASE_URL` instead of disabling globally. Watch runtime logs after removal.
-- **Effort:** 10 min + a watchful redeploy. *(Already diagnosed; task chip spawned earlier.)*
+- **Fix — exact steps (yours to run; per policy I can't change Vercel env vars):**
+  1. **Confirm it's set:** Vercel → project `lyceum` → Settings → Environment Variables → find `NODE_TLS_REJECT_UNAUTHORIZED` (expect `0`, Production scope). CLI: `vercel env ls`.
+  2. **Anticipate why it's there:** it's almost always a band-aid for a managed-Postgres cert (self-signed / incomplete chain). Have the narrow replacement (step 4) ready *before* you remove it.
+  3. **Remove it:** delete the var in the dashboard (every environment it's set in), or `vercel env rm NODE_TLS_REJECT_UNAUTHORIZED production`.
+  4. **If the DB then complains** (`SELF_SIGNED_CERT_IN_CHAIN` / `UNABLE_TO_VERIFY_LEAF_SIGNATURE`): scope trust narrowly on `DATABASE_URL` instead of disabling globally — add `?sslmode=require` (encrypt, minimum) or, better, `?sslmode=verify-full` with the provider's CA bundle. **Do NOT re-add the global var.**
+  5. **Redeploy** (env changes need a fresh deploy — dashboard "Redeploy" or push a commit) and watch logs.
+- **Post-removal verification checklist** (each path previously rode the disabled verify):
+  - **DB:** open a DB-backed page (`/teacher`, `/student`). A Prisma cert error → do step 4.
+  - **Stripe / Mux / Anthropic / OpenAI / Resend:** all use public CAs (should be unaffected), but still smoke one of each — a test checkout + webhook 200, a video playback-token mint, the tutor stream, a receipt send.
+  - **Logs:** Vercel Runtime Logs (or `vercel logs <url>`) — grep `SELF_SIGNED_CERT_IN_CHAIN`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `DEPTH_ZERO_SELF_SIGNED_CERT` for ~10 min post-deploy.
+  - **Rollback:** re-adding the var restores the (insecure) status quo if the DB breaks before you can land the cert fix — treat that as strictly temporary.
+- **Effort:** ~10 min + a watchful redeploy. *(Diagnosed 2026-06-03. With S1-2 + S1-3 + the S2-1 cluster resolved, **this is the only remaining S1 — and it's operational, not a code change.**)*
 
 ### S1-2 · Unvalidated `Json`-column cast in the AI generator worker — ✅ RESOLVED 2026-06-06
 - **Where:** `src/lib/jobs/processOutlineJob.ts:99` — was `const partial = job.partial as unknown as Outline | null`.
