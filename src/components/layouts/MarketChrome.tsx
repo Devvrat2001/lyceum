@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Btn } from "@/components/wf/primitives";
 import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombobox";
+import { useIsMobile } from "@/lib/useMediaQuery";
 
 /**
  * Marketplace top-bar nav, scoped per viewer role.
@@ -24,6 +26,11 @@ import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombo
  * ADMIN is allowed on every tree, but its bar links to the admin
  * console only — keeping the menu role-coherent beats dumping all
  * four areas onto it.
+ *
+ * Responsive: desktop is the single sticky bar (below); on phones the
+ * nav links + search + auth collapse behind a ☰ toggle into a drawer,
+ * matching the role chromes (this app has no CSS breakpoint layer —
+ * responsiveness is JS-driven via `useIsMobile`).
  */
 type NavLink = { label: string; href: string };
 
@@ -62,6 +69,86 @@ function navKeyFor(role: string | null | undefined): NavKey {
     : "ANON";
 }
 
+function LyceumMark() {
+  return (
+    <Link
+      href="/"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        textDecoration: "none",
+        color: "inherit",
+      }}
+    >
+      <div
+        style={{
+          width: 22,
+          height: 22,
+          background: "var(--wf-ink)",
+          borderRadius: 4,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--wf-bg)",
+          fontFamily: "var(--font-serif-stack)",
+          fontSize: 14,
+          fontWeight: 700,
+        }}
+      >
+        L
+      </div>
+      <span
+        style={{
+          fontFamily: "var(--font-serif-stack)",
+          fontSize: 17,
+          fontWeight: 600,
+        }}
+      >
+        Lyceum
+      </span>
+    </Link>
+  );
+}
+
+/** Auth CTA(s) for the bar (desktop) or drawer (`full` → stacked, full-width). */
+function AuthArea({
+  navKey,
+  full = false,
+  onNavigate,
+}: {
+  navKey: NavKey;
+  full?: boolean;
+  onNavigate?: () => void;
+}) {
+  const wrap: React.CSSProperties = full
+    ? { textDecoration: "none", display: "block" }
+    : { textDecoration: "none" };
+  if (navKey === "ANON") {
+    return (
+      <>
+        <Link href="/login" style={wrap} onClick={onNavigate}>
+          <Btn variant="ghost" sm full={full}>
+            Sign in
+          </Btn>
+        </Link>
+        <Link href="/signup" style={wrap} onClick={onNavigate}>
+          <Btn variant="primary" sm full={full}>
+            Start learning
+          </Btn>
+        </Link>
+      </>
+    );
+  }
+  return (
+    <Link href={ROLE_HOME[navKey]} style={wrap} onClick={onNavigate}>
+      <Btn variant="primary" sm full={full}>
+        Go to dashboard
+      </Btn>
+    </Link>
+  );
+}
+
 export function MarketChrome({
   children,
   role = null,
@@ -72,9 +159,118 @@ export function MarketChrome({
 }) {
   const pathname = usePathname() ?? "";
   const isBrowse = pathname === "/" || pathname.startsWith("/course");
+  const isMobile = useIsMobile();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const navKey = navKeyFor(role);
   const nav = ROLE_NAV[navKey];
 
+  const navLinks = nav.map((item) => {
+    // MarketChrome only ever renders on `/` and `/course/*`, so
+    // "Browse" is the only link that can be the active route — the
+    // rest point into role-gated trees.
+    const active = item.href === "/" && isBrowse;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => setDrawerOpen(false)}
+        style={{
+          color: active ? "var(--wf-ink)" : "var(--wf-body)",
+          fontWeight: active ? 600 : 500,
+          textDecoration: "none",
+        }}
+      >
+        {item.label}
+      </Link>
+    );
+  });
+
+  // ---- Mobile: sticky logo bar + ☰ → slide-down drawer ----
+  if (isMobile) {
+    return (
+      <div
+        style={{
+          background: "var(--wf-bg)",
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <header
+          style={{
+            height: 56,
+            padding: "0 14px",
+            borderBottom: "1px solid var(--wf-hairline)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexShrink: 0,
+            background: "white",
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+          }}
+        >
+          <LyceumMark />
+          <button
+            type="button"
+            aria-label={drawerOpen ? "Close menu" : "Open menu"}
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen((o) => !o)}
+            style={{
+              border: "1px solid var(--wf-hairline)",
+              borderRadius: 6,
+              background: "white",
+              width: 34,
+              height: 34,
+              fontSize: 16,
+              cursor: "pointer",
+              color: "var(--wf-ink)",
+            }}
+          >
+            {drawerOpen ? "✕" : "☰"}
+          </button>
+        </header>
+        {drawerOpen && (
+          <div
+            style={{
+              flexShrink: 0,
+              borderBottom: "1px solid var(--wf-hairline)",
+              padding: "12px 14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              background: "white",
+            }}
+          >
+            <HeaderSearchCombobox compact />
+            <nav
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                fontSize: 14,
+              }}
+            >
+              {navLinks}
+            </nav>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: 8 }}
+            >
+              <AuthArea
+                navKey={navKey}
+                full
+                onNavigate={() => setDrawerOpen(false)}
+              />
+            </div>
+          </div>
+        )}
+        {children}
+      </div>
+    );
+  }
+
+  // ---- Desktop: single sticky app bar (unchanged) ----
   return (
     <div
       style={{
@@ -100,43 +296,7 @@ export function MarketChrome({
           zIndex: 10,
         }}
       >
-        <Link
-          href="/"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            textDecoration: "none",
-            color: "inherit",
-          }}
-        >
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              background: "var(--wf-ink)",
-              borderRadius: 4,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--wf-bg)",
-              fontFamily: "var(--font-serif-stack)",
-              fontSize: 14,
-              fontWeight: 700,
-            }}
-          >
-            L
-          </div>
-          <span
-            style={{
-              fontFamily: "var(--font-serif-stack)",
-              fontSize: 17,
-              fontWeight: 600,
-            }}
-          >
-            Lyceum
-          </span>
-        </Link>
+        <LyceumMark />
         <nav
           style={{
             display: "flex",
@@ -146,50 +306,10 @@ export function MarketChrome({
             marginLeft: 12,
           }}
         >
-          {nav.map((item) => {
-            // MarketChrome only ever renders on `/` and `/course/*`,
-            // so "Browse" is the only link that can be the active
-            // route — the rest point into role-gated trees.
-            const active = item.href === "/" && isBrowse;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  color: active ? "var(--wf-ink)" : "var(--wf-body)",
-                  fontWeight: active ? 600 : 500,
-                  textDecoration: "none",
-                }}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+          {navLinks}
         </nav>
         <HeaderSearchCombobox />
-        {navKey === "ANON" ? (
-          <>
-            <Link href="/login" style={{ textDecoration: "none" }}>
-              <Btn variant="ghost" sm>
-                Sign in
-              </Btn>
-            </Link>
-            <Link href="/signup" style={{ textDecoration: "none" }}>
-              <Btn variant="primary" sm>
-                Start learning
-              </Btn>
-            </Link>
-          </>
-        ) : (
-          <Link
-            href={ROLE_HOME[navKey]}
-            style={{ textDecoration: "none" }}
-          >
-            <Btn variant="primary" sm>
-              Go to dashboard
-            </Btn>
-          </Link>
-        )}
+        <AuthArea navKey={navKey} />
       </header>
       {children}
     </div>
