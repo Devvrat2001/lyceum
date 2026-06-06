@@ -1,15 +1,15 @@
 "use client";
 import {
-  enqueueAttempt,
-  flushAttempts,
+  enqueueAction,
+  flushActions,
   type AttemptInput,
-  type OfflineAttemptStore,
-  type QueuedAttempt,
+  type OfflineActionStore,
+  type QueuedAction,
 } from "./attemptQueue";
 
 /**
- * Browser wiring for the offline attempt queue: an IndexedDB-backed
- * OfflineAttemptStore + the reconnect flush that replays queued attempts to
+ * Browser wiring for the offline action queue: an IndexedDB-backed
+ * OfflineActionStore + the reconnect flush that replays queued actions to
  * /api/lesson/attempt-replay. SSR/no-IndexedDB safe — falls back to a no-op
  * store so importing this never throws on the server.
  */
@@ -50,14 +50,15 @@ function tx<T>(
   );
 }
 
-const noopStore: OfflineAttemptStore = {
+const noopStore: OfflineActionStore = {
   all: async () => [],
   put: async () => {},
   remove: async () => {},
 };
 
-const idbStore: OfflineAttemptStore = {
-  all: () => tx<QueuedAttempt[]>("readonly", (s) => s.getAll() as IDBRequest<QueuedAttempt[]>),
+const idbStore: OfflineActionStore = {
+  all: () =>
+    tx<QueuedAction[]>("readonly", (s) => s.getAll() as IDBRequest<QueuedAction[]>),
   put: async (item) => {
     await tx("readwrite", (s) => s.put(item));
   },
@@ -67,35 +68,55 @@ const idbStore: OfflineAttemptStore = {
 };
 
 /** The active store: IndexedDB in the browser, a no-op everywhere else. */
-export function getAttemptStore(): OfflineAttemptStore {
+export function getActionStore(): OfflineActionStore {
   return hasIndexedDB() ? idbStore : noopStore;
 }
 
-/** Queue an attempt for later replay (no-op on the server). */
-export function queueAttempt(input: AttemptInput): Promise<QueuedAttempt> {
-  return enqueueAttempt(getAttemptStore(), input);
+/** Queue an MCQ / QUIZ attempt for later replay (no-op on the server). */
+export function queueAttempt(input: AttemptInput): Promise<QueuedAction> {
+  return enqueueAction(getActionStore(), { kind: "attemptBlock", input });
+}
+
+/** Queue a POLL vote for later replay. */
+export function queuePoll(input: {
+  blockId: string;
+  chosenIndex: number;
+}): Promise<QueuedAction> {
+  return enqueueAction(getActionStore(), { kind: "votePoll", input });
+}
+
+/** Queue a DRAG_MATCH completion for later replay. */
+export function queueDragMatch(input: {
+  blockId: string;
+  placements: (number | null)[];
+  timeMs?: number;
+}): Promise<QueuedAction> {
+  return enqueueAction(getActionStore(), { kind: "completeDragMatch", input });
+}
+
+/** Queue a BRANCHING terminal completion for later replay. */
+export function queueBranching(input: {
+  blockId: string;
+  terminalNodeId: string;
+  timeMs?: number;
+}): Promise<QueuedAction> {
+  return enqueueAction(getActionStore(), { kind: "completeBranching", input });
 }
 
 /**
- * Replay all queued attempts to the server. Each is POSTed to the auth'd
- * replay route, which re-runs lesson.attemptBlock as the signed-in user. A
- * non-2xx leaves the attempt queued for the next reconnect.
+ * Replay all queued actions to the server. Each is POSTed (as `{ kind, input }`)
+ * to the auth'd replay route, which re-runs the matching mutation as the
+ * signed-in user. A non-2xx leaves the action queued for the next reconnect.
  */
 export function flushQueuedAttempts(): Promise<{
   flushed: number;
   failed: number;
 }> {
-  return flushAttempts(getAttemptStore(), async (item) => {
+  return flushActions(getActionStore(), async (item) => {
     const res = await fetch("/api/lesson/attempt-replay", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        blockId: item.blockId,
-        chosenIndex: item.chosenIndex,
-        subIndex: item.subIndex,
-        hintsUsed: item.hintsUsed,
-        timeMs: item.timeMs,
-      }),
+      body: JSON.stringify({ kind: item.kind, input: item.input }),
     });
     if (!res.ok) throw new Error(`replay failed: ${res.status}`);
   });

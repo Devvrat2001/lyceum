@@ -1,20 +1,16 @@
 /**
- * Offline attempt queue — pure logic, storage-injected so it's unit-testable
- * without IndexedDB. When a student submits an answer while offline, the
- * attempt is queued here; a reconnect flush replays each one to the server
- * (see attemptStore.ts for the real IndexedDB store + the flush wiring).
+ * Offline action queue — pure logic, storage-injected so it's unit-testable
+ * without IndexedDB. When a student submits an answer / vote / completion
+ * while offline, the action is queued here; a reconnect flush replays each one
+ * to the server (see attemptStore.ts for the IndexedDB store + flush wiring).
  *
- * Design: best-effort + at-least-once. A queued attempt is removed only after
+ * Design: best-effort + at-least-once. A queued action is removed only after
  * the server accepts it; a failed replay stays queued for the next reconnect.
- * Replaying the same attempt twice just records two Attempt rows server-side,
- * which is harmless (idempotency by content isn't worth the complexity here).
+ * Replaying the same action twice just records two rows server-side, which is
+ * harmless (content-level idempotency isn't worth the complexity here).
  */
 
-/**
- * The full `lesson.attemptBlock` input. Mirrors the router's Zod schema so the
- * queue is not MCQ-locked — QUIZ / AI_QUIZ decks carry `subIndex`, and hints /
- * timing ride along when present.
- */
+/** The full `lesson.attemptBlock` input (MCQ + QUIZ/AI_QUIZ decks). */
 export type AttemptInput = {
   blockId: string;
   chosenIndex: number;
@@ -23,40 +19,60 @@ export type AttemptInput = {
   timeMs?: number;
 };
 
-export type QueuedAttempt = AttemptInput & {
-  id: string;
-  queuedAt: number;
-};
+/**
+ * Every offline-queueable student action, as a discriminated union. `kind`
+ * routes the replay to the matching tRPC mutation and `input` is that
+ * mutation's payload. These are the four self-check submits that award XP:
+ * MCQ/QUIZ (`attemptBlock`), POLL (`votePoll`), DRAG_MATCH
+ * (`completeDragMatch`), and BRANCHING (`completeBranching`).
+ */
+export type OfflineAction =
+  | { kind: "attemptBlock"; input: AttemptInput }
+  | { kind: "votePoll"; input: { blockId: string; chosenIndex: number } }
+  | {
+      kind: "completeDragMatch";
+      input: {
+        blockId: string;
+        placements: (number | null)[];
+        timeMs?: number;
+      };
+    }
+  | {
+      kind: "completeBranching";
+      input: { blockId: string; terminalNodeId: string; timeMs?: number };
+    };
 
-/** Minimal async store the queue needs — implemented by IndexedDB (or memory in tests). */
-export interface OfflineAttemptStore {
-  all(): Promise<QueuedAttempt[]>;
-  put(item: QueuedAttempt): Promise<void>;
+export type QueuedAction = OfflineAction & { id: string; queuedAt: number };
+
+/** Minimal async store the queue needs — IndexedDB (or memory in tests). */
+export interface OfflineActionStore {
+  all(): Promise<QueuedAction[]>;
+  put(item: QueuedAction): Promise<void>;
   remove(id: string): Promise<void>;
 }
 
-/** Queue one attempt for later replay. Returns the stored item. */
-export async function enqueueAttempt(
-  store: OfflineAttemptStore,
-  input: AttemptInput
-): Promise<QueuedAttempt> {
-  const item: QueuedAttempt = {
-    ...input,
+/** Queue one action for later replay. Returns the stored item. */
+export async function enqueueAction(
+  store: OfflineActionStore,
+  action: OfflineAction
+): Promise<QueuedAction> {
+  const item = {
+    ...action,
     id: crypto.randomUUID(),
     queuedAt: Date.now(),
-  };
+  } as QueuedAction;
   await store.put(item);
   return item;
 }
 
 /**
- * Replay every queued attempt via `submit`. Each success is removed from the
+ * Replay every queued action via `submit`. Each success is removed from the
  * queue; each failure is left in place (and counted) so the next flush retries
  * it. Never throws — a failing `submit` can't break the reconnect handler.
  */
-export async function flushAttempts(
-  store: OfflineAttemptStore,
-  submit: (item: QueuedAttempt) => Promise<void>
+export async function flushActions(
+  store: OfflineActionStore,
+  submit: (item: QueuedAction) => Promise<void>
 ): Promise<{ flushed: number; failed: number }> {
   const items = await store.all();
   let flushed = 0;

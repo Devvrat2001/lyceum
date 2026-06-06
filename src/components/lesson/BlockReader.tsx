@@ -29,7 +29,12 @@ import {
   type SettingsFor,
 } from "@/lib/blocks";
 import { trpc } from "@/lib/trpc/react";
-import { queueAttempt } from "@/lib/offline/attemptStore";
+import {
+  queueAttempt,
+  queuePoll,
+  queueDragMatch,
+  queueBranching,
+} from "@/lib/offline/attemptStore";
 
 /**
  * Student-facing render of a single Block from a Lesson. Mirrors the
@@ -935,6 +940,7 @@ function PollBody({
   });
 
   const [localError, setLocalError] = useState<string | null>(null);
+  const [offlineVote, setOfflineVote] = useState<number | null>(null);
 
   if (!stem.trim() || opts.length < 2) {
     return (
@@ -969,18 +975,25 @@ function PollBody({
             data.totalVotes > 0
               ? Math.round((count / data.totalVotes) * 100)
               : 0;
-          const isMine = data.myChoice === i;
+          const isMine = data.myChoice === i || offlineVote === i;
 
           return (
             <button
               key={i}
               type="button"
               onClick={() => {
-                if (pending) return;
+                if (pending || offlineVote !== null) return;
                 if (data.myChoice === i) return; // already mine — noop
+                // Offline: queue the vote + reflect it locally; the live
+                // tallies sync on reconnect.
+                if (typeof navigator !== "undefined" && !navigator.onLine) {
+                  setOfflineVote(i);
+                  void queuePoll({ blockId, chosenIndex: i });
+                  return;
+                }
                 vote.mutate({ blockId, chosenIndex: i });
               }}
-              disabled={pending}
+              disabled={pending || offlineVote !== null}
               style={{
                 position: "relative",
                 display: "flex",
@@ -1043,6 +1056,18 @@ function PollBody({
           );
         })}
       </div>
+      {offlineVote !== null && (
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--wf-mute)",
+            marginBottom: 8,
+          }}
+        >
+          ✓ Vote saved offline — syncs when you reconnect
+        </div>
+      )}
       <div
         style={{
           fontSize: 11,
@@ -1365,7 +1390,13 @@ function BranchingBody({
     if (!cur || cur.choices.length !== 0) return;
     if (completedTerminalsRef.current.has(cur.id)) return;
     completedTerminalsRef.current.add(cur.id);
-    complete.mutate({ blockId, terminalNodeId: cur.id });
+    // Branching plays entirely client-side, so the lesson works offline;
+    // only the XP-award mutation needs the network. Offline → queue it.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      void queueBranching({ blockId, terminalNodeId: cur.id });
+    } else {
+      complete.mutate({ blockId, terminalNodeId: cur.id });
+    }
     // Re-fire only when currentId changes to a not-yet-completed
     // terminal; `complete` is intentionally excluded from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2208,6 +2239,7 @@ function DragMatchBody({
     badgeAwarded: string | null;
   } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [offlineSaved, setOfflineSaved] = useState(false);
 
   const complete = trpc.lesson.completeDragMatch.useMutation({
     onSuccess: (res) => {
@@ -2223,7 +2255,7 @@ function DragMatchBody({
     },
   });
 
-  const checked = feedback !== null;
+  const checked = feedback !== null || offlineSaved;
   const pending = complete.isPending;
 
   const sensors = useSensors(
@@ -2291,6 +2323,7 @@ function DragMatchBody({
     setPlacements(Object.fromEntries(rawPairs.map((_, i) => [i, null])));
     setFeedback(null);
     setSubmitError(null);
+    setOfflineSaved(false);
   };
 
   const onCheck = () => {
@@ -2298,12 +2331,15 @@ function DragMatchBody({
     setSubmitError(null);
     // Server expects a flat array of (number | null) indexed by slot.
     const placementsArr = rawPairs.map((_, i) => placements[i] ?? null);
+    // Offline: we can't compute the server-authoritative score, so save the
+    // placements for replay and show a neutral "saved offline" state.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setOfflineSaved(true);
+      void queueDragMatch({ blockId, placements: placementsArr });
+      return;
+    }
     complete.mutate({ blockId, placements: placementsArr });
   };
-
-  // Server-authoritative once feedback arrives; before that we just
-  // show neutral colors regardless of placement.
-  const correctCount = feedback?.correctCount ?? 0;
 
   return (
     <div>
@@ -2417,20 +2453,6 @@ function DragMatchBody({
           {pending ? "Checking…" : "Check matches"}
         </button>
         {checked && (
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color:
-                correctCount === rawPairs.length
-                  ? "var(--wf-good)"
-                  : "var(--wf-body)",
-            }}
-          >
-            {correctCount} of {rawPairs.length} correct
-          </span>
-        )}
-        {checked && (
           <button
             type="button"
             onClick={onReset}
@@ -2460,6 +2482,13 @@ function DragMatchBody({
             {feedback.correct
               ? "✓ All matched!"
               : `${feedback.correctCount} / ${feedback.totalPairs} correct`}
+          </span>
+        )}
+        {offlineSaved && (
+          <span
+            style={{ fontSize: 12, fontWeight: 600, color: "var(--wf-mute)" }}
+          >
+            ✓ Saved offline — syncs when you reconnect
           </span>
         )}
         {feedback && feedback.points > 0 && (
