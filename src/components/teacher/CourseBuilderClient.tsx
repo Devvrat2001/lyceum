@@ -108,6 +108,7 @@ type Unit = {
   id: string;
   order: number;
   title: string;
+  subtitle: string | null;
   estLabel: string | null;
   lessons: Lesson[];
 };
@@ -187,6 +188,18 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
   const deleteLesson = trpc.teacher.deleteLesson.useMutation({
     onError: (e) => {
       setErr(`Failed to delete lesson: ${e.message}`);
+      setUnits(course.units);
+    },
+  });
+  const reorderUnits = trpc.teacher.reorderUnits.useMutation({
+    onError: (e) => {
+      setErr(`Failed to reorder units: ${e.message}`);
+      setUnits(course.units);
+    },
+  });
+  const reorderLessons = trpc.teacher.reorderLessons.useMutation({
+    onError: (e) => {
+      setErr(`Failed to reorder lessons: ${e.message}`);
       setUnits(course.units);
     },
   });
@@ -473,6 +486,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
         id: unit.id,
         order: unit.order,
         title: unit.title,
+        subtitle: null,
         estLabel: unit.estLabel,
         lessons: [],
       };
@@ -508,12 +522,49 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     }
   };
 
-  const renameUnitH = (unitId: string, title: string) => {
+  const updateUnitH = (
+    unitId: string,
+    patch: { title?: string; subtitle?: string | null }
+  ) => {
     setErr(null);
     setUnits((prev) =>
-      prev.map((u) => (u.id === unitId ? { ...u, title } : u))
+      prev.map((u) => (u.id === unitId ? { ...u, ...patch } : u))
     );
-    updateUnit.mutate({ unitId, title });
+    updateUnit.mutate({ unitId, ...patch });
+    markSaved();
+  };
+
+  // Persist a new unit ordering (DnD in the outline rail). reorderUnits
+  // wants the FULL id list (it rejects partial reorders), so we send the
+  // whole reordered array and optimistically renumber order to 1..N.
+  const reorderUnitsH = (orderedIds: string[]) => {
+    setErr(null);
+    setUnits((prev) => {
+      const byId = new Map(prev.map((u) => [u.id, u]));
+      return orderedIds
+        .map((id, i) => {
+          const u = byId.get(id);
+          return u ? { ...u, order: i + 1 } : null;
+        })
+        .filter((u): u is Unit => u !== null);
+    });
+    reorderUnits.mutate({ courseId: course.id, unitIds: orderedIds });
+    markSaved();
+  };
+
+  const reorderLessonsH = (unitId: string, orderedIds: string[]) => {
+    setErr(null);
+    setUnits((prev) =>
+      prev.map((u) => {
+        if (u.id !== unitId) return u;
+        const byId = new Map(u.lessons.map((l) => [l.id, l]));
+        const lessons = orderedIds
+          .map((id) => byId.get(id))
+          .filter((l): l is Lesson => l !== undefined);
+        return { ...u, lessons };
+      })
+    );
+    reorderLessons.mutate({ unitId, lessonIds: orderedIds });
     markSaved();
   };
 
@@ -644,9 +695,12 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
           onSelectLesson={selectLesson}
           onAddLesson={addLessonH}
           onAddUnit={addUnitH}
-          onRenameUnit={renameUnitH}
+          onUpdateUnit={updateUnitH}
           onDeleteUnit={deleteUnitH}
           onDeleteLesson={deleteLessonH}
+          onReorderUnits={reorderUnitsH}
+          onReorderLessons={reorderLessonsH}
+          sensors={sensors}
           adding={addUnit.isPending || addLesson.isPending}
         />
 
@@ -946,6 +1000,377 @@ function RailAction({
   );
 }
 
+// A draggable lesson row in the outline rail (handle + select + delete).
+function SortableLessonRow({
+  lesson,
+  active,
+  onSelect,
+  onDelete,
+}: {
+  lesson: Lesson;
+  active: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: lesson.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    display: "flex",
+    alignItems: "center",
+    gap: 2,
+    margin: "1px 0",
+    borderRadius: 6,
+    background: active ? SELSOFT : "transparent",
+    borderLeft: `2px solid ${active ? SEL : "transparent"}`,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <span
+        {...attributes}
+        {...listeners}
+        aria-label="Reorder lesson"
+        style={{
+          cursor: "grab",
+          touchAction: "none",
+          display: "inline-flex",
+          padding: "0 1px",
+          opacity: 0.45,
+        }}
+      >
+        <Icon name="drag" size={11} color={tone.mute} />
+      </span>
+      <button
+        type="button"
+        onClick={onSelect}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 4px 6px 4px",
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          textAlign: "left",
+          fontFamily: tone.sans,
+        }}
+      >
+        <Icon name="book" size={12} color={active ? SEL : tone.mute} />
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: active ? 600 : 500,
+            color: active ? SEL : tone.body,
+            flex: 1,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {lesson.title}
+        </span>
+        <span
+          style={{ fontSize: 9, color: tone.mute, fontFamily: tone.mono }}
+        >
+          {lesson.blocks.length}
+        </span>
+      </button>
+      <RailAction label="Delete lesson" glyph="✕" danger onClick={onDelete} />
+    </div>
+  );
+}
+
+// A draggable unit in the outline rail. Owns its own inline-edit state
+// (title + subtitle) and an inner DnD context for its lessons.
+function SortableUnitRow({
+  unit,
+  open,
+  selectedLessonId,
+  sensors,
+  onToggle,
+  onSelectLesson,
+  onAddLesson,
+  onUpdateUnit,
+  onDeleteUnit,
+  onDeleteLesson,
+  onReorderLessons,
+  adding,
+}: {
+  unit: Unit;
+  open: boolean;
+  selectedLessonId: string | null;
+  sensors: ReturnType<typeof useSensors>;
+  onToggle: () => void;
+  onSelectLesson: (lessonId: string) => void;
+  onAddLesson: (unitId: string) => void;
+  onUpdateUnit: (
+    unitId: string,
+    patch: { title?: string; subtitle?: string | null }
+  ) => void;
+  onDeleteUnit: (unitId: string) => void;
+  onDeleteLesson: (unitId: string, lessonId: string) => void;
+  onReorderLessons: (unitId: string, orderedIds: string[]) => void;
+  adding: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: unit.id });
+  const [editing, setEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(unit.title);
+  const [subtitleDraft, setSubtitleDraft] = useState(unit.subtitle ?? "");
+
+  const startEdit = () => {
+    setTitleDraft(unit.title);
+    setSubtitleDraft(unit.subtitle ?? "");
+    setEditing(true);
+  };
+  const commit = () => {
+    setEditing(false);
+    const t = titleDraft.trim();
+    const s = subtitleDraft.trim();
+    const patch: { title?: string; subtitle?: string | null } = {};
+    if (t && t !== unit.title) patch.title = t;
+    if (s !== (unit.subtitle ?? "")) patch.subtitle = s || null;
+    if (Object.keys(patch).length > 0) onUpdateUnit(unit.id, patch);
+  };
+
+  const lessonIds = unit.lessons.map((l) => l.id);
+  const rowStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    marginBottom: 2,
+  };
+
+  return (
+    <div ref={setNodeRef} style={rowStyle}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 2, borderRadius: 6 }}
+      >
+        <span
+          {...attributes}
+          {...listeners}
+          aria-label="Reorder unit"
+          style={{
+            cursor: "grab",
+            touchAction: "none",
+            display: "inline-flex",
+            padding: "0 1px",
+            opacity: 0.45,
+          }}
+        >
+          <Icon name="drag" size={11} color={tone.mute} />
+        </span>
+        {editing ? (
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              padding: "2px 0",
+            }}
+          >
+            <input
+              autoFocus
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commit();
+                if (e.key === "Escape") setEditing(false);
+              }}
+              aria-label="Unit title"
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: tone.ink,
+                border: `1px solid ${SEL}`,
+                borderRadius: 5,
+                padding: "5px 7px",
+                outline: "none",
+                background: "white",
+                fontFamily: tone.sans,
+              }}
+            />
+            <input
+              value={subtitleDraft}
+              onChange={(e) => setSubtitleDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commit();
+                if (e.key === "Escape") setEditing(false);
+              }}
+              onBlur={commit}
+              placeholder="Subtitle (optional)"
+              aria-label="Unit subtitle"
+              style={{
+                fontSize: 11,
+                color: tone.body,
+                border: `1px solid ${tone.line}`,
+                borderRadius: 5,
+                padding: "4px 7px",
+                outline: "none",
+                background: "white",
+                fontFamily: tone.sans,
+              }}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggle}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "7px 4px",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              textAlign: "left",
+              fontFamily: tone.sans,
+            }}
+          >
+            <Icon
+              name="arrow"
+              size={11}
+              color={tone.mute}
+              style={{ transform: open ? "rotate(90deg)" : "none" }}
+            />
+            <span
+              style={{ fontFamily: tone.mono, fontSize: 9, color: tone.mute }}
+            >
+              Unit {unit.order}
+            </span>
+            <span
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: tone.ink,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {unit.title}
+              </span>
+              {unit.subtitle && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: tone.mute,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {unit.subtitle}
+                </span>
+              )}
+            </span>
+            {!open && (
+              <span style={{ fontSize: 10, color: tone.mute }}>
+                {unit.lessons.length}
+              </span>
+            )}
+          </button>
+        )}
+        {!editing && (
+          <>
+            <RailAction label="Rename unit" glyph="✎" onClick={startEdit} />
+            <RailAction
+              label="Delete unit"
+              glyph="✕"
+              danger
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Delete "${unit.title}" and all its lessons? This can't be undone.`
+                  )
+                )
+                  onDeleteUnit(unit.id);
+              }}
+            />
+          </>
+        )}
+      </div>
+
+      {open && (
+        <div style={{ paddingLeft: 10 }}>
+          <DndContext
+            id={`dnd-lessons-${unit.id}`}
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(e) => {
+              const { active, over } = e;
+              if (!over || active.id === over.id) return;
+              const oldI = lessonIds.indexOf(String(active.id));
+              const newI = lessonIds.indexOf(String(over.id));
+              if (oldI < 0 || newI < 0) return;
+              onReorderLessons(unit.id, arrayMove(lessonIds, oldI, newI));
+            }}
+          >
+            <SortableContext
+              items={lessonIds}
+              strategy={verticalListSortingStrategy}
+            >
+              {unit.lessons.map((l) => (
+                <SortableLessonRow
+                  key={l.id}
+                  lesson={l}
+                  active={l.id === selectedLessonId}
+                  onSelect={() => onSelectLesson(l.id)}
+                  onDelete={() => {
+                    if (
+                      window.confirm(
+                        `Delete lesson "${l.title}"? This can't be undone.`
+                      )
+                    )
+                      onDeleteLesson(unit.id, l.id);
+                  }}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+          <button
+            type="button"
+            onClick={() => onAddLesson(unit.id)}
+            disabled={adding}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 8px 6px 10px",
+              fontSize: 11,
+              color: tone.mute,
+              border: "none",
+              background: "transparent",
+              cursor: adding ? "default" : "pointer",
+              fontFamily: tone.sans,
+            }}
+          >
+            <Icon name="plus" size={11} color={tone.mute} />
+            Add lesson
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OutlineRail({
   course,
   units,
@@ -957,9 +1382,12 @@ function OutlineRail({
   onSelectLesson,
   onAddLesson,
   onAddUnit,
-  onRenameUnit,
+  onUpdateUnit,
   onDeleteUnit,
   onDeleteLesson,
+  onReorderUnits,
+  onReorderLessons,
+  sensors,
   adding,
 }: {
   course: CourseProps;
@@ -972,18 +1400,17 @@ function OutlineRail({
   onSelectLesson: (lessonId: string) => void;
   onAddLesson: (unitId: string) => void;
   onAddUnit: () => void;
-  onRenameUnit: (unitId: string, title: string) => void;
+  onUpdateUnit: (
+    unitId: string,
+    patch: { title?: string; subtitle?: string | null }
+  ) => void;
   onDeleteUnit: (unitId: string) => void;
   onDeleteLesson: (unitId: string, lessonId: string) => void;
+  onReorderUnits: (orderedIds: string[]) => void;
+  onReorderLessons: (unitId: string, orderedIds: string[]) => void;
+  sensors: ReturnType<typeof useSensors>;
   adding: boolean;
 }) {
-  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
-  const commitUnitRename = (unitId: string, raw: string) => {
-    const t = raw.trim();
-    const u = units.find((x) => x.id === unitId);
-    setEditingUnitId(null);
-    if (t && u && t !== u.title) onRenameUnit(unitId, t);
-  };
   const hr =
     totalDuration > 0 ? ` · ~${Math.max(1, Math.round(totalDuration / 60))} hr` : "";
   return (
@@ -1040,224 +1467,43 @@ function OutlineRail({
             No units yet. Add your first unit to start building.
           </div>
         )}
-        {units.map((u) => {
-          const open = openUnits.has(u.id);
-          return (
-            <div key={u.id} style={{ marginBottom: 2 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                  borderRadius: 6,
-                }}
-              >
-                {editingUnitId === u.id ? (
-                  <input
-                    autoFocus
-                    defaultValue={u.title}
-                    onBlur={(e) => commitUnitRename(u.id, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter")
-                        (e.target as HTMLInputElement).blur();
-                      if (e.key === "Escape") setEditingUnitId(null);
-                    }}
-                    aria-label="Unit title"
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: tone.ink,
-                      border: `1px solid ${SEL}`,
-                      borderRadius: 5,
-                      padding: "5px 7px",
-                      outline: "none",
-                      background: "white",
-                      fontFamily: tone.sans,
-                    }}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onToggleUnit(u.id)}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "7px 8px",
-                      borderRadius: 6,
-                      border: "none",
-                      background: "transparent",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      fontFamily: tone.sans,
-                    }}
-                  >
-                    <Icon
-                      name="arrow"
-                      size={11}
-                      color={tone.mute}
-                      style={{ transform: open ? "rotate(90deg)" : "none" }}
-                    />
-                    <span
-                      style={{
-                        fontFamily: tone.mono,
-                        fontSize: 9,
-                        color: tone.mute,
-                      }}
-                    >
-                      Unit {u.order}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: tone.ink,
-                        flex: 1,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {u.title}
-                    </span>
-                    {!open && (
-                      <span style={{ fontSize: 10, color: tone.mute }}>
-                        {u.lessons.length}
-                      </span>
-                    )}
-                  </button>
-                )}
-                {editingUnitId !== u.id && (
-                  <>
-                    <RailAction
-                      label="Rename unit"
-                      glyph="✎"
-                      onClick={() => setEditingUnitId(u.id)}
-                    />
-                    <RailAction
-                      label="Delete unit"
-                      glyph="✕"
-                      danger
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `Delete "${u.title}" and all its lessons? This can't be undone.`
-                          )
-                        )
-                          onDeleteUnit(u.id);
-                      }}
-                    />
-                  </>
-                )}
-              </div>
-
-              {open && (
-                <div style={{ paddingLeft: 10 }}>
-                  {u.lessons.map((l) => {
-                    const active = l.id === selectedLessonId;
-                    return (
-                      <div
-                        key={l.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 2,
-                          margin: "1px 0",
-                          borderRadius: 6,
-                          background: active ? SELSOFT : "transparent",
-                          borderLeft: `2px solid ${active ? SEL : "transparent"}`,
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => onSelectLesson(l.id)}
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 4px 6px 8px",
-                            border: "none",
-                            background: "transparent",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontFamily: tone.sans,
-                          }}
-                        >
-                          <Icon
-                            name="book"
-                            size={12}
-                            color={active ? SEL : tone.mute}
-                          />
-                          <span
-                            style={{
-                              fontSize: 12,
-                              fontWeight: active ? 600 : 500,
-                              color: active ? SEL : tone.body,
-                              flex: 1,
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {l.title}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 9,
-                              color: tone.mute,
-                              fontFamily: tone.mono,
-                            }}
-                          >
-                            {l.blocks.length}
-                          </span>
-                        </button>
-                        <RailAction
-                          label="Delete lesson"
-                          glyph="✕"
-                          danger
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Delete lesson "${l.title}"? This can't be undone.`
-                              )
-                            )
-                              onDeleteLesson(u.id, l.id);
-                          }}
-                        />
-                      </div>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => onAddLesson(u.id)}
-                    disabled={adding}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "6px 8px 6px 10px",
-                      fontSize: 11,
-                      color: tone.mute,
-                      border: "none",
-                      background: "transparent",
-                      cursor: adding ? "default" : "pointer",
-                      fontFamily: tone.sans,
-                    }}
-                  >
-                    <Icon name="plus" size={11} color={tone.mute} />
-                    Add lesson
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        <DndContext
+          id={`dnd-units-${course.id}`}
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(e) => {
+            const { active, over } = e;
+            if (!over || active.id === over.id) return;
+            const ids = units.map((u) => u.id);
+            const oldI = ids.indexOf(String(active.id));
+            const newI = ids.indexOf(String(over.id));
+            if (oldI < 0 || newI < 0) return;
+            onReorderUnits(arrayMove(ids, oldI, newI));
+          }}
+        >
+          <SortableContext
+            items={units.map((u) => u.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {units.map((u) => (
+              <SortableUnitRow
+                key={u.id}
+                unit={u}
+                open={openUnits.has(u.id)}
+                selectedLessonId={selectedLessonId}
+                sensors={sensors}
+                onToggle={() => onToggleUnit(u.id)}
+                onSelectLesson={onSelectLesson}
+                onAddLesson={onAddLesson}
+                onUpdateUnit={onUpdateUnit}
+                onDeleteUnit={onDeleteUnit}
+                onDeleteLesson={onDeleteLesson}
+                onReorderLessons={onReorderLessons}
+                adding={adding}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
 
       <div style={{ padding: 12, borderTop: `1px solid ${tone.line}` }}>

@@ -252,3 +252,76 @@ describe("teacher.deleteLesson", () => {
     ).rejects.toThrow(/FORBIDDEN/);
   });
 });
+
+describe("teacher.reorderUnits", () => {
+  it("reorders units to the given sequence and renumbers 1..N", async () => {
+    const t = await createTestUser({ role: "TEACHER" });
+    const { course, units } = await courseWithUnits(t.id, 3);
+    const reversed = [units[2].id, units[1].id, units[0].id];
+
+    const res = await t.caller.teacher.reorderUnits({
+      courseId: course.id,
+      unitIds: reversed,
+    });
+    expect(res.count).toBe(3);
+
+    const rows = await db.unit.findMany({
+      where: { courseId: course.id },
+      orderBy: { order: "asc" },
+      select: { id: true, order: true },
+    });
+    expect(rows.map((r) => r.id)).toEqual(reversed);
+    expect(rows.map((r) => r.order)).toEqual([1, 2, 3]);
+  });
+
+  it("rejects a partial unit list (must list every unit once)", async () => {
+    const t = await createTestUser({ role: "TEACHER" });
+    const { course, units } = await courseWithUnits(t.id, 3);
+    await expect(
+      t.caller.teacher.reorderUnits({
+        courseId: course.id,
+        unitIds: [units[0].id, units[1].id], // missing one
+      })
+    ).rejects.toThrow(/exactly once/i);
+  });
+});
+
+describe("teacher.reorderLessons", () => {
+  it("reorders lessons within a unit and renumbers 1..N", async () => {
+    const t = await createTestUser({ role: "TEACHER" });
+    const { units } = await courseWithUnits(t.id, 1);
+    const unit = units[0];
+    const l1 = unit.lesson; // order 1
+    const l2 = await db.lesson.create({
+      data: {
+        unitId: unit.id,
+        slug: `test-lesson-${crypto.randomUUID()}`,
+        title: "L2",
+        order: 2,
+      },
+    });
+    const l3 = await db.lesson.create({
+      data: {
+        unitId: unit.id,
+        slug: `test-lesson-${crypto.randomUUID()}`,
+        title: "L3",
+        order: 3,
+      },
+    });
+    const reordered = [l3.id, l1.id, l2.id];
+
+    const res = await t.caller.teacher.reorderLessons({
+      unitId: unit.id,
+      lessonIds: reordered,
+    });
+    expect(res.count).toBe(3);
+
+    const rows = await db.lesson.findMany({
+      where: { unitId: unit.id },
+      orderBy: { order: "asc" },
+      select: { id: true, order: true },
+    });
+    expect(rows.map((r) => r.id)).toEqual(reordered);
+    expect(rows.map((r) => r.order)).toEqual([1, 2, 3]);
+  });
+});

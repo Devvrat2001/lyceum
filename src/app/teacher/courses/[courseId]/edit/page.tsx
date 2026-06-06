@@ -42,6 +42,7 @@ export default async function CourseBuilderPage({
             id: u.id,
             order: u.order,
             title: u.title,
+            subtitle: u.subtitle,
             estLabel: u.estLabel,
             lessons: u.lessons.map((l) => ({
               id: l.id,
