@@ -187,12 +187,18 @@ export type BranchingSettings = CommonSettings & {
 };
 export type DragMatchSettings = CommonSettings & {
   pairs?: DragMatchPair[];
+  /** Optional activity caption rendered above the board (the reader reads it). */
+  prompt?: string;
 };
 /** POLL stores plain string options (no per-option `correct`). Distinct
  *  from MCQ's `McqOption[]` even though both fields are called `options`
  *  — the discriminator is `Block.type`, not a field inside the JSON. */
 export type PollSettings = CommonSettings & {
   prompt?: string;
+  /** Legacy poll-question field (shares the JSON column with MCQ's `stem`).
+   *  The reader prefers `stem` then falls back to `prompt`, and the inspector
+   *  still writes `stem` — so it stays declared until a data migration. */
+  stem?: string;
   options?: string[];
 };
 export type SectionSettings = CommonSettings & {
@@ -203,6 +209,8 @@ export type DiscussionSettings = CommonSettings & {
   prompt?: string;
 };
 export type LiveSettings = CommonSettings & {
+  /** Session title shown in the reader's LIVE card. */
+  title?: string;
   startsAt?: string;
   durationMin?: number;
   joinUrl?: string;

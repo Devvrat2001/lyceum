@@ -127,6 +127,37 @@ type _BagCoversCanonical = _Assert<
     : false
 >;
 
+// ---------------------------------------------------------------------------
+// Per-editor prop narrowing. `renderTypeFields` dispatches on `block.type`,
+// which fixes T — so each `*Fields` editor receives its own `SettingsFor<T>`
+// (the canonical per-type shape from `lib/blocks.ts`) instead of the wide bag,
+// and can therefore only read/write its own type's fields: a VIDEO editor
+// reading `.options` (an MCQ field) is now a compile error. `fieldsFor`
+// performs the single narrowing cast — sound because the switch guarantees the
+// row IS that type and the parent's `setDraft` accepts any bag key.
+// ---------------------------------------------------------------------------
+type TypedUpdate<T extends BlockType> = <K extends keyof SettingsFor<T>>(
+  key: K,
+  value: SettingsFor<T>[K]
+) => void;
+type GenericUpdate = <K extends keyof BlockSettingsShape>(
+  key: K,
+  value: BlockSettingsShape[K]
+) => void;
+type FieldsProps<T extends BlockType> = {
+  draft: SettingsFor<T>;
+  update: TypedUpdate<T>;
+};
+function fieldsFor<T extends BlockType>(
+  draft: BlockSettingsShape,
+  update: GenericUpdate
+): FieldsProps<T> {
+  return {
+    draft: draft as unknown as SettingsFor<T>,
+    update: update as unknown as TypedUpdate<T>,
+  };
+}
+
 /** Block types that expose APPEARANCE controls (option-layout etc.). */
 const OPTION_TYPES: ReadonlySet<BlockType> = new Set<BlockType>([
   "MCQ",
@@ -458,46 +489,44 @@ function renderTypeFields(
       return (
         <VideoFields
           blockId={blockId}
-          draft={draft}
-          update={update}
           onSaved={onSaved}
+          {...fieldsFor<"VIDEO">(draft, update)}
         />
       );
     case "READING":
-      return <ReadingFields draft={draft} update={update} />;
+      return <ReadingFields {...fieldsFor<"READING">(draft, update)} />;
     case "MCQ":
-      return <McqFields draft={draft} update={update} />;
+      return <McqFields {...fieldsFor<"MCQ">(draft, update)} />;
     case "SLIDES":
-      return <SlidesFields draft={draft} update={update} />;
+      return <SlidesFields {...fieldsFor<"SLIDES">(draft, update)} />;
     case "PDF":
-      return <PdfFields draft={draft} update={update} />;
+      return <PdfFields {...fieldsFor<"PDF">(draft, update)} />;
     case "SECTION":
-      return <SectionFields draft={draft} update={update} />;
+      return <SectionFields {...fieldsFor<"SECTION">(draft, update)} />;
     case "POLL":
-      return <PollFields draft={draft} update={update} />;
+      return <PollFields {...fieldsFor<"POLL">(draft, update)} />;
     case "DISCUSSION":
-      return <DiscussionFields draft={draft} update={update} />;
+      return <DiscussionFields {...fieldsFor<"DISCUSSION">(draft, update)} />;
     case "AI_QUIZ":
       return (
         <AiQuizFields
           blockId={blockId}
-          draft={draft}
-          update={update}
           onSaved={onSaved}
+          {...fieldsFor<"AI_QUIZ">(draft, update)}
         />
       );
     case "DRAG_MATCH":
-      return <DragMatchFields draft={draft} update={update} />;
+      return <DragMatchFields {...fieldsFor<"DRAG_MATCH">(draft, update)} />;
     case "LIVE":
-      return <LiveFields draft={draft} update={update} />;
+      return <LiveFields {...fieldsFor<"LIVE">(draft, update)} />;
     case "QUIZ":
-      return <QuizFields draft={draft} update={update} />;
+      return <QuizFields {...fieldsFor<"QUIZ">(draft, update)} />;
     case "SIMULATION":
-      return <SimulationFields draft={draft} update={update} />;
+      return <SimulationFields {...fieldsFor<"SIMULATION">(draft, update)} />;
     case "SPEAK":
-      return <SpeakFields draft={draft} update={update} />;
+      return <SpeakFields {...fieldsFor<"SPEAK">(draft, update)} />;
     case "BRANCHING":
-      return <BranchingFields draft={draft} update={update} />;
+      return <BranchingFields {...fieldsFor<"BRANCHING">(draft, update)} />;
     default:
       return (
         <div
@@ -528,13 +557,8 @@ function VideoFields({
   draft,
   update,
   onSaved,
-}: {
+}: FieldsProps<"VIDEO"> & {
   blockId: string;
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
   onSaved: (settings: BlockSettingsShape) => void;
 }) {
   return (
@@ -576,13 +600,8 @@ function MuxVideoField({
   draft,
   update,
   onSaved,
-}: {
+}: FieldsProps<"VIDEO"> & {
   blockId: string;
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
   onSaved: (settings: BlockSettingsShape) => void;
 }) {
   const mux = draft.mux;
@@ -786,16 +805,7 @@ function StatusRow({
   );
 }
 
-function ReadingFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function ReadingFields({ draft, update }: FieldsProps<"READING">) {
   return (
     <TextAreaField
       label="READING (MARKDOWN)"
@@ -809,16 +819,7 @@ function ReadingFields({
   );
 }
 
-function McqFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function McqFields({ draft, update }: FieldsProps<"MCQ">) {
   const options: McqOption[] = Array.isArray(draft.options)
     ? (draft.options as McqOption[])
     : [];
@@ -965,16 +966,7 @@ function McqFields({
   );
 }
 
-function SlidesFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function SlidesFields({ draft, update }: FieldsProps<"SLIDES">) {
   return (
     <>
       <TextField
@@ -996,16 +988,7 @@ function SlidesFields({
   );
 }
 
-function PdfFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function PdfFields({ draft, update }: FieldsProps<"PDF">) {
   return (
     <>
       <TextField
@@ -1027,16 +1010,7 @@ function PdfFields({
   );
 }
 
-function PollFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function PollFields({ draft, update }: FieldsProps<"POLL">) {
   // POLL options are plain strings — no correctness flag, no shared
   // shape with MCQ. Stored in the same `options` field; the router
   // discriminates by Block.type and filters to typeof "string".
@@ -1179,13 +1153,8 @@ function AiQuizFields({
   draft,
   update,
   onSaved,
-}: {
+}: FieldsProps<"AI_QUIZ"> & {
   blockId: string;
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
   // Bubble the freshly-generated questions up to the parent so the
   // course-builder canvas re-reads the block's settings without a
   // full inspector re-mount.
@@ -1392,16 +1361,7 @@ function blankBranchingNode(label: string): BranchingNode {
   };
 }
 
-function BranchingFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function BranchingFields({ draft, update }: FieldsProps<"BRANCHING">) {
   const nodes: BranchingNode[] = Array.isArray(draft.nodes)
     ? (draft.nodes as BranchingNode[])
     : [];
@@ -1714,16 +1674,7 @@ function BranchingFields({
   );
 }
 
-function SpeakFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function SpeakFields({ draft, update }: FieldsProps<"SPEAK">) {
   // SPEAK has two parts: the prompt the reader reads aloud, and an
   // optional `expected` target phrase the reader compares the
   // transcript against. Language is BCP-47 (default en-US) so
@@ -1760,16 +1711,7 @@ function SpeakFields({
   );
 }
 
-function SimulationFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function SimulationFields({ draft, update }: FieldsProps<"SIMULATION">) {
   return (
     <>
       <TextField
@@ -1791,16 +1733,7 @@ function SimulationFields({
   );
 }
 
-function QuizFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function QuizFields({ draft, update }: FieldsProps<"QUIZ">) {
   const questions: QuizQuestion[] = Array.isArray(draft.questions)
     ? (draft.questions as QuizQuestion[])
     : [];
@@ -2024,16 +1957,7 @@ function QuizFields({
   );
 }
 
-function LiveFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function LiveFields({ draft, update }: FieldsProps<"LIVE">) {
   // datetime-local inputs work in local time without offset; convert
   // both directions so storage stays canonical ISO with timezone.
   const localValue = (() => {
@@ -2143,16 +2067,7 @@ function LiveFields({
   );
 }
 
-function DragMatchFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function DragMatchFields({ draft, update }: FieldsProps<"DRAG_MATCH">) {
   const pairs: Array<{ left: string; right: string }> = Array.isArray(
     draft.pairs
   )
@@ -2308,16 +2223,7 @@ function DragMatchFields({
   );
 }
 
-function DiscussionFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function DiscussionFields({ draft, update }: FieldsProps<"DISCUSSION">) {
   // DISCUSSION is mostly student-driven — the only authoring control
   // is an optional prompt question that opens the thread. Stored in
   // the `prompt` field; falls back to a generic placeholder if unset.
@@ -2334,16 +2240,7 @@ function DiscussionFields({
   );
 }
 
-function SectionFields({
-  draft,
-  update,
-}: {
-  draft: BlockSettingsShape;
-  update: <K extends keyof BlockSettingsShape>(
-    key: K,
-    value: BlockSettingsShape[K]
-  ) => void;
-}) {
+function SectionFields({ draft, update }: FieldsProps<"SECTION">) {
   // SECTION is a pure presentational divider — title is the visible
   // heading, subtitle is an optional intro line. Useful for grouping a
   // long lesson into thematic sections without nesting structure.
