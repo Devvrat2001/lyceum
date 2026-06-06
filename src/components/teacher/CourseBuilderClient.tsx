@@ -204,6 +204,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     },
   });
   const duplicateLesson = trpc.teacher.duplicateLesson.useMutation();
+  const duplicateUnit = trpc.teacher.duplicateUnit.useMutation();
   const addBlock = trpc.teacher.addBlock.useMutation();
   const updateBlockM = trpc.teacher.updateBlock.useMutation();
   const deleteBlock = trpc.teacher.deleteBlock.useMutation();
@@ -644,6 +645,42 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     }
   };
 
+  // Clone a unit (+ all lessons + blocks) and drop the copy right after
+  // the original. The server shifts later units; we splice the copy in
+  // and renumber order to stay contiguous.
+  const duplicateUnitH = async (unitId: string) => {
+    setErr(null);
+    try {
+      const { unit } = await duplicateUnit.mutateAsync({ unitId });
+      const newUnit: Unit = {
+        id: unit.id,
+        order: unit.order,
+        title: unit.title,
+        subtitle: unit.subtitle,
+        estLabel: unit.estLabel,
+        lessons: unit.lessons.map((l) => ({
+          id: l.id,
+          slug: l.slug,
+          title: l.title,
+          durationMin: l.durationMin,
+          blocks: l.blocks.map(toBlock),
+        })),
+      };
+      setUnits((prev) => {
+        const idx = prev.findIndex((u) => u.id === unitId);
+        const next = [...prev];
+        next.splice(idx < 0 ? next.length : idx + 1, 0, newUnit);
+        return next.map((u, i) => ({ ...u, order: i + 1 }));
+      });
+      setOpenUnits((prev) => new Set(prev).add(newUnit.id));
+      markSaved();
+    } catch (e) {
+      setErr(
+        `Failed to duplicate unit: ${e instanceof Error ? e.message : ""}`
+      );
+    }
+  };
+
   const renameLessonH = (lessonId: string, title: string) => {
     setUnits((prev) =>
       prev.map((u) => ({
@@ -730,6 +767,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
           onAddUnit={addUnitH}
           onUpdateUnit={updateUnitH}
           onDeleteUnit={deleteUnitH}
+          onDuplicateUnit={duplicateUnitH}
           onDeleteLesson={deleteLessonH}
           onDuplicateLesson={duplicateLessonH}
           onReorderUnits={reorderUnitsH}
@@ -1133,6 +1171,7 @@ function SortableUnitRow({
   onAddLesson,
   onUpdateUnit,
   onDeleteUnit,
+  onDuplicateUnit,
   onDeleteLesson,
   onDuplicateLesson,
   onReorderLessons,
@@ -1150,6 +1189,7 @@ function SortableUnitRow({
     patch: { title?: string; subtitle?: string | null }
   ) => void;
   onDeleteUnit: (unitId: string) => void;
+  onDuplicateUnit: (unitId: string) => void;
   onDeleteLesson: (unitId: string, lessonId: string) => void;
   onDuplicateLesson: (unitId: string, lessonId: string) => void;
   onReorderLessons: (unitId: string, orderedIds: string[]) => void;
@@ -1331,6 +1371,11 @@ function SortableUnitRow({
           <>
             <RailAction label="Rename unit" glyph="✎" onClick={startEdit} />
             <RailAction
+              label="Duplicate unit"
+              glyph="⧉"
+              onClick={() => onDuplicateUnit(unit.id)}
+            />
+            <RailAction
               label="Delete unit"
               glyph="✕"
               danger
@@ -1424,6 +1469,7 @@ function OutlineRail({
   onAddUnit,
   onUpdateUnit,
   onDeleteUnit,
+  onDuplicateUnit,
   onDeleteLesson,
   onDuplicateLesson,
   onReorderUnits,
@@ -1446,6 +1492,7 @@ function OutlineRail({
     patch: { title?: string; subtitle?: string | null }
   ) => void;
   onDeleteUnit: (unitId: string) => void;
+  onDuplicateUnit: (unitId: string) => void;
   onDeleteLesson: (unitId: string, lessonId: string) => void;
   onDuplicateLesson: (unitId: string, lessonId: string) => void;
   onReorderUnits: (orderedIds: string[]) => void;
@@ -1539,6 +1586,7 @@ function OutlineRail({
                 onAddLesson={onAddLesson}
                 onUpdateUnit={onUpdateUnit}
                 onDeleteUnit={onDeleteUnit}
+                onDuplicateUnit={onDuplicateUnit}
                 onDeleteLesson={onDeleteLesson}
                 onDuplicateLesson={onDuplicateLesson}
                 onReorderLessons={onReorderLessons}

@@ -402,3 +402,56 @@ describe("teacher.duplicateLesson", () => {
     ).rejects.toThrow(/FORBIDDEN/);
   });
 });
+
+describe("teacher.duplicateUnit", () => {
+  it("clones the unit + all lessons + blocks right after the original", async () => {
+    const t = await createTestUser({ role: "TEACHER" });
+    const { course, units } = await courseWithUnits(t.id, 2);
+    const original = units[0]; // "Unit 1", order 1, 1 lesson (+1 block)
+    // Add a 2nd lesson (with a block) to verify multi-lesson cloning.
+    const l2 = await db.lesson.create({
+      data: {
+        unitId: original.id,
+        slug: `test-lesson-${crypto.randomUUID()}`,
+        title: "U1 L2",
+        order: 2,
+      },
+    });
+    await db.block.create({
+      data: { lessonId: l2.id, order: 1, type: "MCQ", settings: { stem: "Q" } },
+    });
+
+    const res = await t.caller.teacher.duplicateUnit({ unitId: original.id });
+    expect(res.unit.title).toBe("Unit 1 (copy)");
+    expect(res.unit.id).not.toBe(original.id);
+    expect(res.unit.lessons).toHaveLength(2);
+    expect(res.unit.lessons[0].blocks.length).toBeGreaterThanOrEqual(1);
+
+    // Copy sits at order 2; the former unit-2 shifted to order 3.
+    const rows = await db.unit.findMany({
+      where: { courseId: course.id },
+      orderBy: { order: "asc" },
+      select: { id: true, order: true },
+    });
+    expect(rows.map((r) => r.id)).toEqual([original.id, res.unit.id, units[1].id]);
+    expect(rows.map((r) => r.order)).toEqual([1, 2, 3]);
+
+    // Cloned lessons are fresh rows.
+    const origLessonIds = new Set([original.lesson.id, l2.id]);
+    const copyLessons = await db.lesson.findMany({
+      where: { unitId: res.unit.id },
+      select: { id: true },
+    });
+    expect(copyLessons).toHaveLength(2);
+    expect(copyLessons.every((l) => !origLessonIds.has(l.id))).toBe(true);
+  });
+
+  it("rejects duplicating another teacher's unit (FORBIDDEN)", async () => {
+    const owner = await createTestUser({ role: "TEACHER" });
+    const intruder = await createTestUser({ role: "TEACHER" });
+    const { units } = await courseWithUnits(owner.id, 1);
+    await expect(
+      intruder.caller.teacher.duplicateUnit({ unitId: units[0].id })
+    ).rejects.toThrow(/FORBIDDEN/);
+  });
+});

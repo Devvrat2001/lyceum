@@ -1647,6 +1647,119 @@ export const teacherRouter = router({
     }),
 
   /**
+   * Duplicate a whole unit — clone the unit, every lesson, and every
+   * block, dropping the copy right after the original. The bigger
+   * sibling of duplicateLesson; a teacher reuses a unit's structure as
+   * a template. Each cloned lesson gets a fresh unique slug; later units
+   * shift down so the copy lands at order+1.
+   */
+  duplicateUnit: teacherProcedure
+    .input(z.object({ unitId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const unit = await ctx.db.unit.findUnique({
+        where: { id: input.unitId },
+        select: {
+          id: true,
+          courseId: true,
+          order: true,
+          title: true,
+          subtitle: true,
+          estLabel: true,
+          course: { select: { slug: true, authorId: true } },
+          lessons: {
+            orderBy: { order: "asc" },
+            select: {
+              order: true,
+              title: true,
+              durationMin: true,
+              intro: true,
+              blocks: {
+                orderBy: { order: "asc" },
+                select: { type: true, settings: true, order: true },
+              },
+            },
+          },
+        },
+      });
+      if (!unit) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const newOrder = unit.order + 1;
+      const courseSlug = unit.course.slug;
+
+      const created = await ctx.db.$transaction(async (tx) => {
+        // Make room for the copy at newOrder.
+        await tx.unit.updateMany({
+          where: { courseId: unit.courseId, order: { gte: newOrder } },
+          data: { order: { increment: 1 } },
+        });
+        // Mint a unique slug per cloned lesson. Base mirrors the
+        // seed/AI convention; fall back to a random suffix if a slug at
+        // the new unit-order already exists (a prior unit kept its slugs
+        // when we shifted its order).
+        const lessonsCreate = [];
+        for (const l of unit.lessons) {
+          const base = `${courseSlug}-u${newOrder}-l${l.order}`;
+          const taken = await tx.lesson.findUnique({
+            where: { slug: base },
+            select: { id: true },
+          });
+          lessonsCreate.push({
+            order: l.order,
+            title: l.title,
+            slug: taken ? `${base}-${crypto.randomUUID().slice(0, 5)}` : base,
+            durationMin: l.durationMin,
+            intro: l.intro,
+            isPreview: false,
+            blocks: {
+              create: l.blocks.map((b) => ({
+                type: b.type,
+                settings: (b.settings ?? {}) as Prisma.InputJsonValue,
+                order: b.order,
+              })),
+            },
+          });
+        }
+        return tx.unit.create({
+          data: {
+            courseId: unit.courseId,
+            order: newOrder,
+            title: `${unit.title} (copy)`,
+            subtitle: unit.subtitle,
+            estLabel: unit.estLabel,
+            lessons: { create: lessonsCreate },
+          },
+          select: {
+            id: true,
+            order: true,
+            title: true,
+            subtitle: true,
+            estLabel: true,
+            lessons: {
+              orderBy: { order: "asc" },
+              select: {
+                id: true,
+                slug: true,
+                title: true,
+                durationMin: true,
+                blocks: {
+                  orderBy: { order: "asc" },
+                  select: { id: true, type: true, order: true, settings: true },
+                },
+              },
+            },
+          },
+        });
+      });
+      return { ok: true as const, unit: created };
+    }),
+
+  /**
    * Persist a new block ordering within a single lesson. Same shape
    * as reorderUnits/reorderLessons — rewrites Block.order to 1..N
    * inside a $transaction. Rejects partial reorders (caller must
