@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc/react";
 import {
   findBlockMeta,
   type BlockType,
+  type SettingsFor,
   type McqOption,
   type QuizQuestion,
   type BranchingNode,
@@ -68,12 +69,9 @@ export type BlockSettingsShape = {
   topic?: string;
   count?: number;
   generated?: {
-    questions: Array<{
-      stem: string;
-      difficulty: number;
-      answers: Array<{ key: string; text: string; correct: boolean }>;
-      hint?: string | null;
-    }>;
+    // questions reuse the canonical QuizQuestion (difficulty optional —
+    // matching what the generator returns) instead of a stricter inline copy.
+    questions: QuizQuestion[];
     generatedAt: string;
     mode?: string;
   };
@@ -111,6 +109,25 @@ export type BlockSettingsShape = {
   // unknown / future
   [k: string]: unknown;
 };
+
+// ---------------------------------------------------------------------------
+// Drift guard (type-only, zero runtime cost). The prior pass unified this
+// inspector bag with the canonical per-type shapes in `lib/blocks.ts`. This
+// assertion keeps them from silently diverging: every `SettingsFor<T>` must
+// stay assignable to `BlockSettingsShape`, so adding a field to a `*Settings`
+// type in blocks.ts forces it to be mirrored here too (or `tsc` fails). If one
+// drifts out, the mapped union picks up `false` and `_Assert<false>` errors,
+// pointing straight at the divergent block type.
+// ---------------------------------------------------------------------------
+type _Assert<T extends true> = T;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _BagCoversCanonical = _Assert<
+  {
+    [K in BlockType]: SettingsFor<K> extends BlockSettingsShape ? true : false;
+  }[BlockType] extends true
+    ? true
+    : false
+>;
 
 /** Block types that expose APPEARANCE controls (option-layout etc.). */
 const OPTION_TYPES: ReadonlySet<BlockType> = new Set<BlockType>([

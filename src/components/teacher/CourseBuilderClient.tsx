@@ -27,7 +27,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
-import { BlockInspector } from "@/components/teacher/BlockInspector";
+import {
+  BlockInspector,
+  type BlockSettingsShape,
+} from "@/components/teacher/BlockInspector";
 import { LessonVideoPlayer } from "@/components/video/LessonVideoPlayer";
 import { BLOCK_GROUPS, findBlockMeta, type BlockType } from "@/lib/blocks";
 
@@ -76,18 +79,10 @@ const tone = {
 } as const;
 
 // ── shared types (same shapes the page feeds in) ───────────────────
-export type BlockSettings = {
-  label?: string;
-  notes?: string;
-  appearance?: {
-    optionLayout?: "list" | "grid" | "inline";
-    accent?: string;
-    showLetters?: boolean;
-    cardStyle?: boolean;
-    showCorrect?: boolean;
-  };
-  [k: string]: unknown;
-};
+// The builder shares the inspector's settings bag — one source of truth.
+// It only reaches for label/notes/appearance + arbitrary keys, all of which
+// BlockSettingsShape provides (including its string index signature).
+export type BlockSettings = BlockSettingsShape;
 
 type LessonBlock = {
   id: string;
