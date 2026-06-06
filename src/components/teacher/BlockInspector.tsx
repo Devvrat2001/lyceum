@@ -4,7 +4,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { Btn, Eyebrow, Icon, Toggle } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
-import { findBlockMeta, type BlockType } from "@/lib/blocks";
+import {
+  findBlockMeta,
+  type BlockType,
+  type McqOption,
+  type QuizQuestion,
+  type BranchingNode,
+  type DragMatchPair,
+} from "@/lib/blocks";
 
 /**
  * Per-block editor. Replaces the course-level inspector on the
@@ -27,8 +34,6 @@ import { findBlockMeta, type BlockType } from "@/lib/blocks";
  * — preserves any future fields we haven't yet added an editor for
  * (forward-compatibility).
  */
-export type McqOption = { text: string; correct: boolean };
-
 export type BlockSettingsShape = {
   // universal
   label?: string;
@@ -48,9 +53,12 @@ export type BlockSettingsShape = {
   };
   // READING
   body?: string;
-  // MCQ
+  // MCQ stores `McqOption[]`; POLL reuses the same `options` key for its
+  // plain `string[]` choices (the discriminator is `Block.type`, not a
+  // field inside the JSON). Hence the union — `lib/blocks.ts` holds the
+  // canonical per-type split (`McqSettings` vs `PollSettings`).
   stem?: string;
-  options?: McqOption[];
+  options?: McqOption[] | string[];
   // SECTION (structural divider — title is the visible heading, subtitle is optional)
   title?: string;
   subtitle?: string;
@@ -70,14 +78,9 @@ export type BlockSettingsShape = {
     mode?: string;
   };
   // DRAG_MATCH
-  pairs?: Array<{ left: string; right: string }>;
+  pairs?: DragMatchPair[];
   // QUIZ (curated multi-question MCQ deck; same shape as AI_QUIZ's generated.questions)
-  questions?: Array<{
-    stem: string;
-    difficulty?: number;
-    answers: Array<{ key: string; text: string; correct: boolean }>;
-    hint?: string | null;
-  }>;
+  questions?: QuizQuestion[];
   // LIVE (scheduled session)
   startsAt?: string; // ISO timestamp
   durationMin?: number;
@@ -86,12 +89,7 @@ export type BlockSettingsShape = {
   expected?: string;
   language?: string;
   // BRANCHING (choose-your-own-adventure graph). nodes[0] is the start.
-  nodes?: Array<{
-    id: string;
-    title: string;
-    body: string;
-    choices: Array<{ label: string; to: string }>;
-  }>;
+  nodes?: BranchingNode[];
   // APPEARANCE — "how the block looks" (Course Builder v2 inspector).
   // Persisted forward-compatibly; the student reader honors these as it
   // grows. `accent` is a hex string.
@@ -1033,12 +1031,9 @@ function PollFields({
       )
     : [];
 
-  const setOptions = (next: string[]) =>
-    // The Json type accepts string[] but the shared BlockSettingsShape
-    // declares `options` as McqOption[] for the MCQ case. Cast through
-    // unknown — the runtime shape is just "array of strings", which
-    // the POLL inspector and reader both expect.
-    update("options", next as unknown as BlockSettingsShape["options"]);
+  // `options` is typed `McqOption[] | string[]`; POLL writes the string[]
+  // arm directly — no cast needed now that the union admits both shapes.
+  const setOptions = (next: string[]) => update("options", next);
 
   const addOption = () => {
     if (options.length >= 6) return;
@@ -1349,8 +1344,6 @@ function AiQuizFields({
   );
 }
 
-type QuizQuestion = NonNullable<BlockSettingsShape["questions"]>[number];
-
 const ANSWER_KEYS = ["A", "B", "C", "D"] as const;
 
 function blankQuizQuestion(): QuizQuestion {
@@ -1366,8 +1359,6 @@ function blankQuizQuestion(): QuizQuestion {
     hint: "",
   };
 }
-
-type BranchingNode = NonNullable<BlockSettingsShape["nodes"]>[number];
 
 let _branchingIdSeq = 0;
 function nextNodeId(): string {
@@ -1464,6 +1455,9 @@ function BranchingFields({
         blankBranchingNode("Outcome"),
       ]);
     }
+    // Mount-only seed: gives an empty BRANCHING block a starter graph
+    // exactly once. Re-running on `nodes` changes would fight the
+    // teacher's edits, so the deps stay empty by design.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
