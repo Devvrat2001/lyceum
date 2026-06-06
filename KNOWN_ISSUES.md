@@ -67,11 +67,11 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
   - **time-ticker** + **AI-page job sync** — genuinely-correct external-sync effects (the wall clock; an async job result → editable local state) that the heuristic over-flags; each carries a one-line `eslint-disable-next-line react-hooks/set-state-in-effect` **with a reason**, which survives a future hard-error promotion of the rule.
 - **Result:** ESLint **0 errors** (verified `tsc` + vitest 140/140 + `next build`). The remaining 3 problems are unused-var warnings (S3-1).
 
-### S2-2 · `BlockSettingsShape` is a 20-optional-field bag, not a discriminated union
-- **Where:** type in `src/lib/blocks.ts`; symptom cast at `src/components/teacher/BlockInspector.tsx:1041` — `next as unknown as BlockSettingsShape["options"]`.
-- **Risk:** A VIDEO block can read `.options` (an MCQ field) and it compiles. Wrong-field bugs across 15 block types are invisible to `tsc`. The `as unknown as` casts are the workaround that hides it.
-- **Fix:** Convert to a `Block.type`-keyed discriminated union (pure type-level, no data migration). *(Roadmap §6.6 / Tier 4.5.)*
-- **Effort:** ~1 session.
+### S2-2 · `BlockSettingsShape` wide bag — ✅ SUBSTANTIALLY RESOLVED 2026-06-06
+- **What was already done:** the canonical `Block.type`-keyed discriminated union lives in `lib/blocks.ts` — `SettingsMap` + `SettingsFor<T>` + `settingsFor()` + a compile-time `_ExhaustivenessCheck`. The **data/runtime layer is sound**: server (`lesson.ts`, `generator.ts`) and the reader (`BlockReader.tsx`) already narrow per type.
+- **What shipped this pass (the inspector drift):** `BlockInspector.tsx` now **imports** `McqOption` / `QuizQuestion` / `BranchingNode` / `DragMatchPair` from `blocks.ts` instead of re-declaring them (two sources of truth → one — they can no longer drift), and the one named `as unknown as` cast (POLL's `options`, formerly `:1041`) is **gone**: `options` is typed `McqOption[] | string[]`, so the POLL editor writes its `string[]` arm directly and MCQ keeps its narrowing read.
+- **What remains (smaller, lower-value):** the inspector's polymorphic *draft* is still one wide `BlockSettingsShape` with a `[k: string]: unknown` index signature, so **within the editor form** a VIDEO sub-editor could still read `.options` and compile. The cross-type-read risk is now confined to that single file; removing the index signature + narrowing each of the ~15 `*Fields` editors to `SettingsFor<T>` is the remaining step. *(Roadmap §6.6 / Tier 4.5.)*
+- **Effort remaining:** ~½ session (per-editor narrowing).
 
 ### S2-3 · `Attempt.chosenKey` overloads 5 encodings in one string column
 - **Where:** `Attempt.chosenKey` (schema) — encodes `"subIdx:choiceIdx"`, `"drag:N/M"`, `"branch:<nodeId>"`, etc.
@@ -79,11 +79,11 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **Fix:** Add typed `chosenIndex` / `subIndex` columns + a one-shot backfill. *(Roadmap §6.6 / Tier 5.3 — don't pre-build; do it the moment a query needs it.)*
 - **Effort:** ~1 session incl. backfill.
 
-### S2-4 · `react-hooks/exhaustive-deps` disabled in 6 effects
-- **Where:** `AdminInsights.tsx:17`, `BlockReader.tsx:1361` & `:2185`, `AnalyticsInsights.tsx:20`, `BlockInspector.tsx:1467` & `:1850`.
-- **Risk:** Each suppressed dep array is a stale-closure waiting to happen — the effect captures an old prop/state and silently uses outdated values after the dependency changes. They're correct *today* by construction, but fragile to edits.
-- **Fix:** Per-site review; prefer refs or `useCallback` deps over blanket disables. At minimum, each disable should carry a one-line "why this is safe" comment (some already do).
-- **Effort:** ~1–2 hr to review all six.
+### S2-4 · `react-hooks/exhaustive-deps` disabled in 6 effects — ✅ RESOLVED 2026-06-06
+- **Reviewed all six.** None was an actual stale-closure bug; each is one of three idiomatic patterns. Two were **eliminated**, four are now **documented**:
+  - **Removed the disable (2):** `AdminInsights.tsx` + `AnalyticsInsights.tsx` "auto-generate on first load" effects — converted to a `firedRef` one-shot latch carrying their real deps (`[needsFirstGen, regen]`). `regen` is a fresh object each render, so the latch (not a trimmed dep array) is what guarantees one fire — and a future edit that reads a new prop now surfaces as a lint error instead of hiding.
+  - **Kept + commented (4):** two **mount-only seed** effects (`BlockInspector.tsx` BRANCHING `:1467` / QUIZ `:1850` — `[]` is the intent; re-running would fight the teacher's edits) and two **intentional identity exclusions** (`BlockReader.tsx` BRANCHING terminal re-fires only on `currentId`; DRAG_MATCH shuffle re-keys on `rawPairs.length`, not array identity). All four carry a one-line why-safe comment.
+- **Effort:** done.
 
 ### S2-5 · Error-swallowing `catch {` blocks — ✅ REASSESSED + RESOLVED 2026-06-06
 - **Audit finding:** the original suspicion was largely a false alarm. Every bindless `catch {` in `src` is one of: **feature-detection** (`new URL()` validity in BlockReader SLIDES/PDF/SIMULATION + `LessonVideoPlayer` + CourseBuilderClient `hostOf`; the `stripe`/Mux dynamic-import probes), a **defensive no-op** (SpeechRecognition abort/stop, clipboard-blocked, the SSE partial-line skip in `LessonClient`, the offline-queue retry path), or **input validation that returns a meaningful HTTP error** (the `/api/*` route bodies → 400/401/503). None of those should log — it would be noise (e.g. "user pasted an invalid URL").
