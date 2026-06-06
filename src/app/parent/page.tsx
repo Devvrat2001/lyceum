@@ -1,14 +1,7 @@
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import {
-  Avatar,
-  Btn,
-  Card,
-  Eyebrow,
-  Icon,
-  Meter,
-} from "@/components/wf/primitives";
+import { Avatar, Card, Eyebrow, Icon, Meter } from "@/components/wf/primitives";
+import { ParentHeader } from "@/components/layouts/ParentHeader";
 
 /**
  * Parent dashboard (Tier 2.3, second commit). Shows each linked
@@ -104,42 +97,9 @@ export default async function ParentDashboardPage() {
       }}
     >
       {/* Minimal header. Parent chrome (per-kid sidebar) lands when
-          multi-kid navigation needs it. */}
-      <header
-        style={{
-          height: 56,
-          padding: "0 24px",
-          borderBottom: "1px solid var(--wf-hairline)",
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          flexShrink: 0,
-        }}
-      >
-        <Link
-          href="/parent"
-          style={{
-            fontSize: 16,
-            fontWeight: 700,
-            textDecoration: "none",
-            color: "var(--wf-ink)",
-          }}
-        >
-          Lyceum · Parent
-        </Link>
-        <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, color: "var(--wf-mute)" }}>
-          {me.email}
-        </span>
-        <Link
-          href="/api/auth/signout"
-          style={{ textDecoration: "none" }}
-        >
-          <Btn variant="ghost" sm>
-            Sign out
-          </Btn>
-        </Link>
-      </header>
+          multi-kid navigation needs it; ParentHeader is a client
+          component so it can adapt to phone widths. */}
+      <ParentHeader email={me.email} />
 
       <div
         style={{
@@ -207,7 +167,10 @@ export default async function ParentDashboardPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(420px, 1fr))",
+              // min(420px, 100%) floors each column at the container width on
+              // phones, so a single card can't force horizontal scrolling.
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(min(420px, 100%), 1fr))",
               gap: 16,
             }}
           >
