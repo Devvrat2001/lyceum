@@ -1,4 +1,5 @@
 import "server-only";
+import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db as prisma } from "@/lib/db";
 import {
@@ -26,6 +27,54 @@ import { enqueueOutlineChunk, isQStashEnabled } from "@/lib/qstash";
 export interface OutlineJobInput {
   brief: string;
   settings: GeneratorSettings;
+}
+
+/**
+ * Lenient structural validation for the persisted `partial` Outline blob
+ * read at the start of each chunk run.
+ *
+ * We deliberately do NOT reuse `OutlineSchema` here: the partial
+ * intentionally holds sub-minimum placeholder readings (~110 chars,
+ * below OutlineSchema's `readingContent.min(120)`) between chunks, and
+ * the skeleton's unit/lesson counts aren't bound by OutlineSchema's
+ * `min(3)` authoring rules — so the strict schema would reject a
+ * perfectly valid in-flight blob and fail every generation. We only need
+ * to confirm the shape the chunk logic reads (`units[].lessons[]`) is
+ * intact, so a drifted or half-written blob fails the job cleanly here
+ * instead of crashing deep at `partial.units[unitIdx]`.
+ */
+const PartialOutlineShape = z.object({
+  title: z.string(),
+  tagline: z.string(),
+  description: z.string(),
+  units: z
+    .array(
+      z.object({
+        shortLabel: z.string(),
+        title: z.string(),
+        subtitle: z.string(),
+        durationLabel: z.string(),
+        lessons: z.array(
+          z.object({
+            title: z.string(),
+            summary: z.string(),
+            readingContent: z.string(),
+          })
+        ),
+      })
+    )
+    .min(1),
+});
+
+/**
+ * Returns the partial Outline when `blob` is structurally intact, else
+ * null. Returns the ORIGINAL object (cast) on success — not the parsed
+ * copy — so accumulated fields like `lessons[].blocks` survive untouched.
+ */
+export function validatePartialOutline(blob: unknown): Outline | null {
+  return PartialOutlineShape.safeParse(blob).success
+    ? (blob as Outline)
+    : null;
 }
 
 /**
@@ -96,9 +145,12 @@ export async function processOutlineChunk(
     }
 
     // Chunk i (>= 1): generate readings for unit (i - 1) and merge.
-    const partial = job.partial as unknown as Outline | null;
+    const partial = validatePartialOutline(job.partial);
     if (!partial) {
-      await markFailed(jobId, "Partial outline missing on chunk run");
+      await markFailed(
+        jobId,
+        "Partial outline is missing or malformed — please regenerate the course."
+      );
       return { done: true };
     }
     const unitIdx = job.nextChunk - 1;
