@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { Popover, PopoverOption } from "@/components/ui/Popover";
 import {
   MARKETPLACE_GRADES,
+  MARKETPLACE_LENGTH_BUCKETS,
   MARKETPLACE_PRICE_BUCKETS,
   MARKETPLACE_SUBJECTS,
   labelFor,
@@ -30,6 +31,7 @@ export function MarketplaceFilters() {
   const grade = sp?.get("grade") ?? null;
   const subject = sp?.get("subject") ?? null;
   const price = sp?.get("price") ?? null;
+  const length = sp?.get("length") ?? null;
 
   // Preserve any other params (notably `topic`) when we mutate one
   // dimension — losing the topic filter when picking a grade would be
@@ -45,8 +47,9 @@ export function MarketplaceFilters() {
   const gradeLabel = labelFor(MARKETPLACE_GRADES, grade ?? undefined);
   const subjectLabel = labelFor(MARKETPLACE_SUBJECTS, subject ?? undefined);
   const priceLabel = labelFor(MARKETPLACE_PRICE_BUCKETS, price ?? undefined);
+  const lengthLabel = labelFor(MARKETPLACE_LENGTH_BUCKETS, length ?? undefined);
 
-  const anyActive = !!(grade || subject || price);
+  const anyActive = !!(grade || subject || price || length);
 
   const clearAll = useMemo(() => {
     return () => {
@@ -55,6 +58,7 @@ export function MarketplaceFilters() {
       next.delete("grade");
       next.delete("subject");
       next.delete("price");
+      next.delete("length");
       const qs = next.toString();
       router.push(qs ? `/?${qs}` : "/");
     };
@@ -123,6 +127,28 @@ export function MarketplaceFilters() {
                 active={price === b.value}
                 onClick={() => {
                   updateParam("price", price === b.value ? null : b.value);
+                  close();
+                }}
+              >
+                {b.label}
+              </PopoverOption>
+            ))}
+          </>
+        )}
+      </Popover>
+
+      <Popover
+        active={!!length}
+        triggerLabel={lengthLabel ? `Length · ${lengthLabel}` : "Length"}
+      >
+        {({ close }) => (
+          <>
+            {MARKETPLACE_LENGTH_BUCKETS.map((b) => (
+              <PopoverOption
+                key={b.value}
+                active={length === b.value}
+                onClick={() => {
+                  updateParam("length", length === b.value ? null : b.value);
                   close();
                 }}
               >

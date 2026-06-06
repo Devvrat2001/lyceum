@@ -11,6 +11,7 @@ import {
 } from "@/lib/ai/prompts/marketplaceSearch";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
+import { lengthRangeFor } from "@/lib/marketplace";
 import {
   embedText,
   isEmbeddingsEnabled,
@@ -91,6 +92,8 @@ export const marketplaceRouter = router({
           topic: z.string().optional(),
           /** One of: "free" | "under20" | "20to50" | "50plus" */
           price: z.string().optional(),
+          /** Course-length bucket: "short" | "medium" | "long". */
+          length: z.string().optional(),
           limit: z.number().int().min(1).max(24).default(4),
         })
         .optional()
@@ -111,26 +114,68 @@ export const marketplaceRouter = router({
         ...(input?.grade ? { grade: input.grade } : {}),
         ...(priceFragment ?? {}),
       };
-      const courses = await ctx.db.course.findMany({
+      const limit = input?.limit ?? 4;
+      const orderBy: Prisma.CourseOrderByWithRelationInput[] = [
+        { enrollCount: "desc" },
+        { ratingAvg: "desc" },
+      ];
+      // id is consumed by the marketplace page to cross-reference
+      // course.myEnrolledIds and badge cards the student owns.
+      const cardSelect = {
+        id: true,
+        slug: true,
+        title: true,
+        authorLabel: true,
+        ratingAvg: true,
+        ratingCount: true,
+        priceCents: true,
+        tag: true,
+        thumbnailUrl: true,
+      } satisfies Prisma.CourseSelect;
+
+      const lengthRange = lengthRangeFor(input?.length);
+      if (!lengthRange) {
+        const courses = await ctx.db.course.findMany({
+          where,
+          orderBy,
+          take: limit,
+          select: cardSelect,
+        });
+        const total = await ctx.db.course.count({ where });
+        return { courses, total };
+      }
+
+      // Length is an aggregate over units→lessons, which Prisma can't put in
+      // `where`. Load a bounded candidate pool (same popularity ranking),
+      // count lessons per course, keep those in the bucket, then slice to the
+      // display limit. `total` reflects the filtered pool — enough for the
+      // homepage strip's "N courses" hint without a denormalized column.
+      const POOL_SIZE = 60;
+      const pool = await ctx.db.course.findMany({
         where,
-        orderBy: [{ enrollCount: "desc" }, { ratingAvg: "desc" }],
-        take: input?.limit ?? 4,
+        orderBy,
+        take: POOL_SIZE,
         select: {
-          // id is consumed by the marketplace page to cross-reference
-          // course.myEnrolledIds and badge cards the student owns.
-          id: true,
-          slug: true,
-          title: true,
-          authorLabel: true,
-          ratingAvg: true,
-          ratingCount: true,
-          priceCents: true,
-          tag: true,
-          thumbnailUrl: true,
+          ...cardSelect,
+          units: { select: { _count: { select: { lessons: true } } } },
         },
       });
-      const total = await ctx.db.course.count({ where });
-      return { courses, total };
+      const matched = pool
+        .map((c) => {
+          const { units, ...card } = c;
+          const lessonCount = units.reduce(
+            (acc, u) => acc + u._count.lessons,
+            0
+          );
+          return { card, lessonCount };
+        })
+        .filter(
+          (m) =>
+            m.lessonCount >= lengthRange.min &&
+            m.lessonCount <= lengthRange.max
+        );
+      const courses = matched.slice(0, limit).map((m) => m.card);
+      return { courses, total: matched.length };
     }),
 
   /** Multi-course curriculum bundles. */

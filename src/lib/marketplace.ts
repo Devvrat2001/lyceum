@@ -79,6 +79,34 @@ export const MARKETPLACE_PRICE_BUCKETS: { value: string; label: string }[] = [
   { value: "50plus", label: "$50 and up" },
 ];
 
+/**
+ * Course-length bucket options, keyed by total lesson count. The server
+ * (`marketplace.featured`) turns the `value` into an inclusive lesson-count
+ * range via `lengthRangeFor` and filters a candidate pool by it — there's no
+ * length column to put in a Prisma `where`, so it's an aggregate post-filter.
+ */
+export const MARKETPLACE_LENGTH_BUCKETS: { value: string; label: string }[] = [
+  { value: "short", label: "Short · ≤4 lessons" },
+  { value: "medium", label: "Medium · 5–9" },
+  { value: "long", label: "Long · 10+" },
+];
+
+/** Inclusive lesson-count range for a length-bucket slug; null = no filter. */
+export function lengthRangeFor(
+  slug: string | undefined
+): { min: number; max: number } | null {
+  switch (slug) {
+    case "short":
+      return { min: 1, max: 4 };
+    case "medium":
+      return { min: 5, max: 9 };
+    case "long":
+      return { min: 10, max: Number.MAX_SAFE_INTEGER };
+    default:
+      return null;
+  }
+}
+
 export function labelFor<T extends { value: string; label: string }>(
   items: T[],
   value: string | undefined

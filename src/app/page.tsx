@@ -42,6 +42,7 @@ export default async function MarketplacePage({
     grade?: string;
     subject?: string;
     price?: string;
+    length?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -54,6 +55,7 @@ export default async function MarketplacePage({
   // the prior page behaviour.
   const subject = sp.subject ?? (activeTopic ? undefined : "math");
   const price = sp.price;
+  const length = sp.length;
 
   const trpc = await getServerCaller();
   const [featured, paths, teachers, recommended, enrolledIdList, session] =
@@ -63,6 +65,7 @@ export default async function MarketplacePage({
         ...(subject ? { subject } : {}),
         grade,
         ...(price ? { price } : {}),
+        ...(length ? { length } : {}),
         limit: 4,
       }),
       trpc.marketplace.paths(),
@@ -268,13 +271,6 @@ export default async function MarketplacePage({
             title="Coming soon"
           >
             Format ▾
-          </span>
-          <span
-            className="wf-chip"
-            style={{ opacity: 0.5, cursor: "not-allowed" }}
-            title="Coming soon"
-          >
-            Length ▾
           </span>
           <span
             className="wf-chip"
