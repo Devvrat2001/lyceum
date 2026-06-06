@@ -13,6 +13,7 @@ import { auth } from "@/lib/auth";
 import { TRPCError } from "@trpc/server";
 import { CurriculumAccordion } from "@/components/course/CurriculumAccordion";
 import { EnrollPanel } from "@/components/course/EnrollPanel";
+import { estimateCourseMinutes, formatDuration } from "@/lib/courseLength";
 
 export default async function CourseDetailPage({
   params,
@@ -37,11 +38,11 @@ export default async function CourseDetailPage({
   ]);
 
   const totalLessons = course.units.reduce((a, u) => a + u.lessons.length, 0);
-  const totalDurationMin = course.units.reduce(
-    (a, u) =>
-      a + u.lessons.reduce((b, l) => b + (l.durationMin ?? 0), 0),
-    0
-  );
+  // Estimated time-to-complete: teacher-set lesson durations where present,
+  // a per-lesson fallback otherwise (so every course shows a figure). `exact`
+  // is false when any lesson was estimated → the UI prefixes "~".
+  const { minutes: estimatedMinutes, exact: durationExact } =
+    estimateCourseMinutes(course.units);
   const learn = (course.learnOutcomes as string[] | null) ?? [];
 
   return (
@@ -182,8 +183,8 @@ export default async function CourseDetailPage({
               </h2>
               <span style={{ fontSize: 12, color: "var(--wf-mute)" }}>
                 {course.units.length} units · {totalLessons} lessons
-                {totalDurationMin > 0
-                  ? ` · ${Math.floor(totalDurationMin / 60)}h ${totalDurationMin % 60}m`
+                {estimatedMinutes > 0
+                  ? ` · ${durationExact ? "" : "~"}${formatDuration(estimatedMinutes)}`
                   : ""}
               </span>
             </div>
