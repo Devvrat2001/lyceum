@@ -28,6 +28,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 import { BlockInspector } from "@/components/teacher/BlockInspector";
+import { LessonVideoPlayer } from "@/components/video/LessonVideoPlayer";
 import { BLOCK_GROUPS, findBlockMeta, type BlockType } from "@/lib/blocks";
 
 /**
@@ -174,6 +175,21 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
   const addUnit = trpc.teacher.addUnit.useMutation();
   const addLesson = trpc.teacher.addLesson.useMutation();
   const updateLesson = trpc.teacher.updateLesson.useMutation();
+  const updateUnit = trpc.teacher.updateUnit.useMutation({
+    onError: (e) => setErr(`Failed to rename unit: ${e.message}`),
+  });
+  const deleteUnit = trpc.teacher.deleteUnit.useMutation({
+    onError: (e) => {
+      setErr(`Failed to delete unit: ${e.message}`);
+      setUnits(course.units);
+    },
+  });
+  const deleteLesson = trpc.teacher.deleteLesson.useMutation({
+    onError: (e) => {
+      setErr(`Failed to delete lesson: ${e.message}`);
+      setUnits(course.units);
+    },
+  });
   const addBlock = trpc.teacher.addBlock.useMutation();
   const updateBlockM = trpc.teacher.updateBlock.useMutation();
   const deleteBlock = trpc.teacher.deleteBlock.useMutation();
@@ -492,6 +508,58 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     }
   };
 
+  const renameUnitH = (unitId: string, title: string) => {
+    setErr(null);
+    setUnits((prev) =>
+      prev.map((u) => (u.id === unitId ? { ...u, title } : u))
+    );
+    updateUnit.mutate({ unitId, title });
+    markSaved();
+  };
+
+  // Delete a unit and everything in it. Optimistically drop it and
+  // renumber the survivors' `order` to 1..N (matching the server) so the
+  // "Unit N" labels stay contiguous. If the open lesson lived here, clear
+  // the selection so the canvas doesn't point at a deleted lesson.
+  const deleteUnitH = (unitId: string) => {
+    setErr(null);
+    const unit = units.find((u) => u.id === unitId);
+    const hadSelected = unit?.lessons.some((l) => l.id === selectedLessonId);
+    setUnits((prev) =>
+      prev
+        .filter((u) => u.id !== unitId)
+        .map((u, i) => ({ ...u, order: i + 1 }))
+    );
+    setOpenUnits((prev) => {
+      const next = new Set(prev);
+      next.delete(unitId);
+      return next;
+    });
+    if (hadSelected) {
+      setSelectedLessonId(null);
+      setSelectedBlockId(null);
+    }
+    deleteUnit.mutate({ unitId });
+    markSaved();
+  };
+
+  const deleteLessonH = (unitId: string, lessonId: string) => {
+    setErr(null);
+    if (selectedLessonId === lessonId) {
+      setSelectedLessonId(null);
+      setSelectedBlockId(null);
+    }
+    setUnits((prev) =>
+      prev.map((u) =>
+        u.id === unitId
+          ? { ...u, lessons: u.lessons.filter((l) => l.id !== lessonId) }
+          : u
+      )
+    );
+    deleteLesson.mutate({ lessonId });
+    markSaved();
+  };
+
   const renameLessonH = (lessonId: string, title: string) => {
     setUnits((prev) =>
       prev.map((u) => ({
@@ -576,6 +644,9 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
           onSelectLesson={selectLesson}
           onAddLesson={addLessonH}
           onAddUnit={addUnitH}
+          onRenameUnit={renameUnitH}
+          onDeleteUnit={deleteUnitH}
+          onDeleteLesson={deleteLessonH}
           adding={addUnit.isPending || addLesson.isPending}
         />
 
@@ -783,7 +854,7 @@ function BuilderTopBar({
         ● {savedLabel}
       </span>
       <Link
-        href="/teacher/courses/new"
+        href="/teacher/courses/new/ai"
         style={{
           display: "flex",
           alignItems: "center",
@@ -831,6 +902,50 @@ function BuilderTopBar({
 // ════════════════════════════════════════════════════════════════════
 // LEFT — OUTLINE RAIL
 // ════════════════════════════════════════════════════════════════════
+// A tiny, subtle icon button for the outline rail (rename / delete).
+// Lives outside the unit/lesson <button>s so we never nest buttons.
+function RailAction({
+  label,
+  glyph,
+  danger,
+  onClick,
+}: {
+  label: string;
+  glyph: string;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        flexShrink: 0,
+        width: 22,
+        height: 22,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: "none",
+        borderRadius: 5,
+        background: hover ? (danger ? "#fdecec" : tone.hair) : "transparent",
+        color: hover ? (danger ? tone.accent : tone.ink) : tone.mute,
+        cursor: "pointer",
+        fontSize: 12,
+        lineHeight: 1,
+        fontFamily: tone.sans,
+      }}
+    >
+      {glyph}
+    </button>
+  );
+}
+
 function OutlineRail({
   course,
   units,
@@ -842,6 +957,9 @@ function OutlineRail({
   onSelectLesson,
   onAddLesson,
   onAddUnit,
+  onRenameUnit,
+  onDeleteUnit,
+  onDeleteLesson,
   adding,
 }: {
   course: CourseProps;
@@ -854,8 +972,18 @@ function OutlineRail({
   onSelectLesson: (lessonId: string) => void;
   onAddLesson: (unitId: string) => void;
   onAddUnit: () => void;
+  onRenameUnit: (unitId: string, title: string) => void;
+  onDeleteUnit: (unitId: string) => void;
+  onDeleteLesson: (unitId: string, lessonId: string) => void;
   adding: boolean;
 }) {
+  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
+  const commitUnitRename = (unitId: string, raw: string) => {
+    const t = raw.trim();
+    const u = units.find((x) => x.id === unitId);
+    setEditingUnitId(null);
+    if (t && u && t !== u.title) onRenameUnit(unitId, t);
+  };
   const hr =
     totalDuration > 0 ? ` · ~${Math.max(1, Math.round(totalDuration / 60))} hr` : "";
   return (
@@ -916,107 +1044,193 @@ function OutlineRail({
           const open = openUnits.has(u.id);
           return (
             <div key={u.id} style={{ marginBottom: 2 }}>
-              <button
-                type="button"
-                onClick={() => onToggleUnit(u.id)}
+              <div
                 style={{
-                  width: "100%",
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "7px 8px",
+                  gap: 2,
                   borderRadius: 6,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  fontFamily: tone.sans,
                 }}
               >
-                <Icon
-                  name="arrow"
-                  size={11}
-                  color={tone.mute}
-                  style={{ transform: open ? "rotate(90deg)" : "none" }}
-                />
-                <span
-                  style={{ fontFamily: tone.mono, fontSize: 9, color: tone.mute }}
-                >
-                  Unit {u.order}
-                </span>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: tone.ink,
-                    flex: 1,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {u.title}
-                </span>
-                {!open && (
-                  <span style={{ fontSize: 10, color: tone.mute }}>
-                    {u.lessons.length}
-                  </span>
+                {editingUnitId === u.id ? (
+                  <input
+                    autoFocus
+                    defaultValue={u.title}
+                    onBlur={(e) => commitUnitRename(u.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter")
+                        (e.target as HTMLInputElement).blur();
+                      if (e.key === "Escape") setEditingUnitId(null);
+                    }}
+                    aria-label="Unit title"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: tone.ink,
+                      border: `1px solid ${SEL}`,
+                      borderRadius: 5,
+                      padding: "5px 7px",
+                      outline: "none",
+                      background: "white",
+                      fontFamily: tone.sans,
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onToggleUnit(u.id)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "7px 8px",
+                      borderRadius: 6,
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontFamily: tone.sans,
+                    }}
+                  >
+                    <Icon
+                      name="arrow"
+                      size={11}
+                      color={tone.mute}
+                      style={{ transform: open ? "rotate(90deg)" : "none" }}
+                    />
+                    <span
+                      style={{
+                        fontFamily: tone.mono,
+                        fontSize: 9,
+                        color: tone.mute,
+                      }}
+                    >
+                      Unit {u.order}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: tone.ink,
+                        flex: 1,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {u.title}
+                    </span>
+                    {!open && (
+                      <span style={{ fontSize: 10, color: tone.mute }}>
+                        {u.lessons.length}
+                      </span>
+                    )}
+                  </button>
                 )}
-              </button>
+                {editingUnitId !== u.id && (
+                  <>
+                    <RailAction
+                      label="Rename unit"
+                      glyph="✎"
+                      onClick={() => setEditingUnitId(u.id)}
+                    />
+                    <RailAction
+                      label="Delete unit"
+                      glyph="✕"
+                      danger
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Delete "${u.title}" and all its lessons? This can't be undone.`
+                          )
+                        )
+                          onDeleteUnit(u.id);
+                      }}
+                    />
+                  </>
+                )}
+              </div>
 
               {open && (
                 <div style={{ paddingLeft: 10 }}>
                   {u.lessons.map((l) => {
                     const active = l.id === selectedLessonId;
                     return (
-                      <button
+                      <div
                         key={l.id}
-                        type="button"
-                        onClick={() => onSelectLesson(l.id)}
                         style={{
-                          width: "100%",
                           display: "flex",
                           alignItems: "center",
-                          gap: 8,
-                          padding: "6px 8px 6px 10px",
+                          gap: 2,
                           margin: "1px 0",
                           borderRadius: 6,
-                          border: "none",
                           background: active ? SELSOFT : "transparent",
                           borderLeft: `2px solid ${active ? SEL : "transparent"}`,
-                          cursor: "pointer",
-                          textAlign: "left",
-                          fontFamily: tone.sans,
                         }}
                       >
-                        <Icon
-                          name="book"
-                          size={12}
-                          color={active ? SEL : tone.mute}
-                        />
-                        <span
+                        <button
+                          type="button"
+                          onClick={() => onSelectLesson(l.id)}
                           style={{
-                            fontSize: 12,
-                            fontWeight: active ? 600 : 500,
-                            color: active ? SEL : tone.body,
                             flex: 1,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
+                            minWidth: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "6px 4px 6px 8px",
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            textAlign: "left",
+                            fontFamily: tone.sans,
                           }}
                         >
-                          {l.title}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 9,
-                            color: tone.mute,
-                            fontFamily: tone.mono,
+                          <Icon
+                            name="book"
+                            size={12}
+                            color={active ? SEL : tone.mute}
+                          />
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: active ? 600 : 500,
+                              color: active ? SEL : tone.body,
+                              flex: 1,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {l.title}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 9,
+                              color: tone.mute,
+                              fontFamily: tone.mono,
+                            }}
+                          >
+                            {l.blocks.length}
+                          </span>
+                        </button>
+                        <RailAction
+                          label="Delete lesson"
+                          glyph="✕"
+                          danger
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Delete lesson "${l.title}"? This can't be undone.`
+                              )
+                            )
+                              onDeleteLesson(u.id, l.id);
                           }}
-                        >
-                          {l.blocks.length}
-                        </span>
-                      </button>
+                        />
+                      </div>
                     );
                   })}
                   <button
@@ -2141,12 +2355,18 @@ function BlockBody({ block }: { block: LessonBlock }) {
     }
 
     case "VIDEO":
+      // Real, playable preview — identical to the student reader. An
+      // uploaded Mux video (or a pasted YouTube/Vimeo link) plays right
+      // here in the builder; the course owner is authorized for the
+      // signed-playback token server-side, so it no longer shows a dead
+      // placeholder after upload.
+      return <LessonVideoPlayer settings={s} blockId={block.id} />;
+
     case "SLIDES":
     case "SIMULATION": {
       const url = str(s.url);
       const caption = str(s.caption);
       const labels: Record<string, string> = {
-        VIDEO: "Video",
         SLIDES: "Slides",
         SIMULATION: "Interactive simulation",
       };
@@ -2169,11 +2389,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
             }}
           >
             <div style={{ textAlign: "center" }}>
-              <Icon
-                name={block.type === "VIDEO" ? "play" : "grid"}
-                size={22}
-                color={tone.mute}
-              />
+              <Icon name="grid" size={22} color={tone.mute} />
               <div style={{ marginTop: 6 }}>
                 {url ? hostOf(url) : labels[block.type]}
               </div>
@@ -3069,7 +3285,7 @@ function AIPanel({
       </div>
 
       <Link
-        href="/teacher/courses/new"
+        href="/teacher/courses/new/ai"
         style={{
           display: "flex",
           alignItems: "center",

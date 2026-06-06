@@ -1,175 +1,74 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
-import {
-  Annot,
-  Btn,
-  Card,
-  Icon,
-} from "@/components/wf/primitives";
+import { Annot, Btn, Card, Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
-const DEFAULT_BRIEF =
-  "A 5-unit course on basic algebra for Grade 6. Heavy on visual examples. Include a project where students model their family's grocery budget with variables.";
+const GRADES = ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
-type Settings = {
-  grade: string;
-  subject: string;
-  standard: string;
-  lengthLabel: string;
-  style: string;
-  tone: string;
-  difficulty: string;
+const FIELD: React.CSSProperties = {
+  width: "100%",
+  fontSize: 13,
+  color: "var(--wf-ink)",
+  padding: "9px 11px",
+  background: "white",
+  borderRadius: 4,
+  border: "1px solid var(--wf-hairline)",
+  outline: "none",
+  fontFamily: "var(--font-sans-stack)",
 };
 
-const DEFAULT_SETTINGS: Settings = {
-  grade: "Grade 6",
-  subject: "Math · Algebra",
-  standard: "CCSS 6.EE.A,B,C",
-  lengthLabel: "~8 hours · 24 lessons",
-  style: "Visual / interactive",
-  tone: "Friendly, encouraging",
-  difficulty: "Gentle ramp",
+const LABEL: React.CSSProperties = {
+  display: "block",
+  fontSize: 11,
+  fontWeight: 600,
+  color: "var(--wf-mute)",
+  letterSpacing: "0.02em",
+  marginBottom: 6,
 };
 
-const SETTING_LABELS: { key: keyof Settings; label: string }[] = [
-  { key: "grade", label: "Grade level" },
-  { key: "subject", label: "Subject" },
-  { key: "standard", label: "Standard" },
-  { key: "lengthLabel", label: "Length" },
-  { key: "style", label: "Style" },
-  { key: "tone", label: "Tone" },
-  { key: "difficulty", label: "Difficulty curve" },
-];
-
-type Outline = {
-  title: string;
-  tagline: string;
-  description: string;
-  units: {
-    shortLabel: string;
-    title: string;
-    subtitle: string;
-    // Full per-lesson shape — keeping all three fields here so the
-    // outline state object can be passed straight into
-    // `generator.regenerateUnit` without a cast or shape narrowing.
-    lessons: {
-      title: string;
-      summary: string;
-      readingContent: string;
-    }[];
-    durationLabel: string;
-  }[];
-};
-
-export default function AIGeneratorPage() {
+/**
+ * Manual course creation — the DEFAULT "New course" flow. The teacher
+ * names the course and picks subject/grade; we create an empty DRAFT
+ * and drop them straight into the builder to author units by hand.
+ * Generating with AI is the secondary option (the card at the bottom →
+ * /teacher/courses/new/ai).
+ */
+export default function NewCoursePage() {
   const router = useRouter();
-  const [brief, setBrief] = useState(DEFAULT_BRIEF);
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [editingSetting, setEditingSetting] = useState<keyof Settings | null>(
-    null
-  );
-  const [outline, setOutline] = useState<Outline | null>(null);
-  const [regenIdx, setRegenIdx] = useState<number | null>(null);
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("");
+  const [grade, setGrade] = useState("6");
+  const [tagline, setTagline] = useState("");
+  const [priceUsd, setPriceUsd] = useState("0");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [jobStartedAt, setJobStartedAt] = useState<number | null>(null);
-  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
 
-  const startOutlineJob = trpc.generator.startOutlineJob.useMutation({
-    onSuccess: ({ jobId }) => {
-      setJobId(jobId);
-      setJobStartedAt(Date.now());
-      setErrorMsg(null);
-    },
+  const createCourse = trpc.teacher.createCourse.useMutation({
+    onSuccess: ({ slug }) => router.push(`/teacher/courses/${slug}/edit`),
     onError: (e) => setErrorMsg(e.message),
   });
 
-  // Poll the job every 2s until it reaches a terminal state. tRPC
-  // refetchInterval can return false to stop polling, which we do as
-  // soon as status is succeeded/failed/canceled.
-  const jobQuery = trpc.generator.getJob.useQuery(
-    { jobId: jobId! },
-    {
-      enabled: !!jobId,
-      refetchInterval: (query) => {
-        const status = query.state.data?.status;
-        if (
-          status === "succeeded" ||
-          status === "failed" ||
-          status === "canceled"
-        ) {
-          return false;
-        }
-        return 2000;
-      },
-      // Don't keep stale data around between job runs — each job is its
-      // own request, want a clean slate on the next Generate click.
-      gcTime: 0,
-    }
-  );
+  const canSubmit =
+    title.trim().length >= 3 &&
+    subject.trim().length >= 1 &&
+    !createCourse.isPending;
 
-  // React to job status transitions: on success hydrate the outline +
-  // record elapsed time; on failure surface the error to the toast.
-  useEffect(() => {
-    const job = jobQuery.data;
-    if (!job) return;
-    if (job.status === "succeeded" && job.output) {
-      setOutline(job.output as Outline);
-      if (jobStartedAt) setElapsedMs(Date.now() - jobStartedAt);
-    } else if (job.status === "failed") {
-      setErrorMsg(job.error ?? "Generation failed");
-    } else if (job.status === "canceled") {
-      setErrorMsg("Generation canceled");
-    }
-  }, [jobQuery.data, jobStartedAt]);
-
-  const regenerateUnit = trpc.generator.regenerateUnit.useMutation({
-    onMutate: ({ unitIndex }) => setRegenIdx(unitIndex),
-    onSuccess: (r, vars) => {
-      setOutline((prev) =>
-        prev
-          ? {
-              ...prev,
-              units: prev.units.map((u, i) =>
-                i === vars.unitIndex ? r.unit : u
-              ),
-            }
-          : prev
-      );
-      setRegenIdx(null);
-    },
-    onError: (e) => {
-      setRegenIdx(null);
-      setErrorMsg(e.message);
-    },
-  });
-
-  const saveAsCourse = trpc.generator.saveAsCourse.useMutation({
-    onSuccess: ({ slug }) => {
-      router.push(`/teacher/courses/${slug}/edit`);
-    },
-    onError: (e) => setErrorMsg(e.message),
-  });
-
-  const hasOutline = outline !== null;
-
-  // Derived state for the live job UI. Both `startOutlineJob.isPending`
-  // (mutation in flight) AND a non-terminal `jobQuery.data.status`
-  // count as "still running" — first covers the initial enqueue, second
-  // covers everything between enqueue and final webhook.
-  const jobStatus = jobQuery.data?.status;
-  const isRunning =
-    startOutlineJob.isPending ||
-    jobStatus === "pending" ||
-    jobStatus === "running";
-  const progressPct = jobQuery.data?.progress ?? 0;
-  const stepText =
-    jobQuery.data?.step ??
-    (startOutlineJob.isPending ? "Queueing job…" : null);
+  const submit = () => {
+    setErrorMsg(null);
+    const dollars = Number.parseFloat(priceUsd);
+    const priceCents =
+      Number.isFinite(dollars) && dollars > 0 ? Math.round(dollars * 100) : 0;
+    createCourse.mutate({
+      title: title.trim(),
+      subject: subject.trim(),
+      grade,
+      tagline: tagline.trim() || undefined,
+      priceCents,
+    });
+  };
 
   return (
     <TeacherChrome active="courses">
@@ -185,583 +84,191 @@ export default function AIGeneratorPage() {
         }}
       >
         <Link href="/teacher" style={{ color: "inherit" }}>
-          <Icon
-            name="arrow"
-            size={14}
-            style={{ transform: "rotate(180deg)" }}
-          />
+          <Icon name="arrow" size={14} style={{ transform: "rotate(180deg)" }} />
         </Link>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>
-          New course · AI builder
-        </span>
-        <Annot ai style={{ marginLeft: 8 }}>
-          {hasOutline ? "Step 2 of 4" : "Step 1 of 4"}
-        </Annot>
-        <div style={{ flex: 1 }} />
-        <Btn variant="ghost" sm disabled>
-          Save draft
-        </Btn>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>New course</span>
+        <Annot style={{ marginLeft: 8 }}>Build it your way</Annot>
       </header>
 
       <div
         style={{
           flex: 1,
           overflow: "auto",
-          padding: "32px 28px",
+          padding: "40px 28px",
           background: "var(--wf-fillsoft)",
           display: "flex",
           justifyContent: "center",
         }}
       >
-        <div
-          style={{
-            width: 1080,
-            display: "grid",
-            gridTemplateColumns: "1fr 1.4fr",
-            gap: 24,
-          }}
-        >
-          {/* Left — prompt */}
-          <div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 16,
-              }}
-            >
-              <Icon name="sparkles" size={18} color="var(--wf-ai)" />
-              <h1 className="wf-h1" style={{ fontSize: 22 }}>
-                Describe your course
-              </h1>
-            </div>
-            <Card p={18} style={{ marginBottom: 14 }}>
-              <div
-                className="wf-mono"
-                style={{
-                  fontSize: 11,
-                  color: "var(--wf-mute)",
-                  letterSpacing: "0.04em",
-                  marginBottom: 6,
-                }}
-              >
-                PROMPT
-              </div>
-              <textarea
-                value={brief}
-                onChange={(e) => setBrief(e.target.value)}
-                rows={5}
-                disabled={isRunning}
-                style={{
-                  fontSize: 13,
-                  color: "var(--wf-ink)",
-                  lineHeight: 1.6,
-                  padding: 10,
-                  background: "var(--wf-fillsoft)",
-                  borderRadius: 3,
-                  border: "1px solid var(--wf-hairline)",
-                  width: "100%",
-                  outline: "none",
-                  resize: "vertical",
-                  fontFamily: "var(--font-sans-stack)",
-                }}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  marginTop: 10,
-                  flexWrap: "wrap",
-                }}
-              >
-                {[
-                  "+ Add lesson plan",
-                  "+ Reference textbook",
-                  "+ My standards",
-                ].map((c) => (
-                  <span key={c} className="wf-chip">
-                    {c}
-                  </span>
-                ))}
-              </div>
-            </Card>
-
-            <Card p={16} style={{ marginBottom: 14 }}>
-              <div
-                className="wf-mono"
-                style={{
-                  fontSize: 11,
-                  color: "var(--wf-mute)",
-                  marginBottom: 10,
-                  letterSpacing: "0.04em",
-                }}
-              >
-                SETTINGS
-              </div>
-              {SETTING_LABELS.map(({ key, label }, i, arr) => (
-                <div
-                  key={key}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "8px 0",
-                    borderBottom:
-                      i < arr.length - 1
-                        ? "1px solid var(--wf-hairline)"
-                        : "none",
-                    fontSize: 12,
-                  }}
-                >
-                  <span style={{ color: "var(--wf-mute)" }}>{label}</span>
-                  {editingSetting === key ? (
-                    <input
-                      autoFocus
-                      value={settings[key]}
-                      onChange={(e) =>
-                        setSettings((s) => ({ ...s, [key]: e.target.value }))
-                      }
-                      onBlur={() => setEditingSetting(null)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "Escape")
-                          setEditingSetting(null);
-                      }}
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 500,
-                        textAlign: "right",
-                        border: "1px solid var(--wf-line)",
-                        borderRadius: 3,
-                        padding: "2px 6px",
-                        outline: "none",
-                        background: "white",
-                        width: 220,
-                      }}
-                    />
-                  ) : (
-                    <button
-                      onClick={() => setEditingSetting(key)}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        fontSize: 12,
-                        fontWeight: 500,
-                        cursor: "pointer",
-                        textAlign: "right",
-                        padding: 0,
-                        color: "inherit",
-                      }}
-                    >
-                      {settings[key]}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </Card>
-
-            <Btn
-              variant="ai"
-              full
-              disabled={isRunning || brief.trim().length < 20}
-              icon={<Icon name="sparkles" size={14} color="var(--wf-ai)" />}
-              onClick={() => {
-                setErrorMsg(null);
-                setOutline(null);
-                setElapsedMs(null);
-                setJobId(null);
-                startOutlineJob.mutate({ brief, settings });
-              }}
-            >
-              {isRunning
-                ? "Generating outline…"
-                : hasOutline
-                ? "Regenerate outline"
-                : "Generate outline"}
-            </Btn>
-            {errorMsg && (
-              <div
-                style={{
-                  marginTop: 10,
-                  fontSize: 11,
-                  color: "var(--wf-accent)",
-                  padding: "6px 10px",
-                  border: "1px solid var(--wf-accent)",
-                  background: "var(--wf-accent-soft)",
-                  borderRadius: 4,
-                }}
-              >
-                {errorMsg}
-              </div>
-            )}
+        <div style={{ width: 560, maxWidth: "100%" }}>
+          <div style={{ marginBottom: 18 }}>
+            <h1 className="wf-h1" style={{ fontSize: 22, marginBottom: 4 }}>
+              Create a course
+            </h1>
+            <p style={{ fontSize: 13, color: "var(--wf-body)", lineHeight: 1.5 }}>
+              Start from a blank course and build your units and lessons by
+              hand. You can add an AI-generated draft any time from inside the
+              builder.
+            </p>
           </div>
 
-          {/* Right — preview */}
-          <div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                marginBottom: 16,
-                flexWrap: "wrap",
+          <Card p={22}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (canSubmit) submit();
               }}
             >
-              <h2 className="wf-h2" style={{ fontSize: 16 }}>
-                Generated outline
-              </h2>
-              <Annot ai>
-                Editable · click ✦ to regenerate any unit · click any value to edit
-              </Annot>
-              <div style={{ flex: 1 }} />
-              {elapsedMs !== null && (
-                <span
-                  className="wf-mono"
-                  style={{ fontSize: 11, color: "var(--wf-mute)" }}
-                >
-                  ● Generated in {(elapsedMs / 1000).toFixed(1)}s
-                </span>
-              )}
-            </div>
+              <div style={{ marginBottom: 16 }}>
+                <label htmlFor="course-title" style={LABEL}>
+                  Course title
+                </label>
+                <input
+                  id="course-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Foundations of Algebra"
+                  autoFocus
+                  style={{ ...FIELD, fontSize: 15, fontWeight: 600 }}
+                />
+              </div>
 
-            {/* Live job-status strip — shown whenever a job is in flight.
-                Lets the user watch the chunked generation progress
-                without staring at an opaque spinner for 90 seconds. */}
-            {isRunning && (
-              <Card
-                p={16}
+              <div
                 style={{
-                  marginBottom: 14,
-                  background: "var(--wf-ai-soft)",
-                  borderColor: "var(--wf-ai)",
+                  display: "grid",
+                  gridTemplateColumns: "1.6fr 1fr",
+                  gap: 12,
+                  marginBottom: 16,
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    marginBottom: 10,
-                  }}
-                >
-                  <Icon name="sparkles" size={14} color="var(--wf-ai)" />
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "var(--wf-ink)",
-                    }}
-                  >
-                    {stepText ?? "Working…"}
-                  </span>
-                  <div style={{ flex: 1 }} />
-                  <span
-                    className="wf-mono"
-                    style={{ fontSize: 11, color: "var(--wf-mute)" }}
-                  >
-                    {progressPct}%
-                  </span>
-                </div>
-                <div
-                  style={{
-                    height: 4,
-                    background: "var(--wf-hairline)",
-                    borderRadius: 2,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${progressPct}%`,
-                      background: "var(--wf-ai)",
-                      transition: "width 0.4s ease",
-                    }}
+                <div>
+                  <label htmlFor="course-subject" style={LABEL}>
+                    Subject
+                  </label>
+                  <input
+                    id="course-subject"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="e.g. Math"
+                    list="subject-suggestions"
+                    style={FIELD}
                   />
+                  <datalist id="subject-suggestions">
+                    {["Math", "Science", "English", "History", "Art", "Music", "Computer Science"].map(
+                      (s) => (
+                        <option key={s} value={s} />
+                      )
+                    )}
+                  </datalist>
                 </div>
-                <div
-                  style={{
-                    marginTop: 8,
-                    fontSize: 11,
-                    color: "var(--wf-mute)",
-                  }}
-                >
-                  Chunked across {jobQuery.data?.totalChunks ?? "…"} steps so
-                  each fits inside the function timeout. Safe to leave this
-                  tab open — the job continues even if you navigate away.
+                <div>
+                  <label htmlFor="course-grade" style={LABEL}>
+                    Grade
+                  </label>
+                  <select
+                    id="course-grade"
+                    value={grade}
+                    onChange={(e) => setGrade(e.target.value)}
+                    style={{ ...FIELD, cursor: "pointer" }}
+                  >
+                    {GRADES.map((g) => (
+                      <option key={g} value={g}>
+                        {g === "K" ? "Kindergarten" : `Grade ${g}`}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </Card>
-            )}
+              </div>
 
-            {isRunning && !hasOutline ? (
-              <Card p={32} style={{ textAlign: "center" }}>
-                <div
-                  className="wf-pulse"
-                  style={{
-                    fontSize: 13,
-                    color: "var(--wf-mute)",
-                  }}
-                >
-                  Drafting your course outline…
-                </div>
-              </Card>
-            ) : !hasOutline ? (
-              <Card p={32} style={{ textAlign: "center" }}>
-                <Icon name="sparkles" size={24} color="var(--wf-ai)" />
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    marginBottom: 4,
-                  }}
-                >
-                  Describe your course, then hit Generate.
-                </div>
-                <div style={{ fontSize: 12, color: "var(--wf-mute)" }}>
-                  We&apos;ll suggest 4–6 units with a real-world capstone.
-                </div>
-              </Card>
-            ) : (
-              <Card p={20}>
-                <div
-                  className="wf-mono"
-                  style={{
-                    fontSize: 10,
-                    color: "var(--wf-mute)",
-                    letterSpacing: "0.04em",
-                    marginBottom: 4,
-                  }}
-                >
-                  COURSE NAME · EDIT BEFORE SAVING
-                </div>
+              <div style={{ marginBottom: 16 }}>
+                <label htmlFor="course-tagline" style={LABEL}>
+                  Tagline <span style={{ fontWeight: 400 }}>(optional)</span>
+                </label>
                 <input
-                  className="wf-serif"
-                  value={outline!.title}
-                  onChange={(e) =>
-                    setOutline((p) =>
-                      p ? { ...p, title: e.target.value } : p
-                    )
-                  }
-                  aria-label="Course title"
-                  placeholder="Course title"
-                  style={{
-                    width: "100%",
-                    fontSize: 19,
-                    fontWeight: 700,
-                    marginBottom: 6,
-                    color: "var(--wf-ink)",
-                    border: "1px solid var(--wf-hairline)",
-                    borderRadius: 3,
-                    padding: "6px 8px",
-                    background: "white",
-                    outline: "none",
-                  }}
+                  id="course-tagline"
+                  value={tagline}
+                  onChange={(e) => setTagline(e.target.value)}
+                  placeholder="One line students see on the course card"
+                  style={FIELD}
                 />
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label htmlFor="course-price" style={LABEL}>
+                  Price (USD) <span style={{ fontWeight: 400 }}>— leave 0 for free</span>
+                </label>
                 <input
-                  value={outline!.tagline}
-                  onChange={(e) =>
-                    setOutline((p) =>
-                      p ? { ...p, tagline: e.target.value } : p
-                    )
-                  }
-                  aria-label="Course tagline"
-                  placeholder="One-line tagline"
-                  style={{
-                    width: "100%",
-                    fontSize: 12,
-                    color: "var(--wf-body)",
-                    marginBottom: 8,
-                    fontStyle: "italic",
-                    border: "1px solid var(--wf-hairline)",
-                    borderRadius: 3,
-                    padding: "5px 8px",
-                    background: "white",
-                    outline: "none",
-                  }}
+                  id="course-price"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  inputMode="decimal"
+                  value={priceUsd}
+                  onChange={(e) => setPriceUsd(e.target.value)}
+                  style={{ ...FIELD, width: 140 }}
                 />
+              </div>
+
+              {errorMsg && (
                 <div
                   style={{
+                    marginBottom: 14,
                     fontSize: 12,
-                    color: "var(--wf-body)",
-                    marginBottom: 16,
-                    lineHeight: 1.5,
+                    color: "var(--wf-accent)",
+                    padding: "8px 11px",
+                    border: "1px solid var(--wf-accent)",
+                    background: "var(--wf-accent-soft)",
+                    borderRadius: 4,
                   }}
                 >
-                  {outline!.description}
+                  {errorMsg}
                 </div>
+              )}
 
-                {outline!.units.map((u, i, arr) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 12,
-                      padding: "12px 0",
-                      borderBottom:
-                        i < arr.length - 1
-                          ? "1px solid var(--wf-hairline)"
-                          : "none",
-                      opacity: regenIdx === i ? 0.5 : 1,
-                      transition: "opacity 0.2s",
-                    }}
-                  >
-                    <Icon
-                      name="drag"
-                      size={14}
-                      color="var(--wf-mute)"
-                      style={{ marginTop: 2 }}
-                    />
-                    <span
-                      className="wf-mono"
-                      style={{
-                        fontSize: 11,
-                        color: "var(--wf-mute)",
-                        marginTop: 2,
-                        width: 50,
-                      }}
-                    >
-                      {u.shortLabel}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 600,
-                          marginBottom: 3,
-                        }}
-                      >
-                        {u.title}
-                      </div>
-                      <div
-                        style={{ fontSize: 12, color: "var(--wf-body)" }}
-                      >
-                        {u.subtitle}
-                      </div>
-                      <div
-                        className="wf-mono"
-                        style={{
-                          fontSize: 10,
-                          color: "var(--wf-mute)",
-                          marginTop: 4,
-                        }}
-                      >
-                        {u.lessons.length} lessons · {u.durationLabel}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <button
-                        onClick={() =>
-                          regenerateUnit.mutate({
-                            brief,
-                            settings,
-                            outline: outline!,
-                            unitIndex: i,
-                          })
-                        }
-                        disabled={regenerateUnit.isPending}
-                        aria-label="Regenerate"
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          cursor: regenerateUnit.isPending
-                            ? "wait"
-                            : "pointer",
-                          padding: 4,
-                        }}
-                      >
-                        <Icon
-                          name="sparkles"
-                          size={14}
-                          color="var(--wf-ai)"
-                        />
-                      </button>
-                      <button
-                        aria-label="Settings"
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                          padding: 4,
-                        }}
-                      >
-                        <Icon name="cog" size={14} color="var(--wf-mute)" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                <div
-                  style={{
-                    borderTop: "1px solid var(--wf-hairline)",
-                    marginTop: 14,
-                    paddingTop: 14,
-                    display: "flex",
-                    gap: 8,
-                  }}
-                >
-                  <Btn
-                    variant="ghost"
-                    sm
-                    icon={<Icon name="plus" size={11} />}
-                  >
-                    Add unit
-                  </Btn>
-                  <div style={{ flex: 1 }} />
-                  <Btn
-                    variant="primary"
-                    sm
-                    disabled={saveAsCourse.isPending}
-                    onClick={() =>
-                      saveAsCourse.mutate({
-                        outline: outline!,
-                        settings,
-                        brief,
-                      })
-                    }
-                  >
-                    {saveAsCourse.isPending
-                      ? "Creating course…"
-                      : "Save & open editor →"}
-                  </Btn>
-                </div>
-              </Card>
-            )}
-
-            {hasOutline && (
-              <Card
-                p={14}
-                style={{
-                  marginTop: 14,
-                  background: "var(--wf-ai-soft)",
-                  borderColor: "var(--wf-ai)",
-                }}
+              <Btn
+                variant="primary"
+                full
+                type="submit"
+                disabled={!canSubmit}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <Icon name="sparkles" size={14} color="var(--wf-ai)" />
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--wf-body)",
-                      flex: 1,
-                    }}
-                  >
-                    <b style={{ color: "var(--wf-ai)" }}>Heads up:</b>{" "}
-                    Saving creates this as a DRAFT course owned by you.
-                    You can keep editing in the course builder before
-                    publishing.
-                  </div>
+                {createCourse.isPending
+                  ? "Creating course…"
+                  : "Create course & open builder →"}
+              </Btn>
+            </form>
+          </Card>
+
+          {/* Secondary: AI generation */}
+          <Card
+            p={16}
+            style={{
+              marginTop: 16,
+              background: "var(--wf-ai-soft)",
+              borderColor: "var(--wf-ai)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Icon name="sparkles" size={18} color="var(--wf-ai)" />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--wf-ink)" }}>
+                  In a hurry? Generate with AI
                 </div>
-              </Card>
-            )}
-          </div>
+                <div style={{ fontSize: 12, color: "var(--wf-body)", marginTop: 2 }}>
+                  Describe what you want to teach and get a full unit outline to
+                  edit.
+                </div>
+              </div>
+              <Link href="/teacher/courses/new/ai" style={{ textDecoration: "none" }}>
+                <Btn
+                  variant="ai"
+                  sm
+                  icon={<Icon name="sparkles" size={13} color="var(--wf-ai)" />}
+                >
+                  Use AI builder
+                </Btn>
+              </Link>
+            </div>
+          </Card>
         </div>
       </div>
     </TeacherChrome>

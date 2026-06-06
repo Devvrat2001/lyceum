@@ -21,6 +21,18 @@ import {
   type MuxState,
 } from "@/lib/video/mux";
 
+/**
+ * URL-safe slug from a title. Same rules as the generator's slugify so
+ * manually-created and AI-created courses get identical slug shapes.
+ */
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
 export const teacherRouter = router({
   /** Anyone can check follow state of a teacher (signed-in only). */
   followState: protectedProcedure
@@ -1196,6 +1208,75 @@ export const teacherRouter = router({
     }),
 
   /**
+   * Create a brand-new, EMPTY course owned by the caller and return its
+   * slug so the client can redirect into the builder. This is the
+   * manual ("blank canvas") counterpart to `generator.saveAsCourse`:
+   * same course defaults + unique-slug logic, but no AI, no units —
+   * the teacher builds the outline by hand. `subject`/`grade` are
+   * normalized to the same compact tokens the marketplace filters on
+   * (e.g. "Math · Algebra" → "math", "Grade 6" → "6").
+   */
+  createCourse: teacherProcedure
+    .input(
+      z.object({
+        title: z.string().min(3).max(120),
+        subject: z.string().min(1).max(60),
+        grade: z.string().min(1).max(40),
+        tagline: z.string().max(160).optional(),
+        priceCents: z.number().int().min(0).max(100_000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const title = input.title.trim();
+      const baseSlug = slugify(title) || "course";
+      let slug = baseSlug;
+      let n = 1;
+      while (
+        await ctx.db.course.findUnique({
+          where: { slug },
+          select: { id: true },
+        })
+      ) {
+        n += 1;
+        slug = `${baseSlug}-${n}`;
+      }
+      // Normalize to the same compact tokens the AI path stores so
+      // marketplace subject/grade filters match either creation route.
+      // Grade keeps a single leading letter for "K"; otherwise digits.
+      const subject =
+        input.subject.trim().toLowerCase().split(/\s|·/)[0] || "general";
+      const gradeDigits = input.grade.replace(/[^0-9]/g, "");
+      const grade =
+        gradeDigits ||
+        (/^k/i.test(input.grade.trim()) ? "K" : input.grade.trim()) ||
+        "6";
+      const created = await ctx.db.course.create({
+        data: {
+          slug,
+          title,
+          tagline: input.tagline?.trim() || null,
+          description: "",
+          authorId: ctx.user.id,
+          authorLabel: ctx.session.user.name ?? "Teacher",
+          subject,
+          grade,
+          status: "DRAFT",
+          priceCents: input.priceCents ?? 0,
+          ratingAvg: 0,
+          ratingCount: 0,
+          enrollCount: 0,
+          learnOutcomes: [],
+        },
+        select: { id: true, slug: true },
+      });
+      return {
+        ok: true as const,
+        courseId: created.id,
+        slug: created.slug,
+      };
+    }),
+
+  /**
    * Append a new unit to a course. Used by the builder's outline rail
    * "+ Add unit". order = (max existing unit order) + 1 so it lands at
    * the bottom. Title defaults to "Unit N" when not supplied — the
@@ -1235,6 +1316,92 @@ export const teacherRouter = router({
         select: { id: true, order: true, title: true, estLabel: true },
       });
       return { ok: true as const, unit };
+    }),
+
+  /**
+   * Rename a unit (and/or set its subtitle). Manually-created units
+   * start life as "Unit N"; this is how the teacher gives them a real
+   * name from the outline rail. Partial — only provided fields change;
+   * an empty title is rejected so a unit never becomes nameless.
+   */
+  updateUnit: teacherProcedure
+    .input(
+      z.object({
+        unitId: z.string(),
+        title: z.string().max(120).optional(),
+        subtitle: z.string().max(200).nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const unit = await ctx.db.unit.findUnique({
+        where: { id: input.unitId },
+        select: { id: true, course: { select: { authorId: true } } },
+      });
+      if (!unit) throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "ADMIN" && unit.course.authorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const data: Prisma.UnitUpdateInput = {};
+      if (input.title !== undefined) {
+        const title = input.title.trim();
+        if (title.length === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Unit title can't be empty.",
+          });
+        }
+        data.title = title;
+      }
+      if (input.subtitle !== undefined) {
+        data.subtitle = input.subtitle?.trim() || null;
+      }
+      if (Object.keys(data).length === 0) {
+        return { ok: true as const, changed: false };
+      }
+      const updated = await ctx.db.unit.update({
+        where: { id: unit.id },
+        data,
+        select: { id: true, order: true, title: true, subtitle: true, estLabel: true },
+      });
+      return { ok: true as const, changed: true, unit: updated };
+    }),
+
+  /**
+   * Delete a unit and everything under it. The FK cascade
+   * (Unit → Lesson → Block/Attempt/…) drops the children, then we
+   * renumber the surviving units to a contiguous 1..N so the outline
+   * rail's "Unit N" labels stay tidy and the next `addUnit` doesn't
+   * collide. Destructive — the client confirms first.
+   */
+  deleteUnit: teacherProcedure
+    .input(z.object({ unitId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const unit = await ctx.db.unit.findUnique({
+        where: { id: input.unitId },
+        select: {
+          id: true,
+          courseId: true,
+          course: { select: { authorId: true } },
+        },
+      });
+      if (!unit) throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "ADMIN" && unit.course.authorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      await ctx.db.$transaction(async (tx) => {
+        await tx.unit.delete({ where: { id: unit.id } });
+        const rest = await tx.unit.findMany({
+          where: { courseId: unit.courseId },
+          orderBy: { order: "asc" },
+          select: { id: true },
+        });
+        await Promise.all(
+          rest.map((u, i) =>
+            tx.unit.update({ where: { id: u.id }, data: { order: i + 1 } })
+          )
+        );
+      });
+      return { ok: true as const, unitId: unit.id };
     }),
 
   /**
@@ -1347,6 +1514,46 @@ export const teacherRouter = router({
         select: { id: true, title: true, durationMin: true, slug: true },
       });
       return { ok: true as const, changed: true, lesson: updated };
+    }),
+
+  /**
+   * Delete a lesson and its blocks (FK cascade), then renumber the
+   * surviving lessons in the unit to a contiguous 1..N. Destructive —
+   * the client confirms first. The slug isn't reused, so old reader
+   * links to a deleted lesson simply 404 (correct).
+   */
+  deleteLesson: teacherProcedure
+    .input(z.object({ lessonId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const lesson = await ctx.db.lesson.findUnique({
+        where: { id: input.lessonId },
+        select: {
+          id: true,
+          unitId: true,
+          unit: { select: { course: { select: { authorId: true } } } },
+        },
+      });
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      await ctx.db.$transaction(async (tx) => {
+        await tx.lesson.delete({ where: { id: lesson.id } });
+        const rest = await tx.lesson.findMany({
+          where: { unitId: lesson.unitId },
+          orderBy: { order: "asc" },
+          select: { id: true },
+        });
+        await Promise.all(
+          rest.map((l, i) =>
+            tx.lesson.update({ where: { id: l.id }, data: { order: i + 1 } })
+          )
+        );
+      });
+      return { ok: true as const, lessonId: lesson.id };
     }),
 
   /**

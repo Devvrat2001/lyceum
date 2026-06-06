@@ -95,18 +95,16 @@ export default async function TeacherCoursesPage() {
                 marginBottom: 16,
               }}
             >
-              Build your first course with the AI builder — describe what
-              you want to teach and get a full unit outline in seconds.
+              Start from a blank canvas and build your units your way — or
+              generate a draft with AI. You&apos;re in control either way.
             </div>
             <Link
               href="/teacher/courses/new"
               style={{ textDecoration: "none" }}
             >
               <Btn
-                variant="ai"
-                icon={
-                  <Icon name="sparkles" size={14} color="var(--wf-ai)" />
-                }
+                variant="primary"
+                icon={<Icon name="plus" size={14} color="white" />}
               >
                 Create your first course
               </Btn>
