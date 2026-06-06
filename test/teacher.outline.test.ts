@@ -325,3 +325,80 @@ describe("teacher.reorderLessons", () => {
     expect(rows.map((r) => r.order)).toEqual([1, 2, 3]);
   });
 });
+
+describe("teacher.duplicateLesson", () => {
+  it("clones the lesson + all its blocks (as new rows) right after it", async () => {
+    const t = await createTestUser({ role: "TEACHER" });
+    const { units } = await courseWithUnits(t.id, 1);
+    const unit = units[0];
+    const original = unit.lesson; // order 1, 1 READING block from the fixture
+    await db.block.create({
+      data: { lessonId: original.id, order: 2, type: "MCQ", settings: { stem: "Q" } },
+    });
+
+    const res = await t.caller.teacher.duplicateLesson({ lessonId: original.id });
+    expect(res.lesson.title).toBe("Lesson 1 (copy)");
+    expect(res.lesson.id).not.toBe(original.id);
+    expect(res.lesson.slug).not.toBe(original.slug);
+    expect(res.lesson.blocks).toHaveLength(2);
+
+    // The copy sits right after the original.
+    const rows = await db.lesson.findMany({
+      where: { unitId: unit.id },
+      orderBy: { order: "asc" },
+      select: { id: true, order: true },
+    });
+    expect(rows.map((r) => r.id)).toEqual([original.id, res.lesson.id]);
+    expect(rows.map((r) => r.order)).toEqual([1, 2]);
+
+    // Cloned blocks are fresh rows, not shared with the original.
+    const origBlockIds = new Set(
+      (
+        await db.block.findMany({
+          where: { lessonId: original.id },
+          select: { id: true },
+        })
+      ).map((b) => b.id)
+    );
+    const copyBlocks = await db.block.findMany({
+      where: { lessonId: res.lesson.id },
+      select: { id: true },
+    });
+    expect(copyBlocks).toHaveLength(2);
+    expect(copyBlocks.every((b) => !origBlockIds.has(b.id))).toBe(true);
+  });
+
+  it("shifts later lessons so the copy lands immediately after the source", async () => {
+    const t = await createTestUser({ role: "TEACHER" });
+    const { units } = await courseWithUnits(t.id, 1);
+    const unit = units[0];
+    const l1 = unit.lesson; // order 1
+    const l2 = await db.lesson.create({
+      data: {
+        unitId: unit.id,
+        slug: `test-lesson-${crypto.randomUUID()}`,
+        title: "L2",
+        order: 2,
+      },
+    });
+
+    const res = await t.caller.teacher.duplicateLesson({ lessonId: l1.id });
+
+    const rows = await db.lesson.findMany({
+      where: { unitId: unit.id },
+      orderBy: { order: "asc" },
+      select: { id: true, order: true },
+    });
+    expect(rows.map((r) => r.id)).toEqual([l1.id, res.lesson.id, l2.id]);
+    expect(rows.map((r) => r.order)).toEqual([1, 2, 3]);
+  });
+
+  it("rejects duplicating another teacher's lesson (FORBIDDEN)", async () => {
+    const owner = await createTestUser({ role: "TEACHER" });
+    const intruder = await createTestUser({ role: "TEACHER" });
+    const { units } = await courseWithUnits(owner.id, 1);
+    await expect(
+      intruder.caller.teacher.duplicateLesson({ lessonId: units[0].lesson.id })
+    ).rejects.toThrow(/FORBIDDEN/);
+  });
+});

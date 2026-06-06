@@ -203,6 +203,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       setUnits(course.units);
     },
   });
+  const duplicateLesson = trpc.teacher.duplicateLesson.useMutation();
   const addBlock = trpc.teacher.addBlock.useMutation();
   const updateBlockM = trpc.teacher.updateBlock.useMutation();
   const deleteBlock = trpc.teacher.deleteBlock.useMutation();
@@ -611,6 +612,38 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     markSaved();
   };
 
+  // Clone a lesson (+ its blocks) and drop the copy right after the
+  // original. The server returns the new lesson with cloned blocks; we
+  // splice it into local state and select it.
+  const duplicateLessonH = async (unitId: string, lessonId: string) => {
+    setErr(null);
+    try {
+      const { lesson } = await duplicateLesson.mutateAsync({ lessonId });
+      const newLesson: Lesson = {
+        id: lesson.id,
+        slug: lesson.slug,
+        title: lesson.title,
+        durationMin: lesson.durationMin,
+        blocks: lesson.blocks.map(toBlock),
+      };
+      setUnits((prev) =>
+        prev.map((u) => {
+          if (u.id !== unitId) return u;
+          const idx = u.lessons.findIndex((l) => l.id === lessonId);
+          const lessons = [...u.lessons];
+          lessons.splice(idx < 0 ? lessons.length : idx + 1, 0, newLesson);
+          return { ...u, lessons };
+        })
+      );
+      selectLesson(newLesson.id);
+      markSaved();
+    } catch (e) {
+      setErr(
+        `Failed to duplicate lesson: ${e instanceof Error ? e.message : ""}`
+      );
+    }
+  };
+
   const renameLessonH = (lessonId: string, title: string) => {
     setUnits((prev) =>
       prev.map((u) => ({
@@ -698,6 +731,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
           onUpdateUnit={updateUnitH}
           onDeleteUnit={deleteUnitH}
           onDeleteLesson={deleteLessonH}
+          onDuplicateLesson={duplicateLessonH}
           onReorderUnits={reorderUnitsH}
           onReorderLessons={reorderLessonsH}
           sensors={sensors}
@@ -1005,11 +1039,13 @@ function SortableLessonRow({
   lesson,
   active,
   onSelect,
+  onDuplicate,
   onDelete,
 }: {
   lesson: Lesson;
   active: boolean;
   onSelect: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -1079,6 +1115,7 @@ function SortableLessonRow({
           {lesson.blocks.length}
         </span>
       </button>
+      <RailAction label="Duplicate lesson" glyph="⧉" onClick={onDuplicate} />
       <RailAction label="Delete lesson" glyph="✕" danger onClick={onDelete} />
     </div>
   );
@@ -1097,6 +1134,7 @@ function SortableUnitRow({
   onUpdateUnit,
   onDeleteUnit,
   onDeleteLesson,
+  onDuplicateLesson,
   onReorderLessons,
   adding,
 }: {
@@ -1113,6 +1151,7 @@ function SortableUnitRow({
   ) => void;
   onDeleteUnit: (unitId: string) => void;
   onDeleteLesson: (unitId: string, lessonId: string) => void;
+  onDuplicateLesson: (unitId: string, lessonId: string) => void;
   onReorderLessons: (unitId: string, orderedIds: string[]) => void;
   adding: boolean;
 }) {
@@ -1333,6 +1372,7 @@ function SortableUnitRow({
                   lesson={l}
                   active={l.id === selectedLessonId}
                   onSelect={() => onSelectLesson(l.id)}
+                  onDuplicate={() => onDuplicateLesson(unit.id, l.id)}
                   onDelete={() => {
                     if (
                       window.confirm(
@@ -1385,6 +1425,7 @@ function OutlineRail({
   onUpdateUnit,
   onDeleteUnit,
   onDeleteLesson,
+  onDuplicateLesson,
   onReorderUnits,
   onReorderLessons,
   sensors,
@@ -1406,6 +1447,7 @@ function OutlineRail({
   ) => void;
   onDeleteUnit: (unitId: string) => void;
   onDeleteLesson: (unitId: string, lessonId: string) => void;
+  onDuplicateLesson: (unitId: string, lessonId: string) => void;
   onReorderUnits: (orderedIds: string[]) => void;
   onReorderLessons: (unitId: string, orderedIds: string[]) => void;
   sensors: ReturnType<typeof useSensors>;
@@ -1498,6 +1540,7 @@ function OutlineRail({
                 onUpdateUnit={onUpdateUnit}
                 onDeleteUnit={onDeleteUnit}
                 onDeleteLesson={onDeleteLesson}
+                onDuplicateLesson={onDuplicateLesson}
                 onReorderLessons={onReorderLessons}
                 adding={adding}
               />

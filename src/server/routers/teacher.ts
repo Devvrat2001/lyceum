@@ -1557,6 +1557,96 @@ export const teacherRouter = router({
     }),
 
   /**
+   * Duplicate a lesson — clone its content + every block and drop the
+   * copy right after the original in the same unit. Used by the builder's
+   * outline-rail "duplicate" action; a teacher building by hand often
+   * wants a near-identical lesson as a starting point. Blocks are cloned
+   * verbatim (type + settings + order); a cloned VIDEO keeps the same Mux
+   * playbackId, which plays fine — re-upload to swap it. The copy gets a
+   * fresh unique slug and `isPreview: false`.
+   */
+  duplicateLesson: teacherProcedure
+    .input(z.object({ lessonId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const lesson = await ctx.db.lesson.findUnique({
+        where: { id: input.lessonId },
+        select: {
+          id: true,
+          unitId: true,
+          order: true,
+          title: true,
+          durationMin: true,
+          intro: true,
+          unit: {
+            select: {
+              order: true,
+              course: { select: { slug: true, authorId: true } },
+            },
+          },
+          blocks: {
+            select: { type: true, settings: true, order: true },
+            orderBy: { order: "asc" },
+          },
+        },
+      });
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      if (
+        ctx.user.role !== "ADMIN" &&
+        lesson.unit.course.authorId !== ctx.user.id
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const newOrder = lesson.order + 1;
+      const base = `${lesson.unit.course.slug}-u${lesson.unit.order}-l${newOrder}`;
+      const taken = await ctx.db.lesson.findUnique({
+        where: { slug: base },
+        select: { id: true },
+      });
+      const slug = taken
+        ? `${base}-${crypto.randomUUID().slice(0, 5)}`
+        : base;
+
+      const created = await ctx.db.$transaction(async (tx) => {
+        // Make room: bump every later lesson's order up by one so the
+        // copy lands immediately after the original.
+        await tx.lesson.updateMany({
+          where: { unitId: lesson.unitId, order: { gte: newOrder } },
+          data: { order: { increment: 1 } },
+        });
+        return tx.lesson.create({
+          data: {
+            unitId: lesson.unitId,
+            order: newOrder,
+            title: `${lesson.title} (copy)`,
+            slug,
+            durationMin: lesson.durationMin,
+            intro: lesson.intro,
+            isPreview: false,
+            blocks: {
+              create: lesson.blocks.map((b) => ({
+                type: b.type,
+                settings: (b.settings ?? {}) as Prisma.InputJsonValue,
+                order: b.order,
+              })),
+            },
+          },
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            durationMin: true,
+            blocks: {
+              select: { id: true, type: true, order: true, settings: true },
+              orderBy: { order: "asc" },
+            },
+          },
+        });
+      });
+      return { ok: true as const, lesson: created };
+    }),
+
+  /**
    * Persist a new block ordering within a single lesson. Same shape
    * as reorderUnits/reorderLessons — rewrites Block.order to 1..N
    * inside a $transaction. Rejects partial reorders (caller must
