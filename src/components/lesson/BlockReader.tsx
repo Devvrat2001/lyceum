@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LessonVideoPlayer } from "@/components/video/LessonVideoPlayer";
 import {
   DndContext,
@@ -1684,11 +1684,11 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
     );
   }, []);
 
-  const recognitionRef = useMemo(() => {
-    // useRef would be more conventional but useMemo with stable deps
-    // gives the same single-instance semantic without an extra import.
-    return { current: null as SpeechRecognitionLike | null };
-  }, []);
+  // A real ref: `.current` is mutable by contract, so assigning the live
+  // SpeechRecognition instance to it (in startListening) is allowed under
+  // the React Compiler. A useMemo-created object would trip
+  // react-hooks/immutability — that was KNOWN_ISSUES S1-3.
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   // Cleanup any in-flight TTS / STT when the component unmounts.
   useEffect(() => {

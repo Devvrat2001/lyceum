@@ -14,7 +14,7 @@
 
 The codebase is clean on the usual rot metrics:
 
-- **ESLint: 8 problems total** across all of `src` (5 errors, 3 warnings) — all catalogued below. *(was 9; on 2026-06-06 the AI-generator page moved to `new/ai/` and the video player was extracted out of BlockReader, shifting its lines ~−248 — line refs below updated.)*
+- **ESLint: 7 problems total** across all of `src` (4 errors, 3 warnings) — all catalogued below. *(2026-06-06: down from 9 — **S1-3 resolved** (−1 error); also the AI-generator page moved to `new/ai/` and the video player was extracted out of BlockReader, shifting its lines ~−248 — refs below updated.)*
 - **0** `@ts-ignore` / `@ts-expect-error` in `src`.
 - **2** TODO/FIXME (both the same Email-magic-link note in `auth.ts`).
 - **0** truly-empty `catch {}` (the bindless `catch {` blocks all have bodies).
@@ -40,11 +40,10 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **⚠️ Why NOT `OutlineSchema.safeParse` (the original recommendation):** that would have **broken generation**. The partial deliberately holds ~110-char placeholder readings between chunks (below `readingContent.min(120)`) and the skeleton's unit/lesson counts aren't bound by `OutlineSchema`'s `min(3)` authoring rules — so the strict schema rejects every valid in-flight blob. The fix uses a **lenient structural schema** (shape only) and returns the *original* object so accumulated `lessons[].blocks` survive.
 - **Discovered while fixing → see S3-5:** that placeholder is 110 chars, not ≥120 as its comment claims.
 
-### S1-3 · Ref mutation flagged by React Compiler (SPEAK block)
-- **Where:** `src/components/lesson/BlockReader.tsx:1758` — `recognitionRef.current = r` (`react-hooks/immutability`, **error**).
-- **Risk:** React Compiler treats mutating a ref that was passed to a hook as illegal. Today it's "just a lint error"; under the compiler's memoization it can mis-optimize the SpeechRecognition setup so the SPEAK block's mic handler binds stale state or stops firing. This is the one lint error that is also a latent *runtime* bug.
-- **Fix:** Assign the recognition instance before the hook boundary, or move the SpeechRecognition lifecycle into a dedicated effect that owns the ref.
-- **Effort:** ~30–45 min (careful — risky file).
+### S1-3 · Ref mutation flagged by React Compiler (SPEAK block) — ✅ RESOLVED 2026-06-06
+- **Where:** `src/components/lesson/BlockReader.tsx` SPEAK block — was `recognitionRef.current = r` where `recognitionRef` came from `useMemo(() => ({ current: null }))`.
+- **Fix shipped:** switched `recognitionRef` to a real **`useRef`** — `.current` is mutable by contract, so the assignment is allowed under the React Compiler (a `useMemo` value is treated as immutable, which is what tripped `react-hooks/immutability`). One-line change + the `useRef` import; the error is gone (BlockReader 5→4 lint problems). No behavior change — the ref was already a stable single instance. The original code comment had even flagged `useRef` as "more conventional."
+- **Note:** with S1-2 + S1-3 done, the only remaining **S1 is S1-1** (the prod `NODE_TLS_REJECT_UNAUTHORIZED` Vercel var) — operational, not a code fix.
 
 ---
 
