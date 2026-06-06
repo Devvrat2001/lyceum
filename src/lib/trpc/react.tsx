@@ -11,6 +11,10 @@ export const trpc = createTRPCReact<AppRouter>();
 
 function getBaseUrl() {
   if (typeof window !== "undefined") return ""; // browser uses relative
+  // Read `process.env.PORT` directly (not via lib/env): this is a client
+  // module ("use client"), and lib/env eagerly validates the whole server
+  // env at import and throws on a miss — pulling it into the client bundle
+  // would be wrong. PORT is only consulted here in the SSR branch above.
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 

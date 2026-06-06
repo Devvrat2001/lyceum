@@ -10,6 +10,7 @@ import {
   TUTOR_SYSTEM_PROMPT,
   buildLessonContextBlock,
 } from "@/lib/ai/prompts/tutor";
+import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { checkAIQuotaSoft } from "@/lib/rateLimit";
 import { findCitation } from "@/lib/ai/citations";
@@ -237,7 +238,7 @@ export async function POST(req: Request) {
             citationMatched: !!hit,
             citationPage: hit?.page ?? null,
             citationScore: hit?.score ?? null,
-            mode: process.env.ANTHROPIC_API_KEY ? "claude" : "demo",
+            mode: env.ANTHROPIC_API_KEY ? "claude" : "demo",
             // Audit records that a chat happened (for rate-limit + the
             // FERPA "tutor usage" trail) even when content wasn't stored.
             tutorLoggingOptOut: !logTutor,
