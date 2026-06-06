@@ -2,6 +2,7 @@
 import {
   enqueueAttempt,
   flushAttempts,
+  type AttemptInput,
   type OfflineAttemptStore,
   type QueuedAttempt,
 } from "./attemptQueue";
@@ -71,10 +72,7 @@ export function getAttemptStore(): OfflineAttemptStore {
 }
 
 /** Queue an attempt for later replay (no-op on the server). */
-export function queueAttempt(input: {
-  blockId: string;
-  chosenIndex: number;
-}): Promise<QueuedAttempt> {
+export function queueAttempt(input: AttemptInput): Promise<QueuedAttempt> {
   return enqueueAttempt(getAttemptStore(), input);
 }
 
@@ -94,6 +92,9 @@ export function flushQueuedAttempts(): Promise<{
       body: JSON.stringify({
         blockId: item.blockId,
         chosenIndex: item.chosenIndex,
+        subIndex: item.subIndex,
+        hintsUsed: item.hintsUsed,
+        timeMs: item.timeMs,
       }),
     });
     if (!res.ok) throw new Error(`replay failed: ${res.status}`);

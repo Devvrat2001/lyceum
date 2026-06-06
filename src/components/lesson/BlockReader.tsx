@@ -2992,6 +2992,7 @@ function QuizQuestionCard({
   const [showHint, setShowHint] = useState(false);
   const [feedback, setFeedback] = useState<QuizCardFeedback | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [offlineSaved, setOfflineSaved] = useState(false);
 
   const attempt = trpc.lesson.attemptBlock.useMutation({
     onSuccess: (res) => {
@@ -3011,7 +3012,7 @@ function QuizQuestionCard({
   // lettered `key` (A/B/C/D) used for display. Server is authoritative
   // for correctness once the response arrives; before that we don't
   // colour anything.
-  const checked = feedback !== null;
+  const checked = feedback !== null || offlineSaved;
   const pending = attempt.isPending;
   const correctKey =
     feedback !== null
@@ -3025,6 +3026,16 @@ function QuizQuestionCard({
   const onCheck = () => {
     if (selected === null || chosenIndex < 0 || pending) return;
     setSubmitError(null);
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setOfflineSaved(true);
+      void queueAttempt({
+        blockId,
+        subIndex,
+        chosenIndex,
+        hintsUsed: showHint ? 1 : 0,
+      });
+      return;
+    }
     attempt.mutate({
       blockId,
       subIndex,
@@ -3038,6 +3049,7 @@ function QuizQuestionCard({
     setFeedback(null);
     setShowHint(false);
     setSubmitError(null);
+    setOfflineSaved(false);
   };
 
   return (
@@ -3232,6 +3244,11 @@ function QuizQuestionCard({
             }}
           >
             🔥 {feedback.streak.milestone}-day streak!
+          </span>
+        )}
+        {offlineSaved && (
+          <span style={{ fontSize: 11, color: "var(--wf-mute)", fontWeight: 600 }}>
+            ✓ Saved offline — syncs when you reconnect
           </span>
         )}
       </div>

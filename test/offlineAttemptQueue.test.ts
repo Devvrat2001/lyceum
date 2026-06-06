@@ -36,6 +36,18 @@ describe("enqueueAttempt", () => {
     expect(item.queuedAt).toBeGreaterThan(0);
     expect(store.size()).toBe(1);
   });
+
+  it("carries the full attemptBlock input (subIndex / hints) for quiz decks", async () => {
+    const store = memStore();
+    const item = await enqueueAttempt(store, {
+      blockId: "deck",
+      chosenIndex: 1,
+      subIndex: 3,
+      hintsUsed: 1,
+    });
+    expect(item.subIndex).toBe(3);
+    expect(item.hintsUsed).toBe(1);
+  });
 });
 
 describe("flushAttempts", () => {

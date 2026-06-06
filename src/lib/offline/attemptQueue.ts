@@ -10,10 +10,21 @@
  * which is harmless (idempotency by content isn't worth the complexity here).
  */
 
-export type QueuedAttempt = {
-  id: string;
+/**
+ * The full `lesson.attemptBlock` input. Mirrors the router's Zod schema so the
+ * queue is not MCQ-locked — QUIZ / AI_QUIZ decks carry `subIndex`, and hints /
+ * timing ride along when present.
+ */
+export type AttemptInput = {
   blockId: string;
   chosenIndex: number;
+  subIndex?: number;
+  hintsUsed?: number;
+  timeMs?: number;
+};
+
+export type QueuedAttempt = AttemptInput & {
+  id: string;
   queuedAt: number;
 };
 
@@ -27,12 +38,11 @@ export interface OfflineAttemptStore {
 /** Queue one attempt for later replay. Returns the stored item. */
 export async function enqueueAttempt(
   store: OfflineAttemptStore,
-  input: { blockId: string; chosenIndex: number }
+  input: AttemptInput
 ): Promise<QueuedAttempt> {
   const item: QueuedAttempt = {
+    ...input,
     id: crypto.randomUUID(),
-    blockId: input.blockId,
-    chosenIndex: input.chosenIndex,
     queuedAt: Date.now(),
   };
   await store.put(item);

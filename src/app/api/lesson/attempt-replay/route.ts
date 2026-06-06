@@ -5,9 +5,13 @@ import { getServerCaller } from "@/lib/trpc/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Mirrors lesson.attemptBlock's input (the server re-validates anyway).
 const Schema = z.object({
   blockId: z.string().min(1),
-  chosenIndex: z.number().int().min(0),
+  chosenIndex: z.number().int().min(0).max(9),
+  subIndex: z.number().int().min(0).max(19).optional(),
+  hintsUsed: z.number().int().min(0).max(3).optional(),
+  timeMs: z.number().int().nonnegative().optional(),
 });
 
 /**

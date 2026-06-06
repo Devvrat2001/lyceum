@@ -12,7 +12,7 @@
  *
  * Bump VERSION to invalidate all caches on the next activation.
  */
-const VERSION = "lyceum-v1";
+const VERSION = "lyceum-v2";
 const PRECACHE = `${VERSION}-precache`;
 const RUNTIME = `${VERSION}-runtime`;
 const OFFLINE_URL = "/offline.html";
@@ -51,14 +51,30 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/_next/")) return; // build chunks + HMR
   if (url.pathname.startsWith("/api/")) return; // tRPC / auth / webhooks
 
-  // Navigations: network-first, fall back to the cached offline page.
+  // Navigations: network-first. A visited lesson page is cached on success so
+  // it stays readable in airplane mode; offline, we serve that cached page if
+  // we have it, else the generic offline fallback. (Per-browser cache of the
+  // signed-in user's own page — same trust model as the browser HTTP cache.)
   if (request.mode === "navigate") {
+    const isLesson = url.pathname.startsWith("/student/lesson/");
     event.respondWith(
-      fetch(request).catch(async () => {
-        const cache = await caches.open(PRECACHE);
-        const offline = await cache.match(OFFLINE_URL);
-        return offline ?? Response.error();
-      })
+      fetch(request)
+        .then((response) => {
+          if (isLesson && response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(RUNTIME).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(async () => {
+          if (isLesson) {
+            const cached = await caches.match(request);
+            if (cached) return cached;
+          }
+          const cache = await caches.open(PRECACHE);
+          const offline = await cache.match(OFFLINE_URL);
+          return offline ?? Response.error();
+        })
     );
     return;
   }
