@@ -11,7 +11,7 @@ import {
 } from "@/lib/ai/prompts/marketplaceSearch";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
-import { lengthRangeFor } from "@/lib/marketplace";
+import { lengthRangeFor, ratingMinFor } from "@/lib/marketplace";
 import {
   embedText,
   isEmbeddingsEnabled,
@@ -94,6 +94,8 @@ export const marketplaceRouter = router({
           price: z.string().optional(),
           /** Course-length bucket: "short" | "medium" | "long". */
           length: z.string().optional(),
+          /** Minimum-rating bucket: "30plus" | "35plus" | "40plus" | "45plus". */
+          rating: z.string().optional(),
           limit: z.number().int().min(1).max(24).default(4),
         })
         .optional()
@@ -101,6 +103,9 @@ export const marketplaceRouter = router({
     .query(async ({ ctx, input }) => {
       const topicFragment = topicWhere(input?.topic);
       const priceFragment = priceWhere(input?.price);
+      // Rating is a plain column, so it composes into `where` directly
+      // (and thus applies to both the fast path and the length pool below).
+      const ratingMin = ratingMinFor(input?.rating);
       // Topic chips override the subject hint — if you've picked
       // "Reading" you want ELA courses regardless of what the page's
       // default subject was. The `grade` hint stays as a soft filter.
@@ -113,6 +118,7 @@ export const marketplaceRouter = router({
             : {}),
         ...(input?.grade ? { grade: input.grade } : {}),
         ...(priceFragment ?? {}),
+        ...(ratingMin !== null ? { ratingAvg: { gte: ratingMin } } : {}),
       };
       const limit = input?.limit ?? 4;
       const orderBy: Prisma.CourseOrderByWithRelationInput[] = [

@@ -43,6 +43,7 @@ export default async function MarketplacePage({
     subject?: string;
     price?: string;
     length?: string;
+    rating?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -56,6 +57,7 @@ export default async function MarketplacePage({
   const subject = sp.subject ?? (activeTopic ? undefined : "math");
   const price = sp.price;
   const length = sp.length;
+  const rating = sp.rating;
 
   const trpc = await getServerCaller();
   const [featured, paths, teachers, recommended, enrolledIdList, session] =
@@ -66,6 +68,7 @@ export default async function MarketplacePage({
         grade,
         ...(price ? { price } : {}),
         ...(length ? { length } : {}),
+        ...(rating ? { rating } : {}),
         limit: 4,
       }),
       trpc.marketplace.paths(),
@@ -260,24 +263,16 @@ export default async function MarketplacePage({
         >
           <Eyebrow style={{ marginRight: 8 }}>Filter</Eyebrow>
           <MarketplaceFilters />
-          {/* Static placeholders for filter dimensions we haven't
-              wired yet — Format/Length/Rating need data we don't
-              collect (course delivery format, est. completion time,
-              rating threshold). Left here so the row visually matches
-              the original spec; deferring as a P2+ polish item. */}
+          {/* Format is the one spec'd filter dimension we still can't
+              wire — there's no course delivery-format field (self-paced
+              / live / cohort) to filter on. Left as a disabled chip so
+              the row matches the original spec; deferred as a P2+ item. */}
           <span
             className="wf-chip"
             style={{ opacity: 0.5, cursor: "not-allowed" }}
             title="Coming soon"
           >
             Format ▾
-          </span>
-          <span
-            className="wf-chip"
-            style={{ opacity: 0.5, cursor: "not-allowed" }}
-            title="Coming soon"
-          >
-            Rating ▾
           </span>
           <div style={{ flex: 1 }} />
           <span

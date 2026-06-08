@@ -107,6 +107,38 @@ export function lengthRangeFor(
   }
 }
 
+/**
+ * Minimum-rating bucket options, keyed by a `ratingAvg` floor. Unlike length
+ * (an aggregate over units→lessons that has to be post-filtered), rating is a
+ * plain `Course.ratingAvg` column — so the server folds `ratingMinFor(slug)`
+ * straight into the Prisma `where` as a `{ gte }` clause, no candidate pool.
+ *
+ * Courses with no reviews (ratingAvg defaults to 0) fall out of every
+ * threshold, which matches how Amazon/Udemy "★ & up" filters behave.
+ */
+export const MARKETPLACE_RATING_BUCKETS: { value: string; label: string }[] = [
+  { value: "45plus", label: "4.5★ & up" },
+  { value: "40plus", label: "4.0★ & up" },
+  { value: "35plus", label: "3.5★ & up" },
+  { value: "30plus", label: "3.0★ & up" },
+];
+
+/** Minimum `ratingAvg` for a rating-bucket slug; null = no filter. */
+export function ratingMinFor(slug: string | undefined): number | null {
+  switch (slug) {
+    case "45plus":
+      return 4.5;
+    case "40plus":
+      return 4;
+    case "35plus":
+      return 3.5;
+    case "30plus":
+      return 3;
+    default:
+      return null;
+  }
+}
+
 export function labelFor<T extends { value: string; label: string }>(
   items: T[],
   value: string | undefined
