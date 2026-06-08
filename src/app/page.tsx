@@ -15,6 +15,7 @@ import { MarketplaceHeroSearch } from "@/components/marketplace/MarketplaceHeroS
 import { PathEnrollButton } from "@/components/marketplace/PathEnrollButton";
 import { FollowButton } from "@/components/marketplace/FollowButton";
 import { MarketplaceFilters } from "@/components/marketplace/MarketplaceFilters";
+import { MarketplaceSort } from "@/components/marketplace/MarketplaceSort";
 import {
   MARKETPLACE_GRADES,
   MARKETPLACE_PRICE_BUCKETS,
@@ -44,6 +45,8 @@ export default async function MarketplacePage({
     price?: string;
     length?: string;
     rating?: string;
+    format?: string;
+    sort?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -58,6 +61,8 @@ export default async function MarketplacePage({
   const price = sp.price;
   const length = sp.length;
   const rating = sp.rating;
+  const format = sp.format;
+  const sort = sp.sort;
 
   const trpc = await getServerCaller();
   const [featured, paths, teachers, recommended, enrolledIdList, session] =
@@ -69,6 +74,8 @@ export default async function MarketplacePage({
         ...(price ? { price } : {}),
         ...(length ? { length } : {}),
         ...(rating ? { rating } : {}),
+        ...(format ? { format } : {}),
+        ...(sort ? { sort } : {}),
         limit: 4,
       }),
       trpc.marketplace.paths(),
@@ -263,24 +270,14 @@ export default async function MarketplacePage({
         >
           <Eyebrow style={{ marginRight: 8 }}>Filter</Eyebrow>
           <MarketplaceFilters />
-          {/* Format is the one spec'd filter dimension we still can't
-              wire — there's no course delivery-format field (self-paced
-              / live / cohort) to filter on. Left as a disabled chip so
-              the row matches the original spec; deferred as a P2+ item. */}
-          <span
-            className="wf-chip"
-            style={{ opacity: 0.5, cursor: "not-allowed" }}
-            title="Coming soon"
-          >
-            Format ▾
-          </span>
           <div style={{ flex: 1 }} />
           <span
             className="wf-mono"
             style={{ fontSize: 11, color: "var(--wf-mute)" }}
           >
-            {featured.total.toLocaleString()} courses · sort · POPULAR ▾
+            {featured.total.toLocaleString()} courses
           </span>
+          <MarketplaceSort />
         </div>
 
         {/* Featured */}

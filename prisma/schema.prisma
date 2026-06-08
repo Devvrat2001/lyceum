@@ -189,6 +189,7 @@ model Course {
   authorLabel  String?      // free-form display name (e.g., "Khan Edu Group")
   subject      String       // "math"
   grade        String       // "6"
+  format       String       @default("self_paced") // delivery format: "self_paced" | "live" | "cohort"
   status       CourseStatus @default(DRAFT)
   priceCents   Int          @default(0)
   ratingAvg    Float        @default(0)

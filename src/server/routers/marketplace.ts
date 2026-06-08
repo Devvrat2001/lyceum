@@ -11,7 +11,11 @@ import {
 } from "@/lib/ai/prompts/marketplaceSearch";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
-import { lengthRangeFor, ratingMinFor } from "@/lib/marketplace";
+import {
+  isMarketplaceFormat,
+  lengthRangeFor,
+  ratingMinFor,
+} from "@/lib/marketplace";
 import {
   embedText,
   isEmbeddingsEnabled,
@@ -81,6 +85,32 @@ function priceWhere(slug: string | undefined): Prisma.CourseWhereInput | null {
   }
 }
 
+/**
+ * Translate a sort slug into a Prisma `orderBy`. Slugs come from
+ * `MARKETPLACE_SORTS` in src/lib/marketplace.ts. Unknown / missing slug
+ * (and the explicit "popular") fall through to the popularity default —
+ * most-enrolled, with rating as the tiebreak — so a stale `?sort=` value
+ * degrades to the sensible ranking rather than an error. Every branch has
+ * a deterministic secondary key so pagination/order is stable.
+ */
+function sortOrderFor(
+  slug: string | undefined
+): Prisma.CourseOrderByWithRelationInput[] {
+  switch (slug) {
+    case "newest":
+      return [{ createdAt: "desc" }, { id: "desc" }];
+    case "rating":
+      return [{ ratingAvg: "desc" }, { ratingCount: "desc" }];
+    case "price_asc":
+      return [{ priceCents: "asc" }, { enrollCount: "desc" }];
+    case "price_desc":
+      return [{ priceCents: "desc" }, { enrollCount: "desc" }];
+    case "popular":
+    default:
+      return [{ enrollCount: "desc" }, { ratingAvg: "desc" }];
+  }
+}
+
 export const marketplaceRouter = router({
   /** Featured course cards (top picks). */
   featured: publicProcedure
@@ -96,6 +126,10 @@ export const marketplaceRouter = router({
           length: z.string().optional(),
           /** Minimum-rating bucket: "30plus" | "35plus" | "40plus" | "45plus". */
           rating: z.string().optional(),
+          /** Delivery format: "self_paced" | "live" | "cohort". */
+          format: z.string().optional(),
+          /** Sort slug: "popular" | "newest" | "rating" | "price_asc" | "price_desc". */
+          sort: z.string().optional(),
           limit: z.number().int().min(1).max(24).default(4),
         })
         .optional()
@@ -106,6 +140,12 @@ export const marketplaceRouter = router({
       // Rating is a plain column, so it composes into `where` directly
       // (and thus applies to both the fast path and the length pool below).
       const ratingMin = ratingMinFor(input?.rating);
+      // Format is a plain column too — guard the raw URL value so a stale
+      // `?format=` degrades to "no filter" rather than an empty grid.
+      const format =
+        input?.format && isMarketplaceFormat(input.format)
+          ? input.format
+          : null;
       // Topic chips override the subject hint — if you've picked
       // "Reading" you want ELA courses regardless of what the page's
       // default subject was. The `grade` hint stays as a soft filter.
@@ -119,12 +159,10 @@ export const marketplaceRouter = router({
         ...(input?.grade ? { grade: input.grade } : {}),
         ...(priceFragment ?? {}),
         ...(ratingMin !== null ? { ratingAvg: { gte: ratingMin } } : {}),
+        ...(format ? { format } : {}),
       };
       const limit = input?.limit ?? 4;
-      const orderBy: Prisma.CourseOrderByWithRelationInput[] = [
-        { enrollCount: "desc" },
-        { ratingAvg: "desc" },
-      ];
+      const orderBy = sortOrderFor(input?.sort);
       // id is consumed by the marketplace page to cross-reference
       // course.myEnrolledIds and badge cards the student owns.
       const cardSelect = {

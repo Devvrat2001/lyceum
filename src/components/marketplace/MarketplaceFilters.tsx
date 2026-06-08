@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { Popover, PopoverOption } from "@/components/ui/Popover";
 import {
+  MARKETPLACE_FORMAT_BUCKETS,
   MARKETPLACE_GRADES,
   MARKETPLACE_LENGTH_BUCKETS,
   MARKETPLACE_PRICE_BUCKETS,
@@ -34,6 +35,7 @@ export function MarketplaceFilters() {
   const price = sp?.get("price") ?? null;
   const length = sp?.get("length") ?? null;
   const rating = sp?.get("rating") ?? null;
+  const format = sp?.get("format") ?? null;
 
   // Preserve any other params (notably `topic`) when we mutate one
   // dimension — losing the topic filter when picking a grade would be
@@ -51,8 +53,9 @@ export function MarketplaceFilters() {
   const priceLabel = labelFor(MARKETPLACE_PRICE_BUCKETS, price ?? undefined);
   const lengthLabel = labelFor(MARKETPLACE_LENGTH_BUCKETS, length ?? undefined);
   const ratingLabel = labelFor(MARKETPLACE_RATING_BUCKETS, rating ?? undefined);
+  const formatLabel = labelFor(MARKETPLACE_FORMAT_BUCKETS, format ?? undefined);
 
-  const anyActive = !!(grade || subject || price || length || rating);
+  const anyActive = !!(grade || subject || price || length || rating || format);
 
   const clearAll = useMemo(() => {
     return () => {
@@ -63,6 +66,7 @@ export function MarketplaceFilters() {
       next.delete("price");
       next.delete("length");
       next.delete("rating");
+      next.delete("format");
       const qs = next.toString();
       router.push(qs ? `/?${qs}` : "/");
     };
@@ -175,6 +179,28 @@ export function MarketplaceFilters() {
                 active={rating === b.value}
                 onClick={() => {
                   updateParam("rating", rating === b.value ? null : b.value);
+                  close();
+                }}
+              >
+                {b.label}
+              </PopoverOption>
+            ))}
+          </>
+        )}
+      </Popover>
+
+      <Popover
+        active={!!format}
+        triggerLabel={formatLabel ? `Format · ${formatLabel}` : "Format"}
+      >
+        {({ close }) => (
+          <>
+            {MARKETPLACE_FORMAT_BUCKETS.map((b) => (
+              <PopoverOption
+                key={b.value}
+                active={format === b.value}
+                onClick={() => {
+                  updateParam("format", format === b.value ? null : b.value);
                   close();
                 }}
               >

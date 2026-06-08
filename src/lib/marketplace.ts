@@ -139,6 +139,42 @@ export function ratingMinFor(slug: string | undefined): number | null {
   }
 }
 
+/**
+ * Sort options for the marketplace grid. The `value` maps to a Prisma
+ * `orderBy` in `marketplace.featured`'s `sortOrderFor()` — that mapping
+ * lives in the router (it needs Prisma types) so this file stays
+ * import-light. "popular" is the default and is dropped from the URL when
+ * active, so the canonical homepage URL has no `?sort=`.
+ */
+export const MARKETPLACE_SORTS: { value: string; label: string }[] = [
+  { value: "popular", label: "Popular" },
+  { value: "newest", label: "Newest" },
+  { value: "rating", label: "Top rated" },
+  { value: "price_asc", label: "Price: low to high" },
+  { value: "price_desc", label: "Price: high to low" },
+];
+
+/** The default sort slug — applied when no (or an unknown) `?sort=` is set. */
+export const MARKETPLACE_DEFAULT_SORT = "popular";
+
+/**
+ * Course delivery-format options, filtering `Course.format`. Like
+ * subject/grade it's a plain column, so the slug IS the stored value — no
+ * translation table. `isMarketplaceFormat` guards a URL value before it
+ * reaches the `where` so a junk `?format=` degrades to "no filter" rather
+ * than zero results.
+ */
+export const MARKETPLACE_FORMAT_BUCKETS: { value: string; label: string }[] = [
+  { value: "self_paced", label: "Self-paced" },
+  { value: "live", label: "Live" },
+  { value: "cohort", label: "Cohort-based" },
+];
+
+/** True when `value` is a known `Course.format` slug (URL guard). */
+export function isMarketplaceFormat(value: string | undefined): boolean {
+  return MARKETPLACE_FORMAT_BUCKETS.some((f) => f.value === value);
+}
+
 export function labelFor<T extends { value: string; label: string }>(
   items: T[],
   value: string | undefined

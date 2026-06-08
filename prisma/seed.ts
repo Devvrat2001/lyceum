@@ -325,6 +325,7 @@ async function main() {
     authorLabel: string;
     subject: string;
     grade: string;
+    format?: string; // delivery format; defaults to "self_paced" when omitted
     priceCents: number;
     rating: number;
     ratingCount: number;
@@ -536,6 +537,7 @@ async function main() {
       authorLabel: "Studio Pi",
       subject: "math",
       grade: "6",
+      format: "live",
       priceCents: 2900,
       rating: 4.9,
       ratingCount: 612,
@@ -566,6 +568,7 @@ async function main() {
       authorLabel: "Lyceum School",
       subject: "math",
       grade: "6",
+      format: "cohort",
       priceCents: 4900,
       rating: 4.7,
       ratingCount: 401,
@@ -680,6 +683,7 @@ async function main() {
         authorLabel: c.authorLabel,
         subject: c.subject,
         grade: c.grade,
+        format: c.format ?? "self_paced",
         status: "PUBLISHED",
         priceCents: c.priceCents,
         ratingAvg: c.rating,
@@ -700,6 +704,7 @@ async function main() {
         authorLabel: c.authorLabel,
         subject: c.subject,
         grade: c.grade,
+        format: c.format ?? "self_paced",
         status: "PUBLISHED",
         priceCents: c.priceCents,
         ratingAvg: c.rating,
