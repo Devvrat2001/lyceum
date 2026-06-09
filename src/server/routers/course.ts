@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
+import { ensureEnrollment } from "../services/enrollment";
 
 async function enrollOne(
   db: import("@prisma/client").PrismaClient,
@@ -26,10 +27,8 @@ async function enrollOne(
       message: "Paid courses require Stripe checkout (Phase 3).",
     });
   }
-  await db.enrollment.upsert({
-    where: { userId_courseId: { userId, courseId } },
-    update: { lastActivityAt: new Date() },
-    create: { userId, courseId, lastActivityAt: new Date() },
+  await ensureEnrollment(db, userId, courseId, {
+    lastActivityAt: new Date(),
   });
   return {
     course,
@@ -264,16 +263,7 @@ export const courseRouter = router({
         // table yet — Phase 3 adds one.
         return { ok: true as const, saved: true as const };
       }
-      await ctx.db.enrollment.upsert({
-        where: {
-          userId_courseId: { userId: ctx.user.id, courseId: course.id },
-        },
-        update: {},
-        create: {
-          userId: ctx.user.id,
-          courseId: course.id,
-        },
-      });
+      await ensureEnrollment(ctx.db, ctx.user.id, course.id);
       return { ok: true as const, saved: false as const };
     }),
 });

@@ -9,6 +9,7 @@ import {
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
+import { ensureEnrollment } from "../services/enrollment";
 
 /**
  * Stripe Checkout Session shape (subset we use). Imported as a structural
@@ -226,26 +227,15 @@ export const paymentRouter = router({
       if (order.status === "PAID") {
         return { ok: true as const, alreadyPaid: true, courseSlug: order.course.slug };
       }
-      await ctx.db.$transaction([
-        ctx.db.order.update({
+      await ctx.db.$transaction(async (tx) => {
+        await tx.order.update({
           where: { id: order.id },
           data: { status: "PAID", paidAt: new Date() },
-        }),
-        ctx.db.enrollment.upsert({
-          where: {
-            userId_courseId: {
-              userId: order.userId,
-              courseId: order.courseId,
-            },
-          },
-          create: {
-            userId: order.userId,
-            courseId: order.courseId,
-            lastActivityAt: new Date(),
-          },
-          update: {},
-        }),
-      ]);
+        });
+        await ensureEnrollment(tx, order.userId, order.courseId, {
+          lastActivityAt: new Date(),
+        });
+      });
       // Purchase receipt — best-effort, swallows its own errors so it
       // can never break the confirm.
       await sendOrderReceipt(order.id);

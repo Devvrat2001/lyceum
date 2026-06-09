@@ -12,6 +12,7 @@ import { CLAUDE_MODEL, getClaude, isClaudeEnabled } from "@/lib/ai/claude";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
 import { findBlockTemplate } from "@/lib/blockTemplates";
+import { ensureEnrollment } from "../services/enrollment";
 import { refreshCourseEmbedding } from "@/lib/jobs/refreshCourseEmbedding";
 import {
   isMuxEnabled,
@@ -432,32 +433,17 @@ export const teacherRouter = router({
 
       // Branch 4: existing student + free course → enroll (idempotent).
       //
-      // We probe first to know whether an Enrollment already exists,
-      // because that's what drives the "already_enrolled" vs "enrolled"
-      // response. The earlier version inferred this from the upserted
-      // row's enrolledAt timestamp (older than 5s = pre-existing) —
-      // race-prone when a parallel enroll happens in the same window.
-      // A probe-then-upsert is one extra round-trip but deterministic.
-      // The upsert itself is still atomic via @@unique([userId,
-      // courseId]) — if a parallel call races us between the probe
-      // and the upsert, the upsert's `update: {}` no-ops gracefully.
-      const preExisting = await ctx.db.enrollment.findUnique({
-        where: {
-          userId_courseId: { userId: existing.id, courseId: course.id },
-        },
-        select: { id: true },
-      });
-      const wasAlreadyEnrolled = !!preExisting;
-      if (!wasAlreadyEnrolled) {
-        await ctx.db.enrollment.upsert({
-          where: {
-            userId_courseId: { userId: existing.id, courseId: course.id },
-          },
-          update: {}, // no-op when a race put a row in since the probe
-          create: { userId: existing.id, courseId: course.id },
-          select: { id: true },
-        });
-      }
+      // ensureEnrollment's createMany+skipDuplicates is atomic on the
+      // (userId, courseId) unique index, so `created` is a reliable
+      // first-time signal even under races — it drives the
+      // "already_enrolled" vs "enrolled" response and keeps the course's
+      // enrollCount in step.
+      const { created } = await ensureEnrollment(
+        ctx.db,
+        existing.id,
+        course.id
+      );
+      const wasAlreadyEnrolled = !created;
 
       await audit({
         actorId: ctx.user.id,

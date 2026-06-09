@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { getStripe } from "@/lib/payments/stripe";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
+import { ensureEnrollment } from "@/server/services/enrollment";
 
 /**
  * Stripe webhook. Only runs in real-Stripe mode — demo orders never
@@ -122,26 +123,15 @@ export async function POST(req: Request) {
       if (orderId) {
         const order = await db.order.findUnique({ where: { id: orderId } });
         if (order && order.status === "PENDING") {
-          await db.$transaction([
-            db.order.update({
+          await db.$transaction(async (tx) => {
+            await tx.order.update({
               where: { id: orderId },
               data: { status: "PAID", paidAt: new Date() },
-            }),
-            db.enrollment.upsert({
-              where: {
-                userId_courseId: {
-                  userId: order.userId,
-                  courseId: order.courseId,
-                },
-              },
-              create: {
-                userId: order.userId,
-                courseId: order.courseId,
-                lastActivityAt: new Date(),
-              },
-              update: {},
-            }),
-          ]);
+            });
+            await ensureEnrollment(tx, order.userId, order.courseId, {
+              lastActivityAt: new Date(),
+            });
+          });
           await audit({
             actorId: order.userId,
             kind: "course.publish",

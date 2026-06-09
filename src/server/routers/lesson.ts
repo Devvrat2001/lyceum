@@ -8,6 +8,7 @@ import {
   studentProcedure,
 } from "../trpc";
 import { awardCorrectAttempt } from "../services/awardForAttempt";
+import { ensureEnrollment } from "../services/enrollment";
 import { settingsFor } from "@/lib/blocks";
 import { audit } from "@/lib/audit";
 import {
@@ -1155,24 +1156,13 @@ export const lessonRouter = router({
       const isCourseComplete =
         totalLessons > 0 && completedCount >= totalLessons;
 
-      // Upsert so a student who hits Complete on a free-preview lesson
-      // (without enrolling first) still gets an Enrollment row.
-      await ctx.db.enrollment.upsert({
-        where: {
-          userId_courseId: { userId: ctx.user.id, courseId },
-        },
-        create: {
-          userId: ctx.user.id,
-          courseId,
-          progressPct,
-          completed: isCourseComplete,
-          lastActivityAt: new Date(),
-        },
-        update: {
-          progressPct,
-          completed: isCourseComplete,
-          lastActivityAt: new Date(),
-        },
+      // ensureEnrollment so a student who hits Complete on a free-preview
+      // lesson (without enrolling first) still gets an Enrollment row —
+      // and the course's enrollCount counts them.
+      await ensureEnrollment(ctx.db, ctx.user.id, courseId, {
+        progressPct,
+        completed: isCourseComplete,
+        lastActivityAt: new Date(),
       });
 
       // Find the next *playable* lesson in unit-then-lesson order. The

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
+import { ensureEnrollment } from "../services/enrollment";
 
 export const pathRouter = router({
   bySlug: publicProcedure
@@ -72,16 +73,8 @@ export const pathRouter = router({
           saved += 1;
           continue;
         }
-        await ctx.db.enrollment.upsert({
-          where: {
-            userId_courseId: { userId: ctx.user.id, courseId: course.id },
-          },
-          update: { lastActivityAt: new Date() },
-          create: {
-            userId: ctx.user.id,
-            courseId: course.id,
-            lastActivityAt: new Date(),
-          },
+        await ensureEnrollment(ctx.db, ctx.user.id, course.id, {
+          lastActivityAt: new Date(),
         });
         enrolled += 1;
         if (!firstLessonSlug) {
