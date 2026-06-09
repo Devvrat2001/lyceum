@@ -94,6 +94,7 @@ model User {
   follows        Follow[]    @relation("Follower")
   followers      Follow[]    @relation("Followed")
   authoredCourses Course[]   @relation("CourseAuthor")
+  authoredPaths   Path[]     @relation("PathAuthor")
   taughtClasses  Class[]     @relation("ClassTeacher")
   mastery        Mastery[]
   // Phase 3 — payments
@@ -483,6 +484,11 @@ model Path {
   subtitle  String?      // "12 courses · 84 lessons"
   priceCents Int         @default(0)
   saveLabel  String?     // "Save 38%"
+  // Teacher who owns this bundle; null = platform-curated (seed).
+  // SetNull so deleting a teacher account orphans their bundles to
+  // platform-curated instead of yanking them from enrolled students.
+  authorId  String?
+  author    User?        @relation("PathAuthor", fields: [authorId], references: [id], onDelete: SetNull)
   courses   PathCourse[]
 }
 

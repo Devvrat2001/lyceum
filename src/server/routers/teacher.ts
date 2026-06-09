@@ -21,18 +21,7 @@ import {
   getMuxState,
   type MuxState,
 } from "@/lib/video/mux";
-
-/**
- * URL-safe slug from a title. Same rules as the generator's slugify so
- * manually-created and AI-created courses get identical slug shapes.
- */
-const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+import { slugify } from "@/lib/slugify";
 
 export const teacherRouter = router({
   /** Anyone can check follow state of a teacher (signed-in only). */

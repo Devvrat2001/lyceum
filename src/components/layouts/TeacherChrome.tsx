@@ -37,6 +37,12 @@ const NAV = [
     href: "/teacher/storefront",
   },
   {
+    id: "paths",
+    icon: "branch" as const,
+    label: "Bundles",
+    href: "/teacher/paths",
+  },
+  {
     id: "earnings",
     icon: "bolt" as const,
     label: "Earnings",

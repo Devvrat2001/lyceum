@@ -39,15 +39,8 @@ import {
   type OutlineJobInput,
 } from "@/lib/jobs/processOutlineJob";
 import { refreshCourseEmbedding } from "@/lib/jobs/refreshCourseEmbedding";
+import { slugify } from "@/lib/slugify";
 
-const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80);
 
 /**
  * Map one rich block emitted by the AI worker (RichLessonBlock) into
