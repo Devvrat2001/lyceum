@@ -118,7 +118,6 @@ export default async function StudentDashboard() {
               <h1 className="wf-h1" style={{ fontSize: 30 }}>
                 Welcome back, {dashboard.me.firstName}.
               </h1>
-              <Annot ai>Personalized greeting</Annot>
             </div>
           </div>
 
@@ -135,7 +134,6 @@ export default async function StudentDashboard() {
               <h2 className="wf-h2" style={{ fontSize: 16 }}>
                 Continue learning
               </h2>
-              <Annot>Resume cards · last-activity sort</Annot>
             </div>
             {dashboard.continueLearning.length === 0 ? (
               <Card p={28} style={{ textAlign: "center" }}>
@@ -222,7 +220,6 @@ export default async function StudentDashboard() {
                 >
                   Skill mastery this week
                 </h3>
-                <Annot>Per-strand %</Annot>
               </div>
               {dashboard.skills.length === 0 ? (
                 <div
@@ -357,7 +354,6 @@ export default async function StudentDashboard() {
               <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
                 Your week
               </h3>
-              <Annot>Gamification</Annot>
             </div>
             <div
               style={{

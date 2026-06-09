@@ -489,7 +489,6 @@ export default async function MarketplacePage({
                 End-to-end curricula · save vs. buying separately
               </div>
             </div>
-            <Annot>Bundle = monetization driver</Annot>
           </div>
           <div
             style={{
@@ -619,7 +618,6 @@ export default async function MarketplacePage({
             <h2 className="wf-h2" style={{ fontSize: 18 }}>
               Teachers to follow
             </h2>
-            <Annot>Creator economy · revenue share</Annot>
           </div>
           <div
             style={{

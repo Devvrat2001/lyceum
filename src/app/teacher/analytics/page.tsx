@@ -1,6 +1,5 @@
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
 import {
-  Annot,
   Btn,
   Card,
   Icon,
@@ -125,7 +124,6 @@ export default async function TeacherAnalyticsPage() {
               <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
                 Where students drop off
               </h3>
-              <Annot>Funnel</Annot>
             </div>
             {data.funnel.map((s) => (
               <div key={s.label} style={{ marginBottom: 8 }}>
