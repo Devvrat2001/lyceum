@@ -45,6 +45,17 @@ const Schema = z.object({
   OPENAI_EMBEDDING_API_KEY: z.string().optional(),
   OPENAI_EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
 
+  // India launch — Razorpay (UPI + cards + netbanking). All optional;
+  // absence falls through to Stripe (if configured) then demo. When set,
+  // Razorpay WINS the provider pick: the launch market is India, UPI is
+  // table stakes there, and Stripe India onboarding is invite-only.
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  // Webhook signing secret (Razorpay Dashboard → Webhooks). Without it
+  // /api/razorpay/webhook refuses every delivery — we never act on an
+  // unverified body (mirrors MUX_WEBHOOK_SECRET's posture).
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+
   // Phase 3 — Stripe. All optional; absence flips checkout into demo mode.
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),

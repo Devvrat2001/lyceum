@@ -6,6 +6,11 @@ import {
   getStripe,
   isStripeEnabled,
 } from "@/lib/payments/stripe";
+import {
+  createPaymentLink,
+  isRazorpayEnabled,
+} from "@/lib/payments/razorpay";
+import { CURRENCY } from "@/lib/currency";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
@@ -85,7 +90,15 @@ export const paymentRouter = router({
       const grossCents = course.priceCents;
       const feeCents = computeFeeCents(grossCents);
       const netCents = grossCents - feeCents;
-      const provider = isStripeEnabled() ? "stripe" : "demo";
+      // Provider precedence: Razorpay (India launch — UPI) wins when
+      // configured, then Stripe (international, dormant for now), then
+      // the demo flow. All three are redirect-shaped, so the client
+      // just follows `url` regardless.
+      const provider = isRazorpayEnabled()
+        ? "razorpay"
+        : isStripeEnabled()
+          ? "stripe"
+          : "demo";
       const successUrl = `${env.PUBLIC_BASE_URL}/checkout/success?courseSlug=${course.slug}`;
       const cancelUrl = `${env.PUBLIC_BASE_URL}/course/${course.slug}`;
 
@@ -101,7 +114,7 @@ export const paymentRouter = router({
       const externalId =
         provider === "demo"
           ? `demo_${crypto.randomUUID()}`
-          : `stripe_pending_${crypto.randomUUID()}`;
+          : `${provider}_pending_${crypto.randomUUID()}`;
       const order = await ctx.db.order.create({
         data: {
           userId: ctx.user.id,
@@ -110,7 +123,7 @@ export const paymentRouter = router({
           grossCents,
           feeCents,
           netCents,
-          currency: "usd",
+          currency: CURRENCY.code,
           status: "PENDING",
           provider,
           externalId,
@@ -121,6 +134,24 @@ export const paymentRouter = router({
 
       if (provider === "demo") {
         url = `/demo-checkout/${order.id}`;
+      } else if (provider === "razorpay") {
+        // Payment Link: redirect-shaped like Stripe Checkout. The
+        // platform fee is recorded on the Order (computeFeeCents above);
+        // actual revenue-split transfers (Razorpay Route) are phase 2 —
+        // collections land in the platform account until then, mirroring
+        // how Stripe ran before Connect onboarding.
+        const link = await createPaymentLink({
+          amountPaise: grossCents,
+          referenceId: order.id,
+          description: course.title.slice(0, 250),
+          customerEmail: ctx.user.email ?? undefined,
+          callbackUrl: successUrl,
+        });
+        await ctx.db.order.update({
+          where: { id: order.id },
+          data: { externalId: link.id },
+        });
+        url = link.short_url;
       } else {
         const stripe = (await getStripe()) as StripeLike | null;
         if (!stripe) {
@@ -140,7 +171,9 @@ export const paymentRouter = router({
             {
               quantity: 1,
               price_data: {
-                currency: "usd",
+                // Follows the launch currency; the international phase
+                // makes this per-order (Stripe is dormant until then).
+                currency: CURRENCY.code,
                 unit_amount: grossCents,
                 product_data: { name: course.title },
               },
