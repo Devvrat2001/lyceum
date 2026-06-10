@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { formatPrice as fmtPrice } from "@/lib/currency";
 import { TRPCError } from "@trpc/server";
 import { MarketChrome } from "@/components/layouts/MarketChrome";
 import { Avatar, Card, Eyebrow } from "@/components/wf/primitives";
@@ -15,10 +16,6 @@ function initialsOf(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-}
-
-function fmtPrice(cents: number) {
-  return cents === 0 ? "Free" : `$${(cents / 100).toFixed(0)}`;
 }
 
 /**

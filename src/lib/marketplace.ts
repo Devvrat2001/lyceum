@@ -74,9 +74,9 @@ export const MARKETPLACE_SUBJECTS: { value: string; label: string }[] = [
  */
 export const MARKETPLACE_PRICE_BUCKETS: { value: string; label: string }[] = [
   { value: "free", label: "Free" },
-  { value: "under20", label: "Under $20" },
-  { value: "20to50", label: "$20 – $50" },
-  { value: "50plus", label: "$50 and up" },
+  { value: "under500", label: "Under ₹500" },
+  { value: "500to2000", label: "₹500 – ₹2,000" },
+  { value: "2000plus", label: "₹2,000 and up" },
 ];
 
 /**

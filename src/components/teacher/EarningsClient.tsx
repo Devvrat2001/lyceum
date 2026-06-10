@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney as fmtPrice } from "@/lib/currency";
 import { useState } from "react";
 import { Btn, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
@@ -25,10 +26,6 @@ type Order = {
   buyerName: string;
   provider: string;
 };
-
-function fmtPrice(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 function fmtDate(iso: string) {
   // Pin the locale: `undefined` formats with each runtime's own

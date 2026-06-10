@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatPrice } from "@/lib/currency";
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
 import { Btn, Card, Icon } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
@@ -147,9 +148,7 @@ export default async function TeacherCoursesPage() {
                       ? ` · ★ ${c.ratingAvg.toFixed(1)} (${c.ratingCount})`
                       : " · No ratings yet"}
                     {" · "}
-                    {c.priceCents === 0
-                      ? "Free"
-                      : `$${(c.priceCents / 100).toFixed(2)}`}
+                    {formatPrice(c.priceCents)}
                   </div>
                 </div>
                 <Link

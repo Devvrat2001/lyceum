@@ -2,10 +2,7 @@ import { TeacherChrome } from "@/components/layouts/TeacherChrome";
 import { Card, Eyebrow } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
 import { EarningsClient } from "@/components/teacher/EarningsClient";
-
-function fmtPrice(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+import { formatMoney as fmtPrice } from "@/lib/currency";
 
 export default async function TeacherEarningsPage() {
   const trpc = await getServerCaller();

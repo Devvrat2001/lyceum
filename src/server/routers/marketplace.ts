@@ -71,15 +71,18 @@ function topicWhere(slug: string | undefined): Prisma.CourseWhereInput | null {
  */
 function priceWhere(slug: string | undefined): Prisma.CourseWhereInput | null {
   if (!slug) return null;
+  // priceCents holds paise for the INR launch (both 1/100 of the major
+  // unit — see lib/currency.ts). Old $-era slugs (under20/…) fall to the
+  // default and degrade to "no filter" rather than zero results.
   switch (slug.toLowerCase()) {
     case "free":
       return { priceCents: 0 };
-    case "under20":
-      return { priceCents: { gt: 0, lt: 2000 } };
-    case "20to50":
-      return { priceCents: { gte: 2000, lt: 5000 } };
-    case "50plus":
-      return { priceCents: { gte: 5000 } };
+    case "under500":
+      return { priceCents: { gt: 0, lt: 50_000 } };
+    case "500to2000":
+      return { priceCents: { gte: 50_000, lt: 200_000 } };
+    case "2000plus":
+      return { priceCents: { gte: 200_000 } };
     default:
       return null;
   }

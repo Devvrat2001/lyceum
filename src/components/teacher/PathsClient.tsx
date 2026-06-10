@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/react";
 import { Btn, Card, Eyebrow } from "@/components/wf/primitives";
-
-function fmtPrice(cents: number) {
-  return cents === 0 ? "Free" : `$${(cents / 100).toFixed(0)}`;
-}
+import { formatPrice as fmtPrice } from "@/lib/currency";
 
 /**
  * /teacher/paths — the bundle authoring surface. Until this existed the
@@ -108,7 +105,7 @@ export function PathsClient() {
           <input
             value={priceDollars}
             onChange={(e) => setPriceDollars(e.target.value)}
-            placeholder="Price $"
+            placeholder="Price ₹"
             inputMode="decimal"
             style={inputStyle}
           />

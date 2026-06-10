@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { formatMoney } from "@/lib/currency";
 
 /**
  * Email — purchase receipts (transactional) + weekly progress digests
@@ -142,7 +143,7 @@ export async function sendOrderReceipt(orderId: string): Promise<void> {
       html: receiptHtml({
         buyerName: order.user.name ?? order.user.firstName ?? "there",
         courseTitle: order.course.title,
-        amount: `$${(order.grossCents / 100).toFixed(2)}`,
+        amount: formatMoney(order.grossCents),
         paidAt: (order.paidAt ?? new Date()).toLocaleDateString("en-US", {
           year: "numeric",
           month: "long",

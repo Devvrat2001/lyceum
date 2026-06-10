@@ -22,6 +22,7 @@ import {
   type MuxState,
 } from "@/lib/video/mux";
 import { slugify } from "@/lib/slugify";
+import { CURRENCY } from "@/lib/currency";
 
 export const teacherRouter = router({
   /** Anyone can check follow state of a teacher (signed-in only). */
@@ -861,7 +862,9 @@ export const teacherRouter = router({
           },
           {
             l: "Earnings · MTD",
-            v: `$${Math.round(mtdNet / 100).toLocaleString("en-US")}`,
+            v: `${CURRENCY.symbol}${Math.round(mtdNet / 100).toLocaleString(
+              CURRENCY.locale
+            )}`,
             d:
               earningsDeltaPct !== null
                 ? `${earningsDeltaPct >= 0 ? "+" : "−"}${Math.abs(

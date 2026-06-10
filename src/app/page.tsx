@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatPrice as fmtPrice } from "@/lib/currency";
 import { MarketChrome } from "@/components/layouts/MarketChrome";
 import {
   Annot,
@@ -25,10 +26,6 @@ import {
   labelFor,
 } from "@/lib/marketplace";
 import { Suspense } from "react";
-
-function fmtPrice(cents: number) {
-  return cents === 0 ? "Free" : `$${(cents / 100).toFixed(0)}`;
-}
 
 function fmtCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 1 : 1)}k`;

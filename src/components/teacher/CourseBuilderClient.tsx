@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPrice as fmtPrice } from "@/lib/currency";
 import {
   useCallback,
   useEffect,
@@ -125,9 +126,6 @@ type ViewMode = "edit" | "student";
 type InspectorTab = "block" | "lesson" | "course" | "ai";
 
 // ── tiny helpers ───────────────────────────────────────────────────
-function fmtPrice(cents: number) {
-  return cents === 0 ? "Free" : `$${(cents / 100).toFixed(0)}`;
-}
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }

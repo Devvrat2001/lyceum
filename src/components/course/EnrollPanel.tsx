@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPrice as fmtPrice } from "@/lib/currency";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,10 +30,6 @@ type Props = {
    */
   firstLessonSlug?: string | null;
 };
-
-function fmtPrice(cents: number) {
-  return cents === 0 ? "Free" : `$${(cents / 100).toFixed(0)}`;
-}
 
 export function EnrollPanel({
   courseId,

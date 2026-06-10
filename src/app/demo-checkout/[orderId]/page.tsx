@@ -4,12 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Btn, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { DemoCheckoutForm } from "@/components/payments/DemoCheckoutForm";
-
-function fmtPrice(cents: number, currency = "usd") {
-  return `${currency === "usd" ? "$" : currency.toUpperCase() + " "}${(
-    cents / 100
-  ).toFixed(2)}`;
-}
+import { formatMoney as fmtPrice } from "@/lib/currency";
 
 export default async function DemoCheckoutPage({
   params,
@@ -147,7 +142,7 @@ export default async function DemoCheckoutPage({
               className="wf-serif"
               style={{ fontSize: 28, fontWeight: 700 }}
             >
-              {fmtPrice(order.grossCents, order.currency)}
+              {fmtPrice(order.grossCents)}
             </span>
           </div>
           <div

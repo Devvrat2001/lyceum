@@ -494,7 +494,7 @@ async function main() {
       authorLabel: "Mr. Adeyemi",
       subject: "math",
       grade: "6",
-      priceCents: 1900,
+      priceCents: 49900,
       rating: 4.8,
       ratingCount: 1204,
       enrollCount: 8100,
@@ -538,7 +538,7 @@ async function main() {
       subject: "math",
       grade: "6",
       format: "live",
-      priceCents: 2900,
+      priceCents: 99900,
       rating: 4.9,
       ratingCount: 612,
       enrollCount: 3200,
@@ -569,7 +569,7 @@ async function main() {
       subject: "math",
       grade: "6",
       format: "cohort",
-      priceCents: 4900,
+      priceCents: 149900,
       rating: 4.7,
       ratingCount: 401,
       enrollCount: 2000,
@@ -841,7 +841,7 @@ async function main() {
       slug: "full-year-grade-6-math",
       title: "Full Year · 6th Grade Math",
       subtitle: "12 courses · 84 lessons",
-      priceCents: 12900,
+      priceCents: 299900,
       saveLabel: "Save 38%",
       courseSlugs: ["fractions-decimals-percents", "algebra-foundations", "geometry-origami"],
     },
@@ -849,7 +849,7 @@ async function main() {
       slug: "young-coder",
       title: "Young Coder · Scratch → Python",
       subtitle: "6 courses · 40 hrs",
-      priceCents: 8900,
+      priceCents: 199900,
       saveLabel: "Save 30%",
       courseSlugs: [],
     },
@@ -857,7 +857,7 @@ async function main() {
       slug: "reading-confident",
       title: "Reading Confident · Ch. Books",
       subtitle: "8 books · AI discussion",
-      priceCents: 5900,
+      priceCents: 149900,
       saveLabel: "Save 25%",
       courseSlugs: ["ela-grade-6-novels"],
     },
@@ -948,19 +948,19 @@ async function main() {
   // /teacher/earnings has a meaningful number.
   const orderSeeds: OrderSeed[] = [
     // Mr. Adeyemi · Algebra Foundations ($19) — payouts-enabled, 4 orders
-    { key: "adeyemi-1", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 0, grossCents: 1900, status: "PAID", paidDaysAgo: 1 },
-    { key: "adeyemi-2", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 1, grossCents: 1900, status: "PAID", paidDaysAgo: 4 },
-    { key: "adeyemi-3", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 2, grossCents: 1900, status: "PAID", paidDaysAgo: 9 },
-    { key: "adeyemi-4", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 3, grossCents: 1900, status: "REFUNDED", paidDaysAgo: 18, refundedDaysAgo: 16 },
+    { key: "adeyemi-1", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 0, grossCents: 49900, status: "PAID", paidDaysAgo: 1 },
+    { key: "adeyemi-2", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 1, grossCents: 49900, status: "PAID", paidDaysAgo: 4 },
+    { key: "adeyemi-3", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 2, grossCents: 49900, status: "PAID", paidDaysAgo: 9 },
+    { key: "adeyemi-4", teacherName: "Mr. Adeyemi", courseSlug: "algebra-foundations", buyerIdx: 3, grossCents: 49900, status: "REFUNDED", paidDaysAgo: 18, refundedDaysAgo: 16 },
 
     // Studio Pi · Geometry Origami ($29) — no Stripe account yet, 3 orders
-    { key: "studiopi-1", teacherName: "Studio Pi", courseSlug: "geometry-origami", buyerIdx: 4, grossCents: 2900, status: "PAID", paidDaysAgo: 2 },
-    { key: "studiopi-2", teacherName: "Studio Pi", courseSlug: "geometry-origami", buyerIdx: 0, grossCents: 2900, status: "PAID", paidDaysAgo: 12 },
-    { key: "studiopi-3", teacherName: "Studio Pi", courseSlug: "geometry-origami", buyerIdx: 2, grossCents: 2900, status: "PENDING" },
+    { key: "studiopi-1", teacherName: "Studio Pi", courseSlug: "geometry-origami", buyerIdx: 4, grossCents: 99900, status: "PAID", paidDaysAgo: 2 },
+    { key: "studiopi-2", teacherName: "Studio Pi", courseSlug: "geometry-origami", buyerIdx: 0, grossCents: 99900, status: "PAID", paidDaysAgo: 12 },
+    { key: "studiopi-3", teacherName: "Studio Pi", courseSlug: "geometry-origami", buyerIdx: 2, grossCents: 99900, status: "PENDING" },
 
     // Lyceum School · Math Olympiad ($49) — account onboarded but payouts pending, 2 orders
-    { key: "lyceum-1", teacherName: "Lyceum School", courseSlug: "math-olympiad-prep", buyerIdx: 1, grossCents: 4900, status: "PAID", paidDaysAgo: 5 },
-    { key: "lyceum-2", teacherName: "Lyceum School", courseSlug: "math-olympiad-prep", buyerIdx: 3, grossCents: 4900, status: "PAID", paidDaysAgo: 22 },
+    { key: "lyceum-1", teacherName: "Lyceum School", courseSlug: "math-olympiad-prep", buyerIdx: 1, grossCents: 149900, status: "PAID", paidDaysAgo: 5 },
+    { key: "lyceum-2", teacherName: "Lyceum School", courseSlug: "math-olympiad-prep", buyerIdx: 3, grossCents: 149900, status: "PAID", paidDaysAgo: 22 },
   ];
 
   const nowMs = Date.now();
