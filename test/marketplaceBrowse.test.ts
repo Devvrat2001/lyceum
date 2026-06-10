@@ -107,4 +107,94 @@ describe("marketplace.browse", () => {
     const ids = [...page1.courses, ...page2.courses].map((c) => c.id);
     expect(new Set(ids).size).toBe(3); // no dupes across pages
   });
+
+  it("composes chip filters with the search text", async () => {
+    const marker = `${MARKER}flt`;
+    const teacher = await createTestUser({ role: "TEACHER" });
+    const viewer = await createTestUser({ role: "STUDENT" });
+    const mathFree = await makeCourse(teacher.id, {
+      title: `Math Free ${marker}`,
+    });
+    await db.course.create({
+      data: {
+        slug: `test-vitest-browse-${crypto.randomUUID()}`,
+        title: `Math Paid ${marker}`,
+        description: "Vitest fixture course.",
+        subject: "math",
+        grade: "6",
+        authorId: teacher.id,
+        authorLabel: "Test Teacher",
+        priceCents: 49900,
+        status: "PUBLISHED",
+      },
+    });
+    await db.course.create({
+      data: {
+        slug: `test-vitest-browse-${crypto.randomUUID()}`,
+        title: `Science Free ${marker}`,
+        description: "Vitest fixture course.",
+        subject: "science",
+        grade: "6",
+        authorId: teacher.id,
+        authorLabel: "Test Teacher",
+        priceCents: 0,
+        status: "PUBLISHED",
+      },
+    });
+
+    const res = await viewer.caller.marketplace.browse({
+      q: marker,
+      subject: "math",
+      price: "free",
+      limit: 48,
+    });
+    expect(res.courses.map((c) => c.id)).toEqual([mathFree.id]);
+    expect(res.total).toBe(1);
+  });
+
+  it("length bucket post-filters a candidate pool (single page, no cursor)", async () => {
+    const marker = `${MARKER}len`;
+    const teacher = await createTestUser({ role: "TEACHER" });
+    const viewer = await createTestUser({ role: "STUDENT" });
+    const short = await makeCourse(teacher.id, {
+      title: `Short ${marker}`,
+      enrollCount: 2,
+    });
+    const medium = await makeCourse(teacher.id, {
+      title: `Medium ${marker}`,
+      enrollCount: 1,
+    });
+    const makeLessons = async (courseId: string, n: number) => {
+      const unit = await db.unit.create({
+        data: { courseId, order: 1, title: "U" },
+      });
+      for (let i = 1; i <= n; i++) {
+        await db.lesson.create({
+          data: {
+            unitId: unit.id,
+            order: i,
+            title: `L${i}`,
+            slug: `test-vitest-bl-${crypto.randomUUID()}`,
+          },
+        });
+      }
+    };
+    await makeLessons(short.id, 2); // "short" bucket: 1–4 lessons
+    await makeLessons(medium.id, 6); // "medium" bucket: 5–9 lessons
+
+    const shortRes = await viewer.caller.marketplace.browse({
+      q: marker,
+      length: "short",
+      limit: 48,
+    });
+    expect(shortRes.courses.map((c) => c.id)).toEqual([short.id]);
+    expect(shortRes.nextCursor).toBeNull();
+
+    const mediumRes = await viewer.caller.marketplace.browse({
+      q: marker,
+      length: "medium",
+      limit: 48,
+    });
+    expect(mediumRes.courses.map((c) => c.id)).toEqual([medium.id]);
+  });
 });

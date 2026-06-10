@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { Popover, PopoverOption } from "@/components/ui/Popover";
 import {
@@ -29,6 +29,9 @@ import {
  */
 export function MarketplaceFilters() {
   const router = useRouter();
+  // Pathname-aware so the same chips drive both the homepage ("/") and
+  // the /browse catalog — each writes its own URL.
+  const pathname = usePathname() ?? "/";
   const sp = useSearchParams();
   const grade = sp?.get("grade") ?? null;
   const subject = sp?.get("subject") ?? null;
@@ -45,7 +48,7 @@ export function MarketplaceFilters() {
     if (value === null) next.delete(key);
     else next.set(key, value);
     const qs = next.toString();
-    router.push(qs ? `/?${qs}` : "/");
+    router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
   const gradeLabel = labelFor(MARKETPLACE_GRADES, grade ?? undefined);
@@ -59,7 +62,7 @@ export function MarketplaceFilters() {
 
   const clearAll = useMemo(() => {
     return () => {
-      // Keep `topic` if present; clear our three dimensions only.
+      // Keep `topic` if present; clear our own dimensions only.
       const next = new URLSearchParams(sp?.toString() ?? "");
       next.delete("grade");
       next.delete("subject");
@@ -68,9 +71,9 @@ export function MarketplaceFilters() {
       next.delete("rating");
       next.delete("format");
       const qs = next.toString();
-      router.push(qs ? `/?${qs}` : "/");
+      router.push(qs ? `${pathname}?${qs}` : pathname);
     };
-  }, [router, sp]);
+  }, [router, sp, pathname]);
 
   return (
     <>

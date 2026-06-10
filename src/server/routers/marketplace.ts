@@ -114,6 +114,42 @@ function sortOrderFor(
   }
 }
 
+/**
+ * Compose the catalog `where` from the chip filters. Shared by
+ * `featured` (homepage strip) and `browse` (/browse catalog) so the two
+ * surfaces can never disagree about what a filter means. Length is NOT
+ * here — it's an aggregate post-filter the callers apply over a
+ * candidate pool. Topic chips override the subject hint (picking
+ * "Reading" means ELA regardless of the page's default subject); rating
+ * and format are plain columns guarded against stale URL values.
+ */
+function catalogWhere(input?: {
+  topic?: string;
+  subject?: string;
+  grade?: string;
+  price?: string;
+  rating?: string;
+  format?: string;
+}): Prisma.CourseWhereInput {
+  const topicFragment = topicWhere(input?.topic);
+  const priceFragment = priceWhere(input?.price);
+  const ratingMin = ratingMinFor(input?.rating);
+  const format =
+    input?.format && isMarketplaceFormat(input.format) ? input.format : null;
+  return {
+    status: "PUBLISHED",
+    ...(topicFragment
+      ? topicFragment
+      : input?.subject
+        ? { subject: input.subject }
+        : {}),
+    ...(input?.grade ? { grade: input.grade } : {}),
+    ...(priceFragment ?? {}),
+    ...(ratingMin !== null ? { ratingAvg: { gte: ratingMin } } : {}),
+    ...(format ? { format } : {}),
+  };
+}
+
 export const marketplaceRouter = router({
   /** Featured course cards (top picks). */
   featured: publicProcedure
@@ -138,32 +174,7 @@ export const marketplaceRouter = router({
         .optional()
     )
     .query(async ({ ctx, input }) => {
-      const topicFragment = topicWhere(input?.topic);
-      const priceFragment = priceWhere(input?.price);
-      // Rating is a plain column, so it composes into `where` directly
-      // (and thus applies to both the fast path and the length pool below).
-      const ratingMin = ratingMinFor(input?.rating);
-      // Format is a plain column too — guard the raw URL value so a stale
-      // `?format=` degrades to "no filter" rather than an empty grid.
-      const format =
-        input?.format && isMarketplaceFormat(input.format)
-          ? input.format
-          : null;
-      // Topic chips override the subject hint — if you've picked
-      // "Reading" you want ELA courses regardless of what the page's
-      // default subject was. The `grade` hint stays as a soft filter.
-      const where: Prisma.CourseWhereInput = {
-        status: "PUBLISHED",
-        ...(topicFragment
-          ? topicFragment
-          : input?.subject
-            ? { subject: input.subject }
-            : {}),
-        ...(input?.grade ? { grade: input.grade } : {}),
-        ...(priceFragment ?? {}),
-        ...(ratingMin !== null ? { ratingAvg: { gte: ratingMin } } : {}),
-        ...(format ? { format } : {}),
-      };
+      const where = catalogWhere(input);
       const limit = input?.limit ?? 4;
       const orderBy = sortOrderFor(input?.sort);
       // id is consumed by the marketplace page to cross-reference
@@ -237,47 +248,102 @@ export const marketplaceRouter = router({
     .input(
       z.object({
         q: z.string().trim().max(120).optional(),
+        topic: z.string().optional(),
+        subject: z.string().optional(),
+        grade: z.string().optional(),
+        price: z.string().optional(),
+        /** Course-length bucket — aggregate post-filter, see below. */
+        length: z.string().optional(),
+        rating: z.string().optional(),
+        format: z.string().optional(),
+        sort: z.string().optional(),
         limit: z.number().int().min(1).max(48).default(24),
         cursor: z.string().nullish(),
       })
     )
     .query(async ({ ctx, input }) => {
-      const where: Prisma.CourseWhereInput = {
-        status: "PUBLISHED",
-        ...(input.q
-          ? {
-              OR: [
-                { title: { contains: input.q, mode: "insensitive" } },
-                { tagline: { contains: input.q, mode: "insensitive" } },
-                { description: { contains: input.q, mode: "insensitive" } },
-                { subject: { contains: input.q, mode: "insensitive" } },
-                { authorLabel: { contains: input.q, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      };
+      const base = catalogWhere(input);
+      // q composes via AND so it can never clobber a topic fragment's
+      // own OR block (e.g. test-prep's title keywords).
+      const where: Prisma.CourseWhereInput = input.q
+        ? {
+            AND: [
+              base,
+              {
+                OR: [
+                  { title: { contains: input.q, mode: "insensitive" } },
+                  { tagline: { contains: input.q, mode: "insensitive" } },
+                  {
+                    description: { contains: input.q, mode: "insensitive" },
+                  },
+                  { subject: { contains: input.q, mode: "insensitive" } },
+                  {
+                    authorLabel: { contains: input.q, mode: "insensitive" },
+                  },
+                ],
+              },
+            ],
+          }
+        : base;
+      // Always append an id tiebreak so the cursor walks a total order.
+      const orderBy: Prisma.CourseOrderByWithRelationInput[] = [
+        ...sortOrderFor(input.sort),
+        { id: "desc" },
+      ];
+      const select = {
+        id: true,
+        slug: true,
+        title: true,
+        authorLabel: true,
+        subject: true,
+        grade: true,
+        ratingAvg: true,
+        ratingCount: true,
+        priceCents: true,
+        tag: true,
+      } satisfies Prisma.CourseSelect;
+
+      // Length is an aggregate over units→lessons with no column to
+      // `where` on, so it can't compose with cursor pagination — a
+      // length-filtered browse returns the filtered top-60 candidate
+      // pool as a single page (same strategy as `featured`).
+      const lengthRange = lengthRangeFor(input.length);
+      if (lengthRange) {
+        const POOL_SIZE = 60;
+        const pool = await ctx.db.course.findMany({
+          where,
+          orderBy,
+          take: POOL_SIZE,
+          select: {
+            ...select,
+            units: { select: { _count: { select: { lessons: true } } } },
+          },
+        });
+        const matched = pool
+          .map((c) => {
+            const { units, ...card } = c;
+            const lessonCount = units.reduce(
+              (acc, u) => acc + u._count.lessons,
+              0
+            );
+            return { card, lessonCount };
+          })
+          .filter(
+            (m) =>
+              m.lessonCount >= lengthRange.min &&
+              m.lessonCount <= lengthRange.max
+          )
+          .map((m) => m.card);
+        return { courses: matched, total: matched.length, nextCursor: null };
+      }
+
       const take = input.limit;
       const rows = await ctx.db.course.findMany({
         where,
-        orderBy: [
-          { enrollCount: "desc" },
-          { ratingAvg: "desc" },
-          { id: "desc" },
-        ],
+        orderBy,
         take: take + 1,
         ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          authorLabel: true,
-          subject: true,
-          grade: true,
-          ratingAvg: true,
-          ratingCount: true,
-          priceCents: true,
-          tag: true,
-        },
+        select,
       });
       const courses = rows.slice(0, take);
       // Cursor convention: the LAST RETURNED row's id; the next page

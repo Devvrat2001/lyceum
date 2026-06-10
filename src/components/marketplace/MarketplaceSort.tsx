@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Popover, PopoverOption } from "@/components/ui/Popover";
 import {
   MARKETPLACE_DEFAULT_SORT,
@@ -20,6 +20,8 @@ import {
  */
 export function MarketplaceSort() {
   const router = useRouter();
+  // Pathname-aware: drives "/" and "/browse" alike.
+  const pathname = usePathname() ?? "/";
   const sp = useSearchParams();
   const sort = sp?.get("sort") ?? null;
   // Unknown / missing slug shows the default label (mirrors the server,
@@ -33,7 +35,7 @@ export function MarketplaceSort() {
     if (value === MARKETPLACE_DEFAULT_SORT) next.delete("sort");
     else next.set("sort", value);
     const qs = next.toString();
-    router.push(qs ? `/?${qs}` : "/");
+    router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
   return (

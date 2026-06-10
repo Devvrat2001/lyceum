@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { keepPreviousData } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/react";
 import { Btn, Card, Eyebrow } from "@/components/wf/primitives";
 import { CourseCard } from "./CourseCard";
+import { MarketplaceFilters } from "./MarketplaceFilters";
+import { MarketplaceSort } from "./MarketplaceSort";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 /**
@@ -19,8 +22,23 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
   const [q, setQ] = useState(initialQ);
   const debouncedQ = useDebouncedValue(q.trim(), 250);
 
+  // Chip filters + sort live in the URL (the same MarketplaceFilters /
+  // MarketplaceSort components as the homepage — they're pathname-aware)
+  // while the search text stays local state for keystroke-speed updates.
+  const sp = useSearchParams();
+  const filters = {
+    topic: sp?.get("topic") ?? undefined,
+    subject: sp?.get("subject") ?? undefined,
+    grade: sp?.get("grade") ?? undefined,
+    price: sp?.get("price") ?? undefined,
+    length: sp?.get("length") ?? undefined,
+    rating: sp?.get("rating") ?? undefined,
+    format: sp?.get("format") ?? undefined,
+    sort: sp?.get("sort") ?? undefined,
+  };
+
   const browse = trpc.marketplace.browse.useInfiniteQuery(
-    { q: debouncedQ || undefined, limit: 24 },
+    { q: debouncedQ || undefined, ...filters, limit: 24 },
     {
       getNextPageParam: (last) => last.nextCursor,
       placeholderData: keepPreviousData,
@@ -81,6 +99,23 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
             ? "…"
             : `${total.toLocaleString()} course${total === 1 ? "" : "s"}`}
         </span>
+      </div>
+
+      {/* Same filter row as the homepage — the chips write this page's
+          URL, and the query above re-runs from it. */}
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginBottom: 18,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <Eyebrow style={{ marginRight: 8 }}>Filter</Eyebrow>
+        <MarketplaceFilters />
+        <div style={{ flex: 1 }} />
+        <MarketplaceSort />
       </div>
 
       {browse.isLoading ? null : courses.length === 0 ? (
