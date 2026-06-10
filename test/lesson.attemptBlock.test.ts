@@ -8,47 +8,70 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { cleanupTestUsers, createTestUser } from "./helpers";
 
+type McqOption = { text: string; correct: boolean };
+
+const OPTIONS: McqOption[] = [
+  { text: "3", correct: false },
+  { text: "4", correct: true },
+  { text: "22", correct: false },
+];
+
+// Self-created MCQ fixture. The demo seed predates the block system and
+// creates zero Block rows — the old `findFirst({ type: "MCQ" })` lookup
+// only worked locally because dev DBs have accumulated builder/AI
+// content (CI's fresh seeded DB caught this). Owned by a test-vitest
+// teacher so cleanupTestUsers() cascades the whole tree away.
+let mcqBlockId: string;
+
 beforeAll(async () => {
   await cleanupTestUsers();
+  const teacher = await createTestUser({ role: "TEACHER" });
+  const course = await db.course.create({
+    data: {
+      slug: `test-vitest-attempt-${crypto.randomUUID()}`,
+      title: "Attempt Fixture Course",
+      description: "Vitest fixture course.",
+      subject: "math",
+      grade: "6",
+      authorId: teacher.id,
+      authorLabel: "Test Teacher",
+      priceCents: 0,
+      status: "PUBLISHED",
+    },
+  });
+  const unit = await db.unit.create({
+    data: { courseId: course.id, order: 1, title: "U1" },
+  });
+  const lesson = await db.lesson.create({
+    data: {
+      unitId: unit.id,
+      order: 1,
+      title: "L1",
+      slug: `test-vitest-attempt-${crypto.randomUUID()}`,
+    },
+  });
+  const block = await db.block.create({
+    data: {
+      lessonId: lesson.id,
+      order: 1,
+      type: "MCQ",
+      settings: { stem: "2 + 2 = ?", options: OPTIONS },
+    },
+  });
+  mcqBlockId = block.id;
 });
 afterAll(async () => {
   await cleanupTestUsers();
 });
 
-type McqOption = { text: string; correct: boolean };
-
-/**
- * Pick any MCQ block from the seeded data. The shape is read fresh
- * each test because tests are independent (no shared block id).
- */
+/** The fixture block + derived answer indices (fresh read per test). */
 async function findMcqBlock() {
-  const block = await db.block.findFirst({
-    where: { type: "MCQ" },
+  const block = await db.block.findUniqueOrThrow({
+    where: { id: mcqBlockId },
   });
-  if (!block) {
-    throw new Error("No MCQ block in DB — run `npm run db:seed`.");
-  }
-  const settings = (block.settings ?? {}) as { options?: unknown };
-  const rawOptions = Array.isArray(settings.options) ? settings.options : [];
-  const options = rawOptions.filter(
-    (o): o is McqOption =>
-      o !== null &&
-      typeof o === "object" &&
-      typeof (o as { text?: unknown }).text === "string" &&
-      typeof (o as { correct?: unknown }).correct === "boolean"
-  );
-  if (options.length < 2) {
-    throw new Error(
-      `MCQ block ${block.id} has <2 valid options — reseed the fixtures.`
-    );
-  }
+  const options = OPTIONS;
   const correctIndex = options.findIndex((o) => o.correct);
   const wrongIndex = options.findIndex((o) => !o.correct);
-  if (correctIndex < 0 || wrongIndex < 0) {
-    throw new Error(
-      `MCQ block ${block.id} missing a correct or wrong option.`
-    );
-  }
   return { block, options, correctIndex, wrongIndex };
 }
 
