@@ -22,7 +22,8 @@ type Order = {
   netCents: number;
   grossCents: number;
   courseTitle: string;
-  courseSlug: string;
+  /** Null for bundle (path) orders — they have no course page. */
+  courseSlug: string | null;
   buyerName: string;
   provider: string;
 };

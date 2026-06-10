@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN     "pathId" TEXT,
+ALTER COLUMN "courseId" DROP NOT NULL,
+ALTER COLUMN "teacherId" DROP NOT NULL;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_pathId_fkey" FOREIGN KEY ("pathId") REFERENCES "Path"("id") ON DELETE SET NULL ON UPDATE CASCADE;

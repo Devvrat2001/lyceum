@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
-import { ensureEnrollment } from "@/server/services/enrollment";
+import { fulfillPaidOrder } from "@/server/services/fulfillOrder";
 import {
   orderIdFromRazorpayEvent,
   verifyRazorpaySignature,
@@ -76,15 +76,9 @@ export async function POST(req: Request) {
     if (orderId) {
       const order = await db.order.findUnique({ where: { id: orderId } });
       if (order && order.status === "PENDING") {
-        await db.$transaction(async (tx) => {
-          await tx.order.update({
-            where: { id: orderId },
-            data: { status: "PAID", paidAt: new Date() },
-          });
-          await ensureEnrollment(tx, order.userId, order.courseId, {
-            lastActivityAt: new Date(),
-          });
-        });
+        // Shared fulfillment: PAID flip + enrollment(s) — single course
+        // or every course in a bundle order.
+        await fulfillPaidOrder(db, order);
         await audit({
           actorId: order.userId,
           kind: "course.publish",

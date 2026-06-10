@@ -14,7 +14,7 @@ import { CURRENCY } from "@/lib/currency";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
-import { ensureEnrollment } from "../services/enrollment";
+import { fulfillPaidOrder } from "../services/fulfillOrder";
 
 /**
  * Stripe Checkout Session shape (subset we use). Imported as a structural
@@ -235,6 +235,164 @@ export const paymentRouter = router({
     }),
 
   /**
+   * Start a checkout flow for a PAID multi-course bundle (path).
+   * Mirrors createCheckoutSession: returns a `url` the client redirects
+   * to (Razorpay Payment Link / Stripe Checkout / the demo page). Free
+   * bundles are rejected — path.enroll handles those without an Order.
+   * Fulfillment (webhooks / demoConfirm) enrolls EVERY course in the
+   * path via fulfillPaidOrder.
+   */
+  createPathCheckout: protectedProcedure
+    .input(z.object({ pathId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const path = await ctx.db.path.findUnique({
+        where: { id: input.pathId },
+        include: { courses: { select: { courseId: true } } },
+      });
+      if (!path) throw new TRPCError({ code: "NOT_FOUND" });
+      if (path.priceCents <= 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Use path.enroll for free bundles.",
+        });
+      }
+      if (path.courses.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This bundle has no courses yet.",
+        });
+      }
+      // Fully-owned short circuit — never invite a student to re-buy a
+      // bundle whose every course is already in their library.
+      const ownedCount = await ctx.db.enrollment.count({
+        where: {
+          userId: ctx.user.id,
+          courseId: { in: path.courses.map((c) => c.courseId) },
+        },
+      });
+      if (ownedCount >= path.courses.length) {
+        return {
+          alreadyEnrolled: true as const,
+          url: "/student/library",
+          orderId: null,
+        };
+      }
+
+      const grossCents = path.priceCents;
+      const feeCents = computeFeeCents(grossCents);
+      const netCents = grossCents - feeCents;
+      const provider = isRazorpayEnabled()
+        ? "razorpay"
+        : isStripeEnabled()
+          ? "stripe"
+          : "demo";
+      const successUrl = `${env.PUBLIC_BASE_URL}/checkout/success?pathSlug=${path.slug}`;
+      const cancelUrl = `${env.PUBLIC_BASE_URL}/`;
+
+      const externalId =
+        provider === "demo"
+          ? `demo_${crypto.randomUUID()}`
+          : `${provider}_pending_${crypto.randomUUID()}`;
+      const order = await ctx.db.order.create({
+        data: {
+          userId: ctx.user.id,
+          pathId: path.id,
+          // Teacher-owned bundles attribute earnings to their author;
+          // platform-curated (seeded) bundles have no teacher.
+          teacherId: path.authorId,
+          grossCents,
+          feeCents,
+          netCents,
+          currency: CURRENCY.code,
+          status: "PENDING",
+          provider,
+          externalId,
+        },
+      });
+
+      let url: string;
+      if (provider === "demo") {
+        url = `/demo-checkout/${order.id}`;
+      } else if (provider === "razorpay") {
+        const link = await createPaymentLink({
+          amountPaise: grossCents,
+          referenceId: order.id,
+          description: path.title.slice(0, 250),
+          customerEmail: ctx.user.email ?? undefined,
+          callbackUrl: successUrl,
+        });
+        await ctx.db.order.update({
+          where: { id: order.id },
+          data: { externalId: link.id },
+        });
+        url = link.short_url;
+      } else {
+        const stripe = (await getStripe()) as StripeLike | null;
+        if (!stripe) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Stripe is enabled in env but the SDK isn't installed.",
+          });
+        }
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          payment_method_types: ["card"],
+          success_url: `${successUrl}&sid={CHECKOUT_SESSION_ID}`,
+          cancel_url: cancelUrl,
+          client_reference_id: order.id,
+          customer_email: ctx.user.email ?? undefined,
+          line_items: [
+            {
+              quantity: 1,
+              price_data: {
+                currency: CURRENCY.code,
+                unit_amount: grossCents,
+                product_data: { name: path.title },
+              },
+            },
+          ],
+          // No Connect transfer_data for bundles yet — multi-teacher
+          // splits need per-course apportioning; phase 2 alongside
+          // Razorpay Route.
+          metadata: { orderId: order.id, pathId: path.id },
+          payment_intent_data: {
+            metadata: { orderId: order.id, pathId: path.id },
+          },
+        });
+        if (!session.url) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Stripe returned no checkout URL",
+          });
+        }
+        await ctx.db.order.update({
+          where: { id: order.id },
+          data: { externalId: session.id },
+        });
+        url = session.url;
+      }
+
+      await audit({
+        actorId: ctx.user.id,
+        kind: "course.publish",
+        payload: {
+          variant: "checkout_start",
+          provider,
+          pathId: path.id,
+          orderId: order.id,
+          grossCents,
+        },
+      });
+
+      return {
+        url,
+        orderId: order.id,
+        provider,
+        alreadyEnrolled: false as const,
+      };
+    }),
+
+  /**
    * Demo-mode "I clicked Pay" handler. Real Stripe goes through
    * /api/stripe/webhook instead. This procedure is what
    * /demo-checkout/[orderId] calls when the user confirms the fake
@@ -245,7 +403,10 @@ export const paymentRouter = router({
     .mutation(async ({ ctx, input }) => {
       const order = await ctx.db.order.findUnique({
         where: { id: input.orderId },
-        include: { course: { select: { slug: true, id: true } } },
+        include: {
+          course: { select: { slug: true, id: true } },
+          path: { select: { slug: true } },
+        },
       });
       if (!order) throw new TRPCError({ code: "NOT_FOUND" });
       if (order.userId !== ctx.user.id) {
@@ -258,24 +419,24 @@ export const paymentRouter = router({
         });
       }
       if (order.status === "PAID") {
-        return { ok: true as const, alreadyPaid: true, courseSlug: order.course.slug };
+        return {
+          ok: true as const,
+          alreadyPaid: true,
+          courseSlug: order.course?.slug ?? null,
+          pathSlug: order.path?.slug ?? null,
+        };
       }
-      await ctx.db.$transaction(async (tx) => {
-        await tx.order.update({
-          where: { id: order.id },
-          data: { status: "PAID", paidAt: new Date() },
-        });
-        await ensureEnrollment(tx, order.userId, order.courseId, {
-          lastActivityAt: new Date(),
-        });
-      });
+      // Shared fulfillment: PAID flip + enrollment(s) — single course or
+      // every course in a bundle — identical to the webhook paths.
+      await fulfillPaidOrder(ctx.db, order);
       // Purchase receipt — best-effort, swallows its own errors so it
       // can never break the confirm.
       await sendOrderReceipt(order.id);
       return {
         ok: true as const,
         alreadyPaid: false,
-        courseSlug: order.course.slug,
+        courseSlug: order.course?.slug ?? null,
+        pathSlug: order.path?.slug ?? null,
       };
     }),
 
@@ -318,6 +479,7 @@ export const paymentRouter = router({
           take: limit,
           include: {
             course: { select: { title: true, slug: true } },
+            path: { select: { title: true } },
             user: { select: { name: true, firstName: true } },
           },
         }),
@@ -340,8 +502,10 @@ export const paymentRouter = router({
           status: o.status,
           netCents: o.netCents,
           grossCents: o.grossCents,
-          courseTitle: o.course.title,
-          courseSlug: o.course.slug,
+          courseTitle:
+            o.course?.title ??
+            (o.path ? `Bundle · ${o.path.title}` : "—"),
+          courseSlug: o.course?.slug ?? null,
           buyerName: o.user.name ?? o.user.firstName ?? "Anonymous",
           provider: o.provider,
         })),
@@ -417,6 +581,17 @@ export const paymentRouter = router({
         });
       }
 
+      // Bundle orders span multiple courses with their own enrollment
+      // semantics — out of scope for the demo refund. v1: refuse.
+      const refundCourseId = order.courseId;
+      if (order.pathId || !refundCourseId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Bundle orders can't be refunded from here yet — contact support.",
+        });
+      }
+
       // Demo refund: flip status + drop the enrollment atomically.
       await ctx.db.$transaction([
         ctx.db.order.update({
@@ -424,7 +599,7 @@ export const paymentRouter = router({
           data: { status: "REFUNDED", refundedAt: new Date() },
         }),
         ctx.db.enrollment.deleteMany({
-          where: { userId: order.userId, courseId: order.courseId },
+          where: { userId: order.userId, courseId: refundCourseId },
         }),
       ]);
 
@@ -433,14 +608,14 @@ export const paymentRouter = router({
         kind: "payment.refund_initiated",
         payload: {
           orderId: order.id,
-          courseId: order.courseId,
+          courseId: refundCourseId,
           buyerUserId: order.userId,
           grossCents: order.grossCents,
           provider: order.provider,
           mode: "demo",
           reason: input.reason ?? null,
         },
-        courseId: order.courseId,
+        courseId: refundCourseId,
       });
 
       return {

@@ -19,6 +19,7 @@ export default async function DemoCheckoutPage({
     where: { id: orderId },
     include: {
       course: { select: { title: true, slug: true, tagline: true } },
+      path: { select: { title: true, slug: true, subtitle: true } },
       teacher: { select: { name: true, firstName: true } },
     },
   });
@@ -48,7 +49,11 @@ export default async function DemoCheckoutPage({
   }
 
   if (order.status === "PAID") {
-    redirect(`/checkout/success?courseSlug=${order.course.slug}`);
+    redirect(
+      order.course
+        ? `/checkout/success?courseSlug=${order.course.slug}`
+        : `/checkout/success?pathSlug=${order.path?.slug ?? ""}`
+    );
   }
 
   return (
@@ -112,16 +117,16 @@ export default async function DemoCheckoutPage({
         </div>
 
         <Card p={28}>
-          <Eyebrow>Course purchase</Eyebrow>
+          <Eyebrow>{order.path ? "Bundle purchase" : "Course purchase"}</Eyebrow>
           <h1
             className="wf-h1"
             style={{ fontSize: 22, margin: "8px 0 4px" }}
           >
-            {order.course.title}
+            {order.course?.title ?? order.path?.title}
           </h1>
-          {order.course.tagline && (
+          {(order.course?.tagline ?? order.path?.subtitle) && (
             <div style={{ fontSize: 12, color: "var(--wf-mute)" }}>
-              {order.course.tagline}
+              {order.course?.tagline ?? order.path?.subtitle}
             </div>
           )}
           <div
@@ -169,7 +174,7 @@ export default async function DemoCheckoutPage({
           <DemoCheckoutForm orderId={order.id} />
           <div style={{ marginTop: 12, textAlign: "center" }}>
             <Link
-              href={`/course/${order.course.slug}`}
+              href={order.course ? `/course/${order.course.slug}` : "/"}
               style={{
                 fontSize: 11,
                 color: "var(--wf-mute)",

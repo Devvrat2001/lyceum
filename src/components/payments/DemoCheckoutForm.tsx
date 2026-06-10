@@ -11,7 +11,11 @@ export function DemoCheckoutForm({ orderId }: { orderId: string }) {
 
   const confirm = trpc.payment.demoConfirm.useMutation({
     onSuccess: (r) => {
-      router.push(`/checkout/success?courseSlug=${r.courseSlug}`);
+      router.push(
+        r.courseSlug
+          ? `/checkout/success?courseSlug=${r.courseSlug}`
+          : `/checkout/success?pathSlug=${r.pathSlug ?? ""}`
+      );
     },
     onError: (e) => setError(e.message),
   });

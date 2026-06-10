@@ -74,6 +74,7 @@ export async function GET(req: Request) {
     orderBy: { paidAt: "asc" },
     include: {
       course: { select: { slug: true, title: true } },
+      path: { select: { slug: true, title: true } },
       user: { select: { name: true, firstName: true, email: true } },
     },
   });
@@ -111,8 +112,8 @@ export async function GET(req: Request) {
         o.paidAt
           ? o.paidAt.toISOString().slice(0, 10)
           : "",
-        o.course.slug,
-        o.course.title,
+        o.course?.slug ?? o.path?.slug ?? "—",
+        o.course?.title ?? (o.path ? `Bundle: ${o.path.title}` : "—"),
         o.user.name ?? o.user.firstName ?? "Anonymous",
         o.user.email,
         dollars(o.grossCents),

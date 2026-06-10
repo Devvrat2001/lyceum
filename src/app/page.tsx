@@ -592,6 +592,7 @@ export default async function MarketplacePage({
                     <PathEnrollButton
                       pathId={p.id}
                       pathSlug={p.slug}
+                      priceCents={p.priceCents}
                       ownedCount={ownedInPath}
                       totalCount={p.courses.length}
                     />

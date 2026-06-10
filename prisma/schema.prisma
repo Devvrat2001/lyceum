@@ -490,6 +490,7 @@ model Path {
   authorId  String?
   author    User?        @relation("PathAuthor", fields: [authorId], references: [id], onDelete: SetNull)
   courses   PathCourse[]
+  orders    Order[]      @relation("OrderPath")
 }
 
 model PathCourse {
@@ -570,11 +571,16 @@ model Order {
   id           String      @id @default(cuid())
   userId       String
   user         User        @relation("OrderBuyer", fields: [userId], references: [id], onDelete: Cascade)
-  courseId     String
-  course       Course      @relation("OrderCourse", fields: [courseId], references: [id], onDelete: Cascade)
-  /// Teacher who authored the course; denormalized so the earnings query stays simple.
-  teacherId    String
-  teacher      User        @relation("OrderTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  /// Exactly one of courseId / pathId is set (enforced in code, not DB):
+  /// single-course purchase vs multi-course bundle purchase.
+  courseId     String?
+  course       Course?     @relation("OrderCourse", fields: [courseId], references: [id], onDelete: Cascade)
+  pathId       String?
+  path         Path?       @relation("OrderPath", fields: [pathId], references: [id], onDelete: SetNull)
+  /// Teacher who authored the course (or owns the bundle); denormalized so
+  /// the earnings query stays simple. Null for platform-curated bundles.
+  teacherId    String?
+  teacher      User?       @relation("OrderTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
   /// Gross amount the student paid (cents).
   grossCents   Int
   /// Lyceum take (15% default). Subtract from gross to get net.

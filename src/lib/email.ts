@@ -131,25 +131,34 @@ export async function sendOrderReceipt(orderId: string): Promise<void> {
       where: { id: orderId },
       include: {
         course: { select: { title: true, slug: true } },
+        path: { select: { title: true } },
         user: { select: { email: true, name: true, firstName: true } },
       },
     });
     if (!order || order.status !== "PAID" || !order.user.email) return;
 
+    // Single-course orders link to the course page; bundle orders have
+    // no public detail page yet, so they link home.
+    const itemTitle =
+      order.course?.title ?? order.path?.title ?? "your purchase";
+    const itemUrl = order.course
+      ? `${env.PUBLIC_BASE_URL}/course/${order.course.slug}`
+      : env.PUBLIC_BASE_URL;
+
     await resend.emails.send({
       from: FROM_ADDRESS,
       to: order.user.email,
-      subject: `Your Lyceum receipt — ${order.course.title}`,
+      subject: `Your Lyceum receipt — ${itemTitle}`,
       html: receiptHtml({
         buyerName: order.user.name ?? order.user.firstName ?? "there",
-        courseTitle: order.course.title,
+        courseTitle: itemTitle,
         amount: formatMoney(order.grossCents),
         paidAt: (order.paidAt ?? new Date()).toLocaleDateString("en-US", {
           year: "numeric",
           month: "long",
           day: "numeric",
         }),
-        courseUrl: `${env.PUBLIC_BASE_URL}/course/${order.course.slug}`,
+        courseUrl: itemUrl,
       }),
     });
   } catch (err) {

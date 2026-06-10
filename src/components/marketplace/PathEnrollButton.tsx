@@ -11,6 +11,13 @@ type Props = {
   pathId: string;
   pathSlug: string;
   /**
+   * Bundle price in paise. Paid bundles go through
+   * payment.createPathCheckout (Razorpay/Stripe/demo); free bundles
+   * keep the direct path.enroll flow. Defaults to 0 (free behaviour)
+   * so callers without the data keep the original button.
+   */
+  priceCents?: number;
+  /**
    * How many of the path's courses the viewer already owns. Defaults
    * to 0 (treats viewer as anon / no enrollments) so callers without
    * the data still get the original "Enroll →" behavior.
@@ -23,6 +30,7 @@ type Props = {
 export function PathEnrollButton({
   pathId,
   pathSlug,
+  priceCents = 0,
   ownedCount = 0,
   totalCount = 0,
 }: Props) {
@@ -45,6 +53,22 @@ export function PathEnrollButton({
           ? `Saved ${saved} course${saved === 1 ? "" : "s"} for later`
           : "Already enrolled"
       );
+    },
+    onError: (e) => setFeedback(e.message),
+  });
+
+  const checkout = trpc.payment.createPathCheckout.useMutation({
+    onSuccess: ({ url, alreadyEnrolled }) => {
+      if (alreadyEnrolled) {
+        router.push("/student/library");
+        return;
+      }
+      // External URL (Razorpay/Stripe-hosted) or local /demo-checkout.
+      if (url.startsWith("http")) {
+        window.location.href = url;
+      } else {
+        router.push(url);
+      }
     },
     onError: (e) => setFeedback(e.message),
   });
@@ -97,7 +121,7 @@ export function PathEnrollButton({
       <Btn
         variant="primary"
         sm
-        disabled={enroll.isPending}
+        disabled={enroll.isPending || checkout.isPending}
         onClick={() => {
           if (status !== "authenticated") {
             router.push(
@@ -105,10 +129,18 @@ export function PathEnrollButton({
             );
             return;
           }
-          enroll.mutate({ pathId });
+          if (priceCents > 0) {
+            checkout.mutate({ pathId });
+          } else {
+            enroll.mutate({ pathId });
+          }
         }}
       >
-        {enroll.isPending ? "Enrolling…" : "Enroll →"}
+        {enroll.isPending || checkout.isPending
+          ? "Starting…"
+          : priceCents > 0
+            ? "Buy bundle →"
+            : "Enroll →"}
       </Btn>
     </div>
   );

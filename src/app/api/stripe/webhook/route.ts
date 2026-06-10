@@ -3,7 +3,7 @@ import { env } from "@/lib/env";
 import { getStripe } from "@/lib/payments/stripe";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
-import { ensureEnrollment } from "@/server/services/enrollment";
+import { fulfillPaidOrder } from "@/server/services/fulfillOrder";
 
 /**
  * Stripe webhook. Only runs in real-Stripe mode — demo orders never
@@ -123,15 +123,9 @@ export async function POST(req: Request) {
       if (orderId) {
         const order = await db.order.findUnique({ where: { id: orderId } });
         if (order && order.status === "PENDING") {
-          await db.$transaction(async (tx) => {
-            await tx.order.update({
-              where: { id: orderId },
-              data: { status: "PAID", paidAt: new Date() },
-            });
-            await ensureEnrollment(tx, order.userId, order.courseId, {
-              lastActivityAt: new Date(),
-            });
-          });
+          // Shared fulfillment: PAID flip + enrollment(s) — single
+          // course or every course in a bundle order.
+          await fulfillPaidOrder(db, order);
           await audit({
             actorId: order.userId,
             kind: "course.publish",
@@ -185,21 +179,32 @@ export async function POST(req: Request) {
         );
       }
       if (order && order.status === "PAID") {
-        // Flip the Order and cancel the Enrollment in one tx. We delete
-        // (not soft-delete) the Enrollment so the student loses access
-        // immediately — re-enrolling later just creates a fresh row.
-        await db.$transaction([
-          db.order.update({
+        // Flip the Order and cancel the enrollment(s) in one tx — the
+        // single course, or every course in a bundle order. We delete
+        // (not soft-delete) so the student loses access immediately;
+        // re-enrolling later just creates a fresh row.
+        await db.$transaction(async (tx) => {
+          await tx.order.update({
             where: { id: order.id },
             data: { status: "REFUNDED", refundedAt: new Date() },
-          }),
-          db.enrollment.deleteMany({
-            where: {
-              userId: order.userId,
-              courseId: order.courseId,
-            },
-          }),
-        ]);
+          });
+          if (order.courseId) {
+            await tx.enrollment.deleteMany({
+              where: { userId: order.userId, courseId: order.courseId },
+            });
+          } else if (order.pathId) {
+            const pcs = await tx.pathCourse.findMany({
+              where: { pathId: order.pathId },
+              select: { courseId: true },
+            });
+            await tx.enrollment.deleteMany({
+              where: {
+                userId: order.userId,
+                courseId: { in: pcs.map((p) => p.courseId) },
+              },
+            });
+          }
+        });
         await audit({
           actorId: order.userId,
           kind: "course.publish",
