@@ -8,7 +8,6 @@ import {
   Card,
   Eyebrow,
   Icon,
-  ImageBox,
 } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
 import { auth } from "@/lib/auth";
@@ -17,6 +16,8 @@ import { PathEnrollButton } from "@/components/marketplace/PathEnrollButton";
 import { FollowButton } from "@/components/marketplace/FollowButton";
 import { MarketplaceFilters } from "@/components/marketplace/MarketplaceFilters";
 import { MarketplaceSort } from "@/components/marketplace/MarketplaceSort";
+import { CourseCard } from "@/components/marketplace/CourseCard";
+import { fmtCount } from "@/lib/format";
 import {
   MARKETPLACE_GRADES,
   MARKETPLACE_PRICE_BUCKETS,
@@ -27,10 +28,6 @@ import {
 } from "@/lib/marketplace";
 import { Suspense } from "react";
 
-function fmtCount(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 1 : 1)}k`;
-  return n.toString();
-}
 
 export default async function MarketplacePage({
   searchParams,
@@ -327,9 +324,17 @@ export default async function MarketplacePage({
             <h2 className="wf-h2" style={{ fontSize: 18 }}>
               {featuredHeader}
             </h2>
-            <span style={{ fontSize: 12, color: "var(--wf-mute)" }}>
+            <Link
+              href="/browse"
+              style={{
+                fontSize: 12,
+                color: "var(--wf-accent)",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
               See all {featured.total} →
-            </span>
+            </Link>
           </div>
           {featured.courses.length === 0 ? (
             <Card p={28} style={{ textAlign: "center" }}>
@@ -366,98 +371,13 @@ export default async function MarketplacePage({
                 gap: 12,
               }}
             >
-              {featured.courses.map((c) => {
-                const owned = enrolledIds.has(c.id);
-                return (
-                  <Link
-                    key={c.slug}
-                    href={`/course/${c.slug}`}
-                    style={{ textDecoration: "none", color: "inherit" }}
-                  >
-                    <Card p={0}>
-                      <ImageBox h={130} kind="image" />
-                      <div style={{ padding: 12 }}>
-                        <div
-                          className="wf-mono"
-                          style={{
-                            fontSize: 9,
-                            // When the student already owns the course we
-                            // surface that here, replacing the marketing
-                            // tag (BESTSELLER / NEW / ...). It's the most
-                            // useful signal to render at-a-glance.
-                            color: owned
-                              ? "var(--wf-good)"
-                              : "var(--wf-accent)",
-                            letterSpacing: "0.06em",
-                            marginBottom: 4,
-                          }}
-                        >
-                          {owned ? "✓ IN LIBRARY" : c.tag ?? ""}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            marginBottom: 4,
-                            lineHeight: 1.25,
-                          }}
-                        >
-                          {c.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "var(--wf-mute)",
-                            marginBottom: 8,
-                          }}
-                        >
-                          {c.authorLabel}
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{ fontSize: 11, color: "var(--wf-body)" }}
-                          >
-                            ★ {c.ratingAvg.toFixed(1)}{" "}
-                            <span style={{ color: "var(--wf-mute)" }}>
-                              ({fmtCount(c.ratingCount)})
-                            </span>
-                          </span>
-                          {owned ? (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                color: "var(--wf-good)",
-                              }}
-                            >
-                              Continue →
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color:
-                                  c.priceCents === 0
-                                    ? "var(--wf-good)"
-                                    : "var(--wf-ink)",
-                              }}
-                            >
-                              {fmtPrice(c.priceCents)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  </Link>
-                );
-              })}
+              {featured.courses.map((c) => (
+                <CourseCard
+                  key={c.slug}
+                  course={c}
+                  owned={enrolledIds.has(c.id)}
+                />
+              ))}
             </div>
           )}
         </section>

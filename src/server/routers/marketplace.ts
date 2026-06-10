@@ -225,6 +225,70 @@ export const marketplaceRouter = router({
       return { courses, total: matched.length };
     }),
 
+  /**
+   * The /browse catalog: every PUBLISHED course, optionally narrowed by a
+   * live search string (title/tagline/description/subject/authorLabel,
+   * case-insensitive substring — fast enough at catalog scale; the
+   * tsvector/semantic stack stays the header combobox's job). Cursor
+   * pagination with a deterministic order (id tiebreak) so pages never
+   * overlap while the user scrolls.
+   */
+  browse: publicProcedure
+    .input(
+      z.object({
+        q: z.string().trim().max(120).optional(),
+        limit: z.number().int().min(1).max(48).default(24),
+        cursor: z.string().nullish(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const where: Prisma.CourseWhereInput = {
+        status: "PUBLISHED",
+        ...(input.q
+          ? {
+              OR: [
+                { title: { contains: input.q, mode: "insensitive" } },
+                { tagline: { contains: input.q, mode: "insensitive" } },
+                { description: { contains: input.q, mode: "insensitive" } },
+                { subject: { contains: input.q, mode: "insensitive" } },
+                { authorLabel: { contains: input.q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      };
+      const take = input.limit;
+      const rows = await ctx.db.course.findMany({
+        where,
+        orderBy: [
+          { enrollCount: "desc" },
+          { ratingAvg: "desc" },
+          { id: "desc" },
+        ],
+        take: take + 1,
+        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          authorLabel: true,
+          subject: true,
+          grade: true,
+          ratingAvg: true,
+          ratingCount: true,
+          priceCents: true,
+          tag: true,
+        },
+      });
+      const courses = rows.slice(0, take);
+      // Cursor convention: the LAST RETURNED row's id; the next page
+      // positions on it and `skip: 1` steps past it. (Pointing at the
+      // first unreturned row instead would make skip:1 swallow it.)
+      const nextCursor =
+        rows.length > take ? courses[courses.length - 1].id : null;
+      const total = await ctx.db.course.count({ where });
+      return { courses, total, nextCursor };
+    }),
+
   /** Multi-course curriculum bundles. */
   paths: publicProcedure.query(async ({ ctx }) => {
     return ctx.db.path.findMany({
