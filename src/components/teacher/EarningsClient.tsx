@@ -68,6 +68,7 @@ export function EarningsClient({
     onError: (e) => setError(e.message),
   });
 
+  const payout = trpc.payment.razorpayPayoutStatus.useQuery();
   const startOnboarding = trpc.payment.startConnectOnboarding.useMutation({
     onSuccess: ({ url, provider, accountId }) => {
       setAccount({
@@ -88,6 +89,34 @@ export function EarningsClient({
 
   return (
     <div style={{ maxWidth: 1200, display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* India payouts — Razorpay Route linked account. The platform
+          admin links it (payment.linkRazorpayAccount); revenue splits
+          fire from the razorpay webhook once it's activated. */}
+      <Card p={20}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Icon
+            name="bolt"
+            size={20}
+            color={
+              payout.data?.linked && payout.data.status === "activated"
+                ? "var(--wf-good)"
+                : "var(--wf-mute)"
+            }
+          />
+          <div style={{ flex: 1 }}>
+            <Eyebrow>UPI payouts · Razorpay</Eyebrow>
+            <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>
+              {payout.isLoading
+                ? "Checking…"
+                : payout.data?.linked
+                  ? payout.data.status === "activated"
+                    ? "Linked — revenue splits are active"
+                    : `Linked — ${payout.data.status} (splits start once activated)`
+                  : "Not linked — ask your admin to link your Razorpay account"}
+            </div>
+          </div>
+        </div>
+      </Card>
       <Card p={20}>
         <div
           style={{

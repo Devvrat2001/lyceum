@@ -101,6 +101,63 @@ export function verifyRazorpaySignature(
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+export type RazorpayTransfer = { id: string };
+
+/**
+ * Route revenue-split: transfer part of a captured payment (pay_…) to a
+ * linked account (acc_…). Called best-effort after fulfillment — a
+ * transfer failure must never un-fulfill a paid order; the platform
+ * simply holds the funds until it's retried or settled manually.
+ */
+export async function createRouteTransfer(params: {
+  paymentId: string;
+  accountId: string;
+  amountPaise: number;
+  notes?: Record<string, string>;
+}): Promise<RazorpayTransfer[]> {
+  const res = await fetch(
+    `${API_BASE}/payments/${params.paymentId}/transfers`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader(),
+      },
+      body: JSON.stringify({
+        transfers: [
+          {
+            account: params.accountId,
+            amount: params.amountPaise,
+            currency: "INR",
+            ...(params.notes ? { notes: params.notes } : {}),
+          },
+        ],
+      }),
+    }
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(
+      `Razorpay transfer failed (${res.status}): ${body.slice(0, 300)}`
+    );
+  }
+  const json = (await res.json()) as { items?: RazorpayTransfer[] };
+  return json.items ?? [];
+}
+
+/**
+ * Razorpay payment id (pay_…) from a verified webhook event. Present on
+ * `payment.captured` AND `payment_link.paid` (both deliveries carry the
+ * payment entity) — it's what Route transfers are created against.
+ */
+export function paymentIdFromRazorpayEvent(event: unknown): string | null {
+  if (typeof event !== "object" || event === null) return null;
+  const e = event as {
+    payload?: { payment?: { entity?: { id?: string } } };
+  };
+  return e.payload?.payment?.entity?.id ?? null;
+}
+
 /**
  * Minimal structural shape of the webhook events we handle. Razorpay
  * payloads are large; we only trust the ids we extract and re-verify

@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { protectedProcedure, router, teacherProcedure } from "../trpc";
+import {
+  adminProcedure,
+  protectedProcedure,
+  router,
+  teacherProcedure,
+} from "../trpc";
 import {
   computeFeeCents,
   getStripe,
@@ -625,6 +630,80 @@ export const paymentRouter = router({
         status: "REFUNDED" as const,
       };
     }),
+
+  /**
+   * Admin links a teacher to a Razorpay Route linked account (acc_…).
+   * Admin-only on purpose: linked accounts are created by the platform
+   * in the Razorpay Dashboard (Route → Account, with the teacher's bank
+   * details), so letting teachers self-claim arbitrary ids would route
+   * other people's money. Once the account's status is "activated", the
+   * razorpay webhook starts splitting net revenue to it on every paid
+   * order.
+   */
+  linkRazorpayAccount: adminProcedure
+    .input(
+      z.object({
+        teacherId: z.string().min(1),
+        accountId: z
+          .string()
+          .regex(
+            /^acc_[A-Za-z0-9]+$/,
+            "Expected a Razorpay linked-account id (acc_…)"
+          ),
+        status: z
+          .enum(["created", "activated", "suspended"])
+          .default("activated"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const teacher = await ctx.db.user.findUnique({
+        where: { id: input.teacherId },
+        select: { id: true, role: true },
+      });
+      if (!teacher || teacher.role !== "TEACHER") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "teacherId must be a TEACHER account.",
+        });
+      }
+      const account = await ctx.db.razorpayAccount.upsert({
+        where: { teacherId: input.teacherId },
+        update: { externalId: input.accountId, status: input.status },
+        create: {
+          teacherId: input.teacherId,
+          externalId: input.accountId,
+          status: input.status,
+        },
+      });
+      await audit({
+        actorId: ctx.user.id,
+        kind: "payment.razorpay_account_linked",
+        payload: {
+          teacherId: input.teacherId,
+          accountId: input.accountId,
+          status: input.status,
+        },
+      });
+      return {
+        ok: true as const,
+        accountId: account.externalId,
+        status: account.status,
+      };
+    }),
+
+  /**
+   * The signed-in teacher's Razorpay payout-link state — feeds the
+   * earnings page's "UPI payouts" status line.
+   */
+  razorpayPayoutStatus: teacherProcedure.query(async ({ ctx }) => {
+    const acct = await ctx.db.razorpayAccount.findUnique({
+      where: { teacherId: ctx.user.id },
+      select: { status: true },
+    });
+    return acct
+      ? { linked: true as const, status: acct.status }
+      : { linked: false as const, status: null };
+  }),
 
   /**
    * Start Stripe Connect Express onboarding. Returns a `url` the

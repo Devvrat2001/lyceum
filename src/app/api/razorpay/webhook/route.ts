@@ -5,7 +5,9 @@ import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
 import { fulfillPaidOrder } from "@/server/services/fulfillOrder";
 import {
+  createRouteTransfer,
   orderIdFromRazorpayEvent,
+  paymentIdFromRazorpayEvent,
   verifyRazorpaySignature,
 } from "@/lib/payments/razorpay";
 
@@ -93,6 +95,52 @@ export async function POST(req: Request) {
         });
         // Purchase receipt — best-effort, swallows its own errors.
         await sendOrderReceipt(orderId);
+
+        // Payouts groundwork: best-effort Route transfer of the
+        // teacher's net to their activated linked account. A transfer
+        // failure must never affect fulfillment — the platform simply
+        // holds the funds (and the audit row flags it for follow-up).
+        const paymentId = paymentIdFromRazorpayEvent(event);
+        if (paymentId && order.teacherId && order.netCents > 0) {
+          try {
+            const acct = await db.razorpayAccount.findUnique({
+              where: { teacherId: order.teacherId },
+            });
+            if (acct?.status === "activated") {
+              const transfers = await createRouteTransfer({
+                paymentId,
+                accountId: acct.externalId,
+                amountPaise: order.netCents,
+                notes: { orderId: order.id },
+              });
+              await audit({
+                actorId: order.userId,
+                kind: "payment.route_transfer",
+                payload: {
+                  ok: true,
+                  orderId: order.id,
+                  teacherId: order.teacherId,
+                  netCents: order.netCents,
+                  transferIds: transfers.map((t) => t.id),
+                },
+                courseId: order.courseId,
+              });
+            }
+          } catch (err) {
+            console.error("[razorpay.webhook] route transfer failed", err);
+            await audit({
+              actorId: order.userId,
+              kind: "payment.route_transfer",
+              payload: {
+                ok: false,
+                orderId: order.id,
+                teacherId: order.teacherId,
+                netCents: order.netCents,
+              },
+              courseId: order.courseId,
+            });
+          }
+        }
       }
     }
     // Unknown / irrelevant events get a 200 so Razorpay doesn't retry.

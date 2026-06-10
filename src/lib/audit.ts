@@ -16,6 +16,8 @@ export type AuditKind =
   | "course.unpublish"
   | "course.update"
   | "payment.refund_initiated"
+  | "payment.razorpay_account_linked"
+  | "payment.route_transfer"
   | "teacher.invite_student"
   | "discussion.delete_comment";
 

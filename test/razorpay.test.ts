@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import crypto from "node:crypto";
 import {
   orderIdFromRazorpayEvent,
+  paymentIdFromRazorpayEvent,
   verifyRazorpaySignature,
 } from "@/lib/payments/razorpay";
 
@@ -78,5 +79,25 @@ describe("orderIdFromRazorpayEvent", () => {
     expect(
       orderIdFromRazorpayEvent({ event: "payment_link.paid", payload: {} })
     ).toBeNull();
+  });
+});
+
+describe("paymentIdFromRazorpayEvent", () => {
+  it("reads the payment entity id from either event shape", () => {
+    const payload = { payment: { entity: { id: "pay_123" } } };
+    expect(
+      paymentIdFromRazorpayEvent({ event: "payment.captured", payload })
+    ).toBe("pay_123");
+    expect(
+      paymentIdFromRazorpayEvent({ event: "payment_link.paid", payload })
+    ).toBe("pay_123");
+  });
+
+  it("returns null when the payment entity is absent or input is junk", () => {
+    expect(
+      paymentIdFromRazorpayEvent({ event: "payment_link.paid", payload: {} })
+    ).toBeNull();
+    expect(paymentIdFromRazorpayEvent(null)).toBeNull();
+    expect(paymentIdFromRazorpayEvent(42)).toBeNull();
   });
 });

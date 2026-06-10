@@ -101,6 +101,7 @@ model User {
   ordersBought   Order[]     @relation("OrderBuyer")
   ordersSold     Order[]     @relation("OrderTeacher")
   stripeAccount  StripeAccount?
+  razorpayAccount RazorpayAccount?
   blockVotes     BlockVote[]
   blockComments  BlockComment[]
   // Phase 4 — parent role: a PARENT user's links to their STUDENT
@@ -644,6 +645,21 @@ model StripeEvent {
 /// Per-teacher Stripe Connect Express account. Created when a teacher
 /// starts onboarding. The actual KYC dance happens on Stripe's hosted
 /// pages; we just store the account id + whether it's payouts-enabled.
+model RazorpayAccount {
+  id          String   @id @default(cuid())
+  teacherId   String   @unique
+  teacher     User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  /// Razorpay Route linked-account id (acc_…). Created by the platform
+  /// admin in the Razorpay Dashboard (Route → Accounts) and linked via
+  /// payment.linkRazorpayAccount — teachers can't self-claim ids.
+  externalId  String   @unique
+  /// "created" | "activated" | "suspended". The razorpay webhook only
+  /// splits revenue (Route transfer) to "activated" accounts.
+  status      String   @default("created")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model StripeAccount {
   id          String   @id @default(cuid())
   teacherId   String   @unique
