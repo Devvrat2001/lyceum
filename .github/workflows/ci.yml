@@ -6,10 +6,12 @@
 #      for the `master` branch, copy its URL.
 #   2. GitHub → repo → Settings → Secrets → Actions: add
 #      VERCEL_DEPLOY_HOOK with that URL.
-#   3. Vercel → Project → Settings → Git → Ignored Build Step: set the
-#      command to `exit 0`. Git pushes then never auto-build — but
-#      Deploy Hooks BYPASS the ignored build step, so the curl at the
-#      end of this workflow is what triggers the real deploy.
+#   3. Vercel → Project → Settings → Build and Deployment → "Ignored
+#      Build Step": set the behavior dropdown to "Don't build anything"
+#      (equivalent to a Custom command of `exit 0`). Git pushes then
+#      never auto-build — they appear as Canceled in the deploy list —
+#      but Deploy Hooks BYPASS the ignored build step, so the curl at
+#      the end of this workflow is what triggers the real deploy.
 # Until steps 1–3 are done this workflow is a tripwire only: it runs
 # the suite and skips the deploy step with a notice, while Vercel keeps
 # auto-deploying as before. Safe to land first, flip the gate later.
