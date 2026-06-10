@@ -60,6 +60,10 @@ model User {
   // just their name + published course list.
   headline       String?
   bio            String?     @db.Text
+  // Admin moderation: hides the teacher's card from the public
+  // marketplace teacher rail. The /t/[teacherId] storefront stays
+  // reachable by direct link (soft hide, not a ban).
+  hiddenFromMarketplace Boolean @default(false)
   role           Role        @default(STUDENT)
   institutionId  String?
   institution    Institution? @relation(fields: [institutionId], references: [id])

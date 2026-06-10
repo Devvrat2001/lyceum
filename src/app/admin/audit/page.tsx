@@ -17,6 +17,18 @@ const KIND_LABELS: Record<string, { label: string; color: string }> = {
     label: "Discussion Moderation",
     color: "var(--wf-accent)",
   },
+  "payment.razorpay_account_linked": {
+    label: "Payout Account Linked",
+    color: "var(--wf-good)",
+  },
+  "payment.route_transfer": {
+    label: "Payout Transfer",
+    color: "var(--wf-good)",
+  },
+  "admin.teacher_visibility": {
+    label: "Teacher Visibility",
+    color: "var(--wf-accent)",
+  },
 };
 
 function timeAgo(d: Date): string {

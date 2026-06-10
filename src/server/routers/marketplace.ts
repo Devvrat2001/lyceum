@@ -372,6 +372,9 @@ export const marketplaceRouter = router({
       const teachers = await ctx.db.user.findMany({
         where: {
           role: "TEACHER",
+          // Admin soft-hide (e.g. duplicate/test accounts) — the
+          // /t/[teacherId] storefront stays reachable by direct link.
+          hiddenFromMarketplace: false,
           authoredCourses: { some: { status: "PUBLISHED" } },
         },
         take: input?.limit ?? 4,

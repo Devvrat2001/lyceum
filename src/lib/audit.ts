@@ -19,7 +19,8 @@ export type AuditKind =
   | "payment.razorpay_account_linked"
   | "payment.route_transfer"
   | "teacher.invite_student"
-  | "discussion.delete_comment";
+  | "discussion.delete_comment"
+  | "admin.teacher_visibility";
 
 type AuditInput = {
   actorId?: string | null;

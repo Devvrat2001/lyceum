@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import { router, adminProcedure } from "../trpc";
+import { audit } from "@/lib/audit";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -892,5 +893,78 @@ export const adminRouter = router({
         topCourses,
         funnel,
       };
+    }),
+
+  /**
+   * Every TEACHER account with the facts an admin needs to triage them:
+   * real email (disambiguates same-display-name accounts), course +
+   * student counts, payout-account link state, and the marketplace
+   * visibility flag. Platform-wide on purpose — marketplace moderation
+   * isn't scoped to one institution.
+   */
+  teachers: adminProcedure.query(async ({ ctx }) => {
+    const rows = await ctx.db.user.findMany({
+      where: { role: "TEACHER" },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        name: true,
+        firstName: true,
+        email: true,
+        createdAt: true,
+        hiddenFromMarketplace: true,
+        razorpayAccount: { select: { externalId: true, status: true } },
+        authoredCourses: { select: { status: true, enrollCount: true } },
+      },
+    });
+    return rows.map((t) => {
+      const published = t.authoredCourses.filter(
+        (c) => c.status === "PUBLISHED"
+      );
+      return {
+        id: t.id,
+        name: t.name ?? t.firstName ?? "Teacher",
+        email: t.email,
+        createdAt: t.createdAt,
+        hiddenFromMarketplace: t.hiddenFromMarketplace,
+        publishedCourses: published.length,
+        totalCourses: t.authoredCourses.length,
+        // Mirrors marketplace.teachers: students = enrollments across
+        // PUBLISHED courses only, so the two surfaces agree.
+        studentsCount: published.reduce((a, c) => a + c.enrollCount, 0),
+        payout: t.razorpayAccount
+          ? {
+              externalId: t.razorpayAccount.externalId,
+              status: t.razorpayAccount.status,
+            }
+          : null,
+      };
+    });
+  }),
+
+  /** Soft-hide / unhide a teacher from the public marketplace rail. */
+  setTeacherVisibility: adminProcedure
+    .input(z.object({ teacherId: z.string(), hidden: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const teacher = await ctx.db.user.findUnique({
+        where: { id: input.teacherId },
+        select: { id: true, role: true },
+      });
+      if (!teacher || teacher.role !== "TEACHER") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No teacher account with that id.",
+        });
+      }
+      await ctx.db.user.update({
+        where: { id: teacher.id },
+        data: { hiddenFromMarketplace: input.hidden },
+      });
+      await audit({
+        actorId: ctx.user.id,
+        kind: "admin.teacher_visibility",
+        payload: { teacherId: teacher.id, hidden: input.hidden },
+      });
+      return { teacherId: teacher.id, hidden: input.hidden };
     }),
 });
