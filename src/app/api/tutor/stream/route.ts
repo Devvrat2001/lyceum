@@ -26,12 +26,16 @@ const RequestSchema = z.object({
   sessionId: z.string().nullish(),
   message: z.string().min(1).max(4000),
   // Prior turns from the client (cheap UX echo so the client doesn't have
-  // to round-trip on every render). We trust the DB as source of truth.
+  // to round-trip on every render). Each item is hard-truncated server-side
+  // (not rejected — legit assistant turns can exceed a reject-cap) so 40
+  // client-supplied strings can't amplify token cost arbitrarily. The
+  // content is replayed to the model verbatim, so this cap is the only
+  // bound on it. (REQUIREMENTS R5.)
   history: z
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
-        content: z.string(),
+        content: z.string().transform((s) => s.slice(0, 8_000)),
       })
     )
     .max(40)
