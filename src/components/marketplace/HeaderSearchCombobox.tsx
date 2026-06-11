@@ -304,7 +304,7 @@ export function HeaderSearchCombobox({
                         {c.tag ? ` · ${c.tag}` : ""}
                       </div>
                     </div>
-                    {typeof c.ratingAvg === "number" && (
+                    {typeof c.ratingAvg === "number" && c.ratingAvg > 0 && (
                       <span
                         style={{
                           fontSize: 10,

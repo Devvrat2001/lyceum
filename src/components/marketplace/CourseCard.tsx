@@ -75,12 +75,18 @@ export function CourseCard({
               alignItems: "center",
             }}
           >
-            <span style={{ fontSize: 11, color: "var(--wf-body)" }}>
-              ★ {course.ratingAvg.toFixed(1)}{" "}
-              <span style={{ color: "var(--wf-mute)" }}>
-                ({fmtCount(course.ratingCount)})
+            {course.ratingCount > 0 ? (
+              <span style={{ fontSize: 11, color: "var(--wf-body)" }}>
+                ★ {course.ratingAvg.toFixed(1)}{" "}
+                <span style={{ color: "var(--wf-mute)" }}>
+                  ({fmtCount(course.ratingCount)})
+                </span>
               </span>
-            </span>
+            ) : (
+              <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
+                Not yet rated
+              </span>
+            )}
             {owned ? (
               <span
                 style={{

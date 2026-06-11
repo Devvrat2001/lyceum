@@ -110,12 +110,16 @@ export default async function CourseDetailPage({
                 fontSize: 13,
               }}
             >
-              <span>
-                ★ {course.ratingAvg.toFixed(1)}{" "}
-                <span style={{ color: "var(--wf-mute)" }}>
-                  ({course.ratingCount.toLocaleString()})
+              {course.ratingCount > 0 ? (
+                <span>
+                  ★ {course.ratingAvg.toFixed(1)}{" "}
+                  <span style={{ color: "var(--wf-mute)" }}>
+                    ({course.ratingCount.toLocaleString()})
+                  </span>
                 </span>
-              </span>
+              ) : (
+                <span style={{ color: "var(--wf-mute)" }}>Not yet rated</span>
+              )}
               <span style={{ color: "var(--wf-mute)" }}>·</span>
               <span>
                 By <b>{course.authorLabel ?? course.author.name ?? "—"}</b>

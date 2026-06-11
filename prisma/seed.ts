@@ -327,9 +327,6 @@ async function main() {
     grade: string;
     format?: string; // delivery format; defaults to "self_paced" when omitted
     priceCents: number;
-    rating: number;
-    ratingCount: number;
-    enrollCount: number;
     tag: string;
     aiHint: string;
     upgradeNote: string;
@@ -424,9 +421,6 @@ async function main() {
       subject: "math",
       grade: "6",
       priceCents: 0,
-      rating: 4.9,
-      ratingCount: 2184,
-      enrollCount: 12400,
       tag: "BESTSELLER",
       aiHint: "AI says: matches your skill level — start at Unit 2",
       upgradeNote: "Or upgrade for certificates · $19",
@@ -495,9 +489,6 @@ async function main() {
       subject: "math",
       grade: "6",
       priceCents: 49900,
-      rating: 4.8,
-      ratingCount: 1204,
-      enrollCount: 8100,
       tag: "NEW",
       aiHint: "AI says: pace yourself — try 2 lessons per week",
       upgradeNote: "One-time · Lifetime access",
@@ -539,9 +530,6 @@ async function main() {
       grade: "6",
       format: "live",
       priceCents: 99900,
-      rating: 4.9,
-      ratingCount: 612,
-      enrollCount: 3200,
       tag: "INTERACTIVE",
       aiHint: "AI says: companion to your geometry strand · perfect fit",
       upgradeNote: "Includes printable starter pack",
@@ -570,9 +558,6 @@ async function main() {
       grade: "6",
       format: "cohort",
       priceCents: 149900,
-      rating: 4.7,
-      ratingCount: 401,
-      enrollCount: 2000,
       tag: "CHALLENGE",
       aiHint:
         "AI says: stretch level — try after you finish Algebra Foundations",
@@ -602,9 +587,6 @@ async function main() {
       subject: "science",
       grade: "6",
       priceCents: 0,
-      rating: 4.6,
-      ratingCount: 380,
-      enrollCount: 4200,
       tag: "POPULAR",
       aiHint: "AI says: matches your current science strand",
       upgradeNote: "Free for institution students",
@@ -643,9 +625,6 @@ async function main() {
       subject: "ela",
       grade: "6",
       priceCents: 0,
-      rating: 4.8,
-      ratingCount: 220,
-      enrollCount: 1900,
       tag: "TEACHER PICK",
       aiHint: "AI says: pairs well with your reading log",
       upgradeNote: "Free with class enrollment",
@@ -686,9 +665,6 @@ async function main() {
         format: c.format ?? "self_paced",
         status: "PUBLISHED",
         priceCents: c.priceCents,
-        ratingAvg: c.rating,
-        ratingCount: c.ratingCount,
-        enrollCount: c.enrollCount,
         tag: c.tag,
         aiHint: c.aiHint,
         upgradeNote: c.upgradeNote,
@@ -707,9 +683,6 @@ async function main() {
         format: c.format ?? "self_paced",
         status: "PUBLISHED",
         priceCents: c.priceCents,
-        ratingAvg: c.rating,
-        ratingCount: c.ratingCount,
-        enrollCount: c.enrollCount,
         tag: c.tag,
         aiHint: c.aiHint,
         upgradeNote: c.upgradeNote,
@@ -783,33 +756,160 @@ async function main() {
     }
   }
 
-  // Reviews on the bestseller course
-  const bestseller = await db.course.findUniqueOrThrow({
-    where: { slug: "fractions-decimals-percents" },
-  });
-  await db.review.deleteMany({
-    where: { courseId: bestseller.id, reviewerName: { not: null } },
-  });
-  await db.review.createMany({
-    data: [
+  // ── Demo reviews (honest ratings) ──
+  // Persona reviews are REAL Review rows; each course's displayed
+  // ratingAvg/ratingCount are recomputed from them at the end of the
+  // seed — never hand-stamped. The old seed wrote vanity numbers
+  // ("612 ratings" backed by 2 rows); anything that wants a bigger
+  // number now has to seed bigger data.
+  type ReviewSeed = {
+    rating: number;
+    body: string;
+    reviewerName: string;
+    reviewerRole: string;
+  };
+  const REVIEW_SEEDS: Record<string, ReviewSeed[]> = {
+    "fractions-decimals-percents": [
       {
-        userId: jordan.id,
-        courseId: bestseller.id,
         rating: 5,
         body: "My daughter actually asks to do math now. The AI tutor is patient and gentle.",
         reviewerName: "Sarah M.",
         reviewerRole: "Parent · Grade 6",
       },
       {
-        userId: jordan.id,
-        courseId: bestseller.id,
         rating: 5,
         body: "I assign units of this directly into my class. Saves me 5 hrs of prep a week.",
         reviewerName: "Mr. Davis",
         reviewerRole: "Teacher · Cedar Middle",
       },
+      {
+        rating: 5,
+        body: "The pizza problems finally made fractions click for me.",
+        reviewerName: "Jordan S.",
+        reviewerRole: "Student · Grade 6",
+      },
+      {
+        rating: 4,
+        body: "Great pacing. I'd love more challenge problems at the end of each unit.",
+        reviewerName: "Priya R.",
+        reviewerRole: "Parent · Grade 6",
+      },
     ],
-  });
+    "algebra-foundations": [
+      {
+        rating: 5,
+        body: "“Why letters?” was the first algebra explanation that didn't scare my son.",
+        reviewerName: "Dana W.",
+        reviewerRole: "Parent · Grade 7",
+      },
+      {
+        rating: 5,
+        body: "Clean progression from arithmetic into variables. My tutoring students fly through it.",
+        reviewerName: "Ms. Okafor",
+        reviewerRole: "Tutor",
+      },
+      {
+        rating: 4,
+        body: "Solid foundations. The balance-scale visuals are excellent.",
+        reviewerName: "Marcus T.",
+        reviewerRole: "Teacher · Grade 7",
+      },
+    ],
+    "geometry-origami": [
+      {
+        rating: 5,
+        body: "We fold along in class every Friday. The kids beg for it.",
+        reviewerName: "Mrs. Ellis",
+        reviewerRole: "Teacher · Grade 6",
+      },
+      {
+        rating: 5,
+        body: "Hands-down the most creative math course on here.",
+        reviewerName: "Kenji A.",
+        reviewerRole: "Parent",
+      },
+      {
+        rating: 4,
+        body: "Beautiful idea. A few folds are tricky to follow on a small screen.",
+        reviewerName: "Lauren B.",
+        reviewerRole: "Parent · Grade 5",
+      },
+    ],
+    "math-olympiad-prep": [
+      {
+        rating: 5,
+        body: "Took our school's math club from zero to district finals.",
+        reviewerName: "Coach Petrov",
+        reviewerRole: "Teacher · Math Club",
+      },
+      {
+        rating: 4,
+        body: "Hard in the right way — every problem teaches a technique.",
+        reviewerName: "Ananya G.",
+        reviewerRole: "Student · Grade 8",
+      },
+    ],
+    "earth-science-grade-6": [
+      {
+        rating: 5,
+        body: "The water-cycle unit replaced two weeks of my own slides.",
+        reviewerName: "Mr. Hutchins",
+        reviewerRole: "Teacher · Grade 6",
+      },
+      {
+        rating: 4,
+        body: "My class loved the rock-cycle simulations.",
+        reviewerName: "Gloria F.",
+        reviewerRole: "Teacher · Grade 6",
+      },
+      {
+        rating: 4,
+        body: "Engaging, accurate, and well-paced.",
+        reviewerName: "David L.",
+        reviewerRole: "Parent",
+      },
+    ],
+    "ela-grade-6-novels": [
+      {
+        rating: 5,
+        body: "Finally a novels course that treats kids like real readers.",
+        reviewerName: "Ms. Bennett",
+        reviewerRole: "Teacher · ELA",
+      },
+      {
+        rating: 4,
+        body: "The discussion prompts sparked actual dinner-table conversation.",
+        reviewerName: "Rachel K.",
+        reviewerRole: "Parent · Grade 6",
+      },
+    ],
+  };
+
+  // Seeded reviews are authored by demo users so the idempotency wipe
+  // can target ownership. NB: do NOT wipe on `reviewerName != null` —
+  // course.submitReview denormalizes the reviewer's real name into that
+  // column too, so a name-based wipe would delete organic reviews.
+  const demoReviewerIds = [jordan.id, ...classmateUsers.map((c) => c.user.id)];
+  for (const [slug, seeds] of Object.entries(REVIEW_SEEDS)) {
+    const course = await db.course.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    if (!course) continue;
+    await db.review.deleteMany({
+      where: { courseId: course.id, userId: { in: demoReviewerIds } },
+    });
+    await db.review.createMany({
+      data: seeds.map((r, i) => ({
+        userId: demoReviewerIds[i % demoReviewerIds.length],
+        courseId: course.id,
+        rating: r.rating,
+        body: r.body,
+        reviewerName: r.reviewerName,
+        reviewerRole: r.reviewerRole,
+      })),
+    });
+  }
 
   // Enrollments for Jordan in the 3 "continue learning" courses
   const continueCourses = [
@@ -1063,6 +1163,36 @@ async function main() {
         provider: "demo",
         payoutsEnabled: s.payoutsEnabled,
         chargesEnabled: s.chargesEnabled,
+      },
+    });
+  }
+
+  // ── Honest denormalized counters (last, so every writer above is
+  // reflected) ──
+  // Recompute ratingAvg/ratingCount from Review and enrollCount from
+  // Enrollment for each seeded course. Scoped to COURSE_SEEDS slugs:
+  // organic courses in a shared dev DB keep their service-maintained
+  // counters.
+  for (const c of COURSE_SEEDS) {
+    const course = await db.course.findUnique({
+      where: { slug: c.slug },
+      select: { id: true },
+    });
+    if (!course) continue;
+    const [agg, enrollCount] = await Promise.all([
+      db.review.aggregate({
+        where: { courseId: course.id },
+        _avg: { rating: true },
+        _count: true,
+      }),
+      db.enrollment.count({ where: { courseId: course.id } }),
+    ]);
+    await db.course.update({
+      where: { id: course.id },
+      data: {
+        ratingAvg: agg._avg.rating ?? 0,
+        ratingCount: agg._count,
+        enrollCount,
       },
     });
   }
