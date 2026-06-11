@@ -1,20 +1,24 @@
 # Gated-deploy CI — the full verification gauntlet on every push to
 # master, with production deploys fired ONLY on green.
 #
-# How the gate works (one-time Vercel setup, in this order):
-#   1. Vercel → Project → Settings → Git → Deploy Hooks: create a hook
-#      for the `master` branch, copy its URL.
-#   2. GitHub → repo → Settings → Secrets → Actions: add
-#      VERCEL_DEPLOY_HOOK with that URL.
+# How the gate works (one-time setup, in this order):
+#   1. Vercel → Account Settings → Tokens: create a token scoped to the
+#      team that owns this project.
+#   2. GitHub → repo → Settings → Secrets and variables → Actions: add
+#      a REPOSITORY secret named VERCEL_TOKEN with that token.
 #   3. Vercel → Project → Settings → Build and Deployment → "Ignored
-#      Build Step": set the behavior dropdown to "Don't build anything"
-#      (equivalent to a Custom command of `exit 0`). Git pushes then
-#      never auto-build — they appear as Canceled in the deploy list —
-#      but Deploy Hooks BYPASS the ignored build step, so the curl at
-#      the end of this workflow is what triggers the real deploy.
-# Until steps 1–3 are done this workflow is a tripwire only: it runs
-# the suite and skips the deploy step with a notice, while Vercel keeps
-# auto-deploying as before. Safe to land first, flip the gate later.
+#      Build Step": "Don't build anything". Git pushes then never
+#      auto-build — they appear as Canceled in the deploy list — and
+#      the deploy job below is the only path to production.
+#
+# Why not a Deploy Hook? Tried first (2026-06-11): hook-triggered
+# builds are subject to the Ignored Build Step too — the hook fired and
+# its deployment came out CANCELED. The CLI prebuilt flow sidesteps the
+# whole question: `vercel build` runs here in CI and `vercel deploy
+# --prebuilt` only uploads artifacts, so Vercel never enters a build
+# phase for the ignore step to cancel.
+#
+# Until VERCEL_TOKEN is set the deploy job skips with a notice.
 #
 # The Postgres service uses the pgvector image — the schema has a
 # vector(1536) column and the `CREATE EXTENSION vector` migration would
@@ -92,15 +96,38 @@ jobs:
       # then next build — the same script Vercel executes.
       - run: npm run build
 
-      - name: Trigger Vercel production deploy (green builds only)
-        if: github.ref == 'refs/heads/master'
+  # Separate job on purpose: `vercel build` must see ONLY the production
+  # env pulled from Vercel. The verify job's CI-level DATABASE_URL etc.
+  # would shadow the pulled values (process env beats .env files — even
+  # an empty string shadows).
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Not secrets — these ids appear in every deployment URL / API
+      # response. They stand in for the .vercel/project.json link file.
+      VERCEL_ORG_ID: team_PQZMPoTZFxScDAwAX7EgmvhH
+      VERCEL_PROJECT_ID: prj_gsc5DZUhGg4x75pRD7BZgT5zWwcB
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Build with prod env and deploy prebuilt artifacts
         env:
-          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          if [ -z "$HOOK" ]; then
-            echo "VERCEL_DEPLOY_HOOK secret not set — skipping deploy trigger."
-            echo "(Vercel keeps auto-deploying on push until the Ignored Build Step gate is flipped — see the header of this file.)"
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN secret not set — skipping deploy."
+            echo "(One-time setup lives in the header of this file.)"
             exit 0
           fi
-          curl -fsS -X POST "$HOOK" >/dev/null
-          echo "Deploy hook fired — Vercel is building this commit."
+          npx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx vercel@latest build --prod --token="$VERCEL_TOKEN"
+          npx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          echo "Production deployment created."
