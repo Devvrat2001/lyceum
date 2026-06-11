@@ -11,12 +11,18 @@
 #      auto-build — they appear as Canceled in the deploy list — and
 #      the deploy job below is the only path to production.
 #
-# Why not a Deploy Hook? Tried first (2026-06-11): hook-triggered
-# builds are subject to the Ignored Build Step too — the hook fired and
-# its deployment came out CANCELED. The CLI prebuilt flow sidesteps the
-# whole question: `vercel build` runs here in CI and `vercel deploy
-# --prebuilt` only uploads artifacts, so Vercel never enters a build
-# phase for the ignore step to cancel.
+# Why this exact shape (all three learned the hard way, 2026-06-11):
+#   - NOT a Deploy Hook: hook-triggered builds are subject to the
+#     Ignored Build Step too — the hook fired and its deployment came
+#     out CANCELED.
+#   - NOT `vercel build` + `deploy --prebuilt`: this project's env vars
+#     are marked Sensitive on Vercel, and `vercel pull` writes Sensitive
+#     values as EMPTY strings — the build then fails env validation
+#     (and `prisma migrate deploy` would have no real DATABASE_URL).
+#   - Plain `vercel deploy --prod` works: it uploads the source and
+#     Vercel builds remotely where Sensitive env IS available, and CLI
+#     deployments BYPASS the Ignored Build Step (verified live — the
+#     gate only cancels git-push and hook builds).
 #
 # Until VERCEL_TOKEN is set the deploy job skips with a notice.
 #
@@ -96,10 +102,6 @@ jobs:
       # then next build — the same script Vercel executes.
       - run: npm run build
 
-  # Separate job on purpose: `vercel build` must see ONLY the production
-  # env pulled from Vercel. The verify job's CI-level DATABASE_URL etc.
-  # would shadow the pulled values (process env beats .env files — even
-  # an empty string shadows).
   deploy:
     needs: verify
     if: github.ref == 'refs/heads/master'
@@ -116,9 +118,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
 
-      - name: Build with prod env and deploy prebuilt artifacts
+      # Uploads the source; Vercel builds remotely with the project's
+      # real (Sensitive) env and applies prisma migrations there. The
+      # command blocks until the deployment is READY and exits non-zero
+      # if the remote build fails, so a red remote build = red CI.
+      - name: Deploy to Vercel (remote build, production)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
@@ -127,7 +132,4 @@ jobs:
             echo "(One-time setup lives in the header of this file.)"
             exit 0
           fi
-          npx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
-          npx vercel@latest build --prod --token="$VERCEL_TOKEN"
-          npx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
-          echo "Production deployment created."
+          npx vercel@latest deploy --prod --token="$VERCEL_TOKEN"
