@@ -752,6 +752,58 @@ async function main() {
             });
           }
         }
+
+        // ── Reader blocks ──
+        // The legacy Question/LessonStep rows above predate the block
+        // system; the student reader renders Blocks. Every seeded
+        // lesson gets at least a READING block (no empty reader pages),
+        // lessons with fixture questions also get a QUIZ block built
+        // from the same data, and each course's first lesson hosts a
+        // DISCUSSION thread. CI's first run caught that this seed
+        // created zero Block rows — keep the reader exercised.
+        let blockOrder = 1;
+        await db.block.create({
+          data: {
+            lessonId: lesson.id,
+            order: blockOrder++,
+            type: "READING",
+            settings: {
+              body:
+                l.intro ??
+                `${l.title} — a guided walk through this part of “${u.title}.” ` +
+                  `Work the examples as they appear, then check yourself against the quiz at the end of the unit.`,
+            },
+          },
+        });
+        if (l.questions && l.questions.length > 0) {
+          await db.block.create({
+            data: {
+              lessonId: lesson.id,
+              order: blockOrder++,
+              type: "QUIZ",
+              settings: {
+                questions: l.questions.map((q) => ({
+                  stem: q.stem,
+                  difficulty: q.difficulty ?? 2,
+                  answers: q.answers,
+                })),
+              },
+            },
+          });
+        }
+        if (u.order === 1 && l.order === 1) {
+          await db.block.create({
+            data: {
+              lessonId: lesson.id,
+              order: blockOrder++,
+              type: "DISCUSSION",
+              settings: {
+                prompt:
+                  "Introduce yourself! What do you already know about this topic, and what do you want to be able to do by the end?",
+              },
+            },
+          });
+        }
       }
     }
   }
