@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Card, ImageBox } from "@/components/wf/primitives";
+import { Card } from "@/components/wf/primitives";
 import { formatPrice } from "@/lib/currency";
 import { fmtCount } from "@/lib/format";
+import { courseGradient } from "@/lib/thumbnail";
 
 export type CourseCardData = {
   id: string;
@@ -12,6 +13,7 @@ export type CourseCardData = {
   ratingCount: number;
   priceCents: number;
   tag: string | null;
+  thumbnailUrl: string | null;
 };
 
 /**
@@ -36,7 +38,33 @@ export function CourseCard({
       style={{ textDecoration: "none", color: "inherit" }}
     >
       <Card p={0}>
-        <ImageBox h={130} kind="image" />
+        {course.thumbnailUrl ? (
+          // Teacher-pasted thumbnails live on arbitrary hosts, so
+          // next/image would need a wildcard remotePatterns proxy —
+          // a plain lazy <img> is the deliberate choice here.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={course.thumbnailUrl}
+            alt=""
+            loading="lazy"
+            style={{
+              width: "100%",
+              height: 130,
+              objectFit: "cover",
+              display: "block",
+              borderBottom: "1px solid var(--wf-hairline)",
+            }}
+          />
+        ) : (
+          <div
+            aria-hidden
+            style={{
+              height: 130,
+              background: courseGradient(course.slug),
+              borderBottom: "1px solid var(--wf-hairline)",
+            }}
+          />
+        )}
         <div style={{ padding: 12 }}>
           <div
             className="wf-mono"

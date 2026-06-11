@@ -301,6 +301,7 @@ export const marketplaceRouter = router({
         ratingCount: true,
         priceCents: true,
         tag: true,
+        thumbnailUrl: true,
       } satisfies Prisma.CourseSelect;
 
       // Length is an aggregate over units→lessons with no column to

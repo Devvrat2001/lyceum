@@ -1,13 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketChrome } from "@/components/layouts/MarketChrome";
-import {
-  Annot,
-  Avatar,
-  Card,
-  Icon,
-  ImageBox,
-} from "@/components/wf/primitives";
+import { Annot, Avatar, Card, Icon } from "@/components/wf/primitives";
+import { courseGradient } from "@/lib/thumbnail";
 import { getServerCaller } from "@/lib/trpc/server";
 import { auth } from "@/lib/auth";
 import { TRPCError } from "@trpc/server";
@@ -134,12 +129,35 @@ export default async function CourseDetailPage({
                 })}
               </span>
             </div>
-            <ImageBox
-              h={300}
-              kind="video"
-              label="Course preview · 1:24"
-              style={{ marginBottom: 24 }}
-            />
+            {course.thumbnailUrl ? (
+              // Arbitrary-host teacher thumbnail — plain <img> on
+              // purpose (see CourseCard).
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={course.thumbnailUrl}
+                alt={`${course.title} thumbnail`}
+                style={{
+                  width: "100%",
+                  height: 300,
+                  objectFit: "cover",
+                  display: "block",
+                  borderRadius: 6,
+                  border: "1px solid var(--wf-hairline)",
+                  marginBottom: 24,
+                }}
+              />
+            ) : (
+              <div
+                aria-hidden
+                style={{
+                  height: 300,
+                  background: courseGradient(course.slug),
+                  borderRadius: 6,
+                  border: "1px solid var(--wf-hairline)",
+                  marginBottom: 24,
+                }}
+              />
+            )}
 
             {learn.length > 0 && (
               <>

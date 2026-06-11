@@ -478,6 +478,10 @@ export const teacherRouter = router({
         subject: z.string().max(40).optional(),
         grade: z.string().max(40).optional(),
         priceCents: z.number().int().min(0).max(1_000_000).optional(),
+        // Card/hero art. Empty string clears (falls back to the
+        // deterministic gradient); http(s)-shape is enforced in the
+        // handler so the error message stays human-readable.
+        thumbnailUrl: z.string().max(600).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -528,6 +532,16 @@ export const teacherRouter = router({
       }
       if (input.priceCents !== undefined) {
         data.priceCents = input.priceCents;
+      }
+      if (input.thumbnailUrl !== undefined) {
+        const raw = input.thumbnailUrl.trim();
+        if (raw.length > 0 && !/^https?:\/\//i.test(raw)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Thumbnail must be an http(s) image URL.",
+          });
+        }
+        data.thumbnailUrl = raw.length > 0 ? raw : null;
       }
 
       if (Object.keys(data).length === 0) {

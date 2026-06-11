@@ -118,6 +118,7 @@ type CourseProps = {
   subject: string;
   grade: string;
   priceCents: number;
+  thumbnailUrl: string | null;
   updatedAt: string;
   units: Unit[];
 };
@@ -3719,6 +3720,7 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
   const [subject, setSubject] = useState(course.subject);
   const [grade, setGrade] = useState(course.grade);
   const [price, setPrice] = useState((course.priceCents / 100).toString());
+  const [thumbnailUrl, setThumbnailUrl] = useState(course.thumbnailUrl ?? "");
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   const update = trpc.teacher.updateCourse.useMutation({
@@ -3737,7 +3739,8 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
     tagline !== (course.tagline ?? "") ||
     subject !== course.subject ||
     grade !== course.grade ||
-    priceCents !== course.priceCents;
+    priceCents !== course.priceCents ||
+    thumbnailUrl !== (course.thumbnailUrl ?? "");
 
   return (
     <Field label="DETAILS">
@@ -3759,6 +3762,12 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
           onChange={setPrice}
           type="number"
         />
+        <DetailInput
+          label="Thumbnail URL"
+          value={thumbnailUrl}
+          onChange={setThumbnailUrl}
+          placeholder="https://… (blank = auto gradient)"
+        />
         <button
           type="button"
           disabled={!dirty || titleEmpty || update.isPending}
@@ -3770,6 +3779,7 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
               subject: subject.trim(),
               grade: grade.trim(),
               priceCents,
+              thumbnailUrl: thumbnailUrl.trim(),
             })
           }
           style={{

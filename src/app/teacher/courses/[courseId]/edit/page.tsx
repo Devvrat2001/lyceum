@@ -37,6 +37,7 @@ export default async function CourseBuilderPage({
           subject: course.subject,
           grade: course.grade,
           priceCents: course.priceCents,
+          thumbnailUrl: course.thumbnailUrl,
           updatedAt: course.updatedAt.toISOString(),
           units: course.units.map((u) => ({
             id: u.id,
