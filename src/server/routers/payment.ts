@@ -20,6 +20,7 @@ import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
 import { fulfillPaidOrder } from "../services/fulfillOrder";
+import { removeEnrollment } from "../services/enrollment";
 
 /**
  * Stripe Checkout Session shape (subset we use). Imported as a structural
@@ -575,14 +576,19 @@ export const paymentRouter = router({
         });
       }
 
-      if (isStripeEnabled() && order.provider === "stripe") {
-        // Real-Stripe refund path lands with Tier 2.2 smoke test.
-        // Throw rather than silently demo-refund so we don't lose
-        // money in the gap.
+      // Only demo orders may take the demo-refund branch below. A
+      // razorpay/stripe order falling through would flip the DB to
+      // REFUNDED and revoke the enrollment WITHOUT moving any actual
+      // money at the provider — the student paid, lost access, and got
+      // nothing back. (The old guard only caught stripe-while-stripe-
+      // enabled; razorpay orders fell straight through. REQUIREMENTS R2.)
+      if (order.provider !== "demo") {
         throw new TRPCError({
-          code: "NOT_IMPLEMENTED" as never,
+          code: "PRECONDITION_FAILED",
           message:
-            "Real-Stripe refunds are pending wiring. Issue from the Stripe Dashboard until v2.",
+            order.provider === "razorpay"
+              ? "Issue this refund from the Razorpay Dashboard — in-app Razorpay refunds aren't wired yet."
+              : "Issue this refund from the Stripe Dashboard — the charge.refunded webhook syncs it back.",
         });
       }
 
@@ -597,16 +603,16 @@ export const paymentRouter = router({
         });
       }
 
-      // Demo refund: flip status + drop the enrollment atomically.
-      await ctx.db.$transaction([
-        ctx.db.order.update({
+      // Demo refund: flip status + drop the enrollment (and its
+      // enrollCount tick — removeEnrollment keeps the counter honest)
+      // atomically.
+      await ctx.db.$transaction(async (tx) => {
+        await tx.order.update({
           where: { id: order.id },
           data: { status: "REFUNDED", refundedAt: new Date() },
-        }),
-        ctx.db.enrollment.deleteMany({
-          where: { userId: order.userId, courseId: refundCourseId },
-        }),
-      ]);
+        });
+        await removeEnrollment(tx, order.userId, refundCourseId);
+      });
 
       await audit({
         actorId: ctx.user.id,

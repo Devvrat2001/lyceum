@@ -54,3 +54,35 @@ export async function ensureEnrollment(
   };
   return "$transaction" in db ? db.$transaction(run) : run(db);
 }
+
+/**
+ * Exact mirror of `ensureEnrollment` for the refund paths: delete the
+ * (userId, courseId) Enrollment if present and decrement the denormalized
+ * `Course.enrollCount` in the same transaction. Without this, every refund
+ * left the counter one too high forever (the delete never touched it), so
+ * "N students" drifted upward as refunds accumulated.
+ *
+ * Idempotent: removing a missing row is a no-op (webhook re-deliveries are
+ * safe). The decrement is guarded with `enrollCount > 0` so historical
+ * drift can never push the counter negative.
+ */
+export async function removeEnrollment(
+  db: Db,
+  userId: string,
+  courseId: string
+): Promise<{ removed: boolean }> {
+  const run = async (tx: Db) => {
+    const deleted = await tx.enrollment.deleteMany({
+      where: { userId, courseId },
+    });
+    const removed = deleted.count === 1;
+    if (removed) {
+      await tx.course.updateMany({
+        where: { id: courseId, enrollCount: { gt: 0 } },
+        data: { enrollCount: { decrement: 1 } },
+      });
+    }
+    return { removed };
+  };
+  return "$transaction" in db ? db.$transaction(run) : run(db);
+}

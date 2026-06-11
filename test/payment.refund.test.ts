@@ -8,6 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
+import { ensureEnrollment } from "@/server/services/enrollment";
 import { cleanupTestUsers, createTestUser } from "./helpers";
 
 beforeAll(async () => {
@@ -133,5 +134,79 @@ describe("payment.refundOrder (demo mode)", () => {
     const result = await admin.caller.payment.refundOrder({ orderId });
     expect(result.ok).toBe(true);
     expect(result.status).toBe("REFUNDED");
+  });
+
+  it("refund restores the course's enrollCount (honest counters)", async () => {
+    const teacher = await createTestUser({ role: "TEACHER" });
+    const buyer = await createTestUser({ role: "STUDENT" });
+    const { orderId, courseId } = await buyAndConfirm(teacher, buyer);
+
+    const paid = await db.course.findUniqueOrThrow({
+      where: { id: courseId },
+      select: { enrollCount: true },
+    });
+    expect(paid.enrollCount).toBe(1);
+
+    await teacher.caller.payment.refundOrder({ orderId });
+
+    const refunded = await db.course.findUniqueOrThrow({
+      where: { id: courseId },
+      select: { enrollCount: true },
+    });
+    expect(refunded.enrollCount).toBe(0);
+  });
+
+  it("razorpay orders can't take the demo-refund path (no money would move)", async () => {
+    const teacher = await createTestUser({ role: "TEACHER" });
+    const buyer = await createTestUser({ role: "STUDENT" });
+    const course = await db.course.create({
+      data: {
+        slug: `test-vitest-course-${crypto.randomUUID()}`,
+        title: "Razorpay Refund Fixture",
+        description: ".",
+        subject: "Math",
+        grade: "6",
+        authorId: teacher.id,
+        priceCents: 49900,
+        status: "DRAFT",
+      },
+    });
+    // A PAID razorpay order, exactly as the webhook would have left it.
+    const order = await db.order.create({
+      data: {
+        userId: buyer.id,
+        courseId: course.id,
+        teacherId: teacher.id,
+        grossCents: 49900,
+        feeCents: 7485,
+        netCents: 42415,
+        currency: "inr",
+        status: "PAID",
+        provider: "razorpay",
+        externalId: `plink_test_${crypto.randomUUID()}`,
+        paidAt: new Date(),
+      },
+    });
+    await ensureEnrollment(db, buyer.id, course.id);
+
+    await expect(
+      teacher.caller.payment.refundOrder({ orderId: order.id })
+    ).rejects.toThrow(/Razorpay Dashboard/);
+
+    // Nothing was touched: still PAID, enrollment + counter intact.
+    const after = await db.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
+    expect(after.status).toBe("PAID");
+    expect(after.refundedAt).toBeNull();
+    const enrollment = await db.enrollment.findUnique({
+      where: { userId_courseId: { userId: buyer.id, courseId: course.id } },
+    });
+    expect(enrollment).not.toBeNull();
+    const counter = await db.course.findUniqueOrThrow({
+      where: { id: course.id },
+      select: { enrollCount: true },
+    });
+    expect(counter.enrollCount).toBe(1);
   });
 });

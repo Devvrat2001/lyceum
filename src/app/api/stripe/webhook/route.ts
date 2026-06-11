@@ -4,6 +4,7 @@ import { getStripe } from "@/lib/payments/stripe";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
 import { fulfillPaidOrder } from "@/server/services/fulfillOrder";
+import { removeEnrollment } from "@/server/services/enrollment";
 
 /**
  * Stripe webhook. Only runs in real-Stripe mode — demo orders never
@@ -182,27 +183,24 @@ export async function POST(req: Request) {
         // Flip the Order and cancel the enrollment(s) in one tx — the
         // single course, or every course in a bundle order. We delete
         // (not soft-delete) so the student loses access immediately;
-        // re-enrolling later just creates a fresh row.
+        // re-enrolling later just creates a fresh row. removeEnrollment
+        // (not a bare deleteMany) so each course's enrollCount ticks
+        // back down — the mirror of ensureEnrollment on the way in.
         await db.$transaction(async (tx) => {
           await tx.order.update({
             where: { id: order.id },
             data: { status: "REFUNDED", refundedAt: new Date() },
           });
           if (order.courseId) {
-            await tx.enrollment.deleteMany({
-              where: { userId: order.userId, courseId: order.courseId },
-            });
+            await removeEnrollment(tx, order.userId, order.courseId);
           } else if (order.pathId) {
             const pcs = await tx.pathCourse.findMany({
               where: { pathId: order.pathId },
               select: { courseId: true },
             });
-            await tx.enrollment.deleteMany({
-              where: {
-                userId: order.userId,
-                courseId: { in: pcs.map((p) => p.courseId) },
-              },
-            });
+            for (const pc of pcs) {
+              await removeEnrollment(tx, order.userId, pc.courseId);
+            }
           }
         });
         await audit({

@@ -7,7 +7,10 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
-import { ensureEnrollment } from "@/server/services/enrollment";
+import {
+  ensureEnrollment,
+  removeEnrollment,
+} from "@/server/services/enrollment";
 import { cleanupTestUsers, createTestUser } from "./helpers";
 
 beforeAll(async () => {
@@ -122,5 +125,41 @@ describe("ensureEnrollment", () => {
     const mine = teachers.find((t) => t.id === teacher.id);
     expect(mine).toBeTruthy();
     expect(mine!.studentsCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("removeEnrollment", () => {
+  it("deletes the row and decrements the counter; repeat removal is a no-op", async () => {
+    const teacher = await createTestUser({ role: "TEACHER" });
+    const student = await createTestUser({ role: "STUDENT" });
+    const course = await makeCourse(teacher.id);
+
+    await ensureEnrollment(db, student.id, course.id);
+    expect(await enrollCountOf(course.id)).toBe(1);
+
+    const first = await removeEnrollment(db, student.id, course.id);
+    expect(first.removed).toBe(true);
+    expect(await enrollCountOf(course.id)).toBe(0);
+
+    const again = await removeEnrollment(db, student.id, course.id);
+    expect(again.removed).toBe(false);
+    expect(await enrollCountOf(course.id)).toBe(0);
+  });
+
+  it("never drives the counter below zero, even against drifted data", async () => {
+    const teacher = await createTestUser({ role: "TEACHER" });
+    const student = await createTestUser({ role: "STUDENT" });
+    const course = await makeCourse(teacher.id);
+
+    // Simulate historical drift: a row exists but the counter reads 0.
+    await ensureEnrollment(db, student.id, course.id);
+    await db.course.update({
+      where: { id: course.id },
+      data: { enrollCount: 0 },
+    });
+
+    const res = await removeEnrollment(db, student.id, course.id);
+    expect(res.removed).toBe(true);
+    expect(await enrollCountOf(course.id)).toBe(0);
   });
 });
