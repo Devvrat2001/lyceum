@@ -1,5 +1,3 @@
-import type { FullConfig } from "@playwright/test";
-
 /**
  * Playwright global teardown: wipe every test-vitest-* user that any
  * spec created during this run.
@@ -26,7 +24,7 @@ import type { FullConfig } from "@playwright/test";
  *     isn't reachable from here. Build a fresh Prisma client off
  *     `DATABASE_URL` instead.
  */
-export default async function globalTeardown(_config: FullConfig) {
+export default async function globalTeardown() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { config: loadDotEnv } = require("dotenv");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -38,7 +36,6 @@ export default async function globalTeardown(_config: FullConfig) {
 
   const url = process.env.DATABASE_URL;
   if (!url) {
-    // eslint-disable-next-line no-console
     console.warn(
       "[playwright teardown] DATABASE_URL not set — skipping test-user cleanup"
     );
@@ -61,7 +58,6 @@ export default async function globalTeardown(_config: FullConfig) {
       where: { email: { startsWith: PREFIX } },
     });
     if (count > 0) {
-      // eslint-disable-next-line no-console
       console.log(
         `[playwright teardown] wiped ${count} test-vitest-* user(s)`
       );

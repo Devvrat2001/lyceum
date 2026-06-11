@@ -775,7 +775,26 @@ async function main() {
             },
           },
         });
-        if (l.questions && l.questions.length > 0) {
+        if (l.questions && l.questions.length === 1) {
+          // A single question reads better as an inline MCQ check than
+          // a one-card quiz deck (and the e2e lesson-flow spec drives
+          // the MCQ UI on multiplying-fractions).
+          const q = l.questions[0];
+          await db.block.create({
+            data: {
+              lessonId: lesson.id,
+              order: blockOrder++,
+              type: "MCQ",
+              settings: {
+                stem: q.stem,
+                options: q.answers.map((a) => ({
+                  text: a.text,
+                  correct: a.correct,
+                })),
+              },
+            },
+          });
+        } else if (l.questions && l.questions.length > 1) {
           await db.block.create({
             data: {
               lessonId: lesson.id,

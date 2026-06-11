@@ -63,9 +63,9 @@ jobs:
       NEXTAUTH_SECRET: ci-only-dummy-secret-0123456789abcdef
       PUBLIC_BASE_URL: http://localhost:3000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -94,7 +94,7 @@ jobs:
 
       - run: npx tsc --noEmit
 
-      - run: npx eslint src test
+      - run: npx eslint src test e2e
 
       - run: npx vitest run
 
@@ -102,8 +102,72 @@ jobs:
       # then next build — the same script Vercel executes.
       - run: npm run build
 
+  # Browser smokes (Playwright, chromium): real cookies, Auth.js
+  # session, tRPC-over-HTTP — the layer vitest deliberately skips.
+  # Runs in parallel with `verify` against its own DB service; the
+  # playwright config boots `npm run dev` itself (webServer block).
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lyceum
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5433/lyceum
+      NEXTAUTH_SECRET: ci-only-dummy-secret-0123456789abcdef
+      PUBLIC_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Write CI env files
+        run: |
+          cat > .env.local <<EOF
+          DATABASE_URL=$DATABASE_URL
+          NEXTAUTH_SECRET=$NEXTAUTH_SECRET
+          PUBLIC_BASE_URL=$PUBLIC_BASE_URL
+          EOF
+          touch .env
+
+      - run: npx prisma generate
+
+      - run: npx prisma migrate deploy
+
+      # The specs assert against seeded demo content (quick-login
+      # buttons, the multiplying-fractions MCQ, the paid course).
+      - run: npm run db:seed
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
   deploy:
-    needs: verify
+    needs: [verify, e2e]
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -113,9 +177,9 @@ jobs:
       VERCEL_ORG_ID: team_PQZMPoTZFxScDAwAX7EgmvhH
       VERCEL_PROJECT_ID: prj_gsc5DZUhGg4x75pRD7BZgT5zWwcB
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
 
