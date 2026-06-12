@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Annot, Btn, Card, Icon } from "@/components/wf/primitives";
 
 type IconName = "play" | "sparkles" | "book" | "mic" | "check" | "arrow";
@@ -11,6 +12,8 @@ type PlanItem = {
   title: string;
   meta: string;
   state: PlanState;
+  /** Where "Start" navigates; null = check-off only (e.g. streak saver). */
+  href?: string | null;
 };
 
 export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
@@ -40,12 +43,10 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
         <h2 className="wf-h2" style={{ fontSize: 16 }}>
           Today&apos;s plan
         </h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <Annot ai>AI-curated · 35 min</Annot>
-          <Btn sm variant="ghost">
-            Customize
-          </Btn>
-        </div>
+        {/* Honest label — the plan is rule-built from real progress
+            (next lesson / assignments / weakest skill), not AI, and the
+            old "· 35 min" estimate + dead Customize button were props. */}
+        <Annot>Planned from your progress</Annot>
       </div>
       <Card p={0}>
         {plan.map((row, i) => (
@@ -133,9 +134,21 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
             {row.state === "done" ? (
               <Icon name="check" size={16} color="var(--wf-good)" />
             ) : row.state === "now" ? (
-              <Btn sm variant="primary" onClick={() => advance(i)}>
-                Start
-              </Btn>
+              row.href ? (
+                <Link
+                  href={row.href}
+                  style={{ textDecoration: "none" }}
+                  onClick={() => advance(i)}
+                >
+                  <Btn sm variant="primary">
+                    Start
+                  </Btn>
+                </Link>
+              ) : (
+                <Btn sm variant="primary" onClick={() => advance(i)}>
+                  Done
+                </Btn>
+              )
             ) : (
               <Icon name="arrow" size={16} color="var(--wf-mute)" />
             )}

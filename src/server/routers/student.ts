@@ -59,7 +59,12 @@ export const studentRouter = router({
                 include: {
                   lessons: {
                     orderBy: { order: "asc" },
-                    select: { slug: true, title: true, durationMin: true },
+                    select: {
+                      id: true,
+                      slug: true,
+                      title: true,
+                      durationMin: true,
+                    },
                   },
                 },
               },
@@ -96,7 +101,7 @@ export const studentRouter = router({
       }),
       ctx.db.lessonProgress.findMany({
         where: { userId: me.id, completedAt: { gte: weekStart } },
-        select: { completedAt: true },
+        select: { completedAt: true, lessonId: true },
       }),
       ctx.db.badge.count(),
       ctx.db.userBadge.count({ where: { userId: me.id } }),
@@ -205,19 +210,127 @@ export const studentRouter = router({
       };
     });
 
-    // No real "today's plan" generator exists yet — the page renders
-    // an empty state when this is empty rather than ship a hardcoded
-    // mock plan ("Intro to Equivalent Fractions…") that doesn't
-    // reflect the user's actual courses. The item shape matches
-    // TodaysPlan's `PlanItem` so the component drops in once we wire
-    // a real source.
-    const todaysPlan: Array<{
+    // ── Today's plan (R13): deterministic v1, no AI required ──
+    // Sources in priority order: work completed today (visible wins,
+    // crossed off) → due assignments → the next uncompleted lesson of
+    // the most-recent course → weakest-skill practice → a streak saver
+    // when the streak is at risk. First actionable item gets "now".
+    type PlanItem = {
       ico: "play" | "sparkles" | "book" | "mic" | "check" | "arrow";
       tag: string;
       title: string;
       meta: string;
       state: "done" | "now" | "next";
-    }> = [];
+      href: string | null;
+    };
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const doneTodayIds = new Set(
+      weekProgress
+        .filter((p) => p.completedAt.toISOString().slice(0, 10) === todayKey)
+        .map((p) => p.lessonId)
+    );
+    const planItems: PlanItem[] = [];
+
+    const topEnrollment = enrollments[0] ?? null;
+    const topLessons = topEnrollment
+      ? topEnrollment.course.units.flatMap((u) => u.lessons)
+      : [];
+
+    // Completed-today rows from the top course (max 2).
+    for (const l of topLessons) {
+      if (doneTodayIds.has(l.id) && planItems.length < 2) {
+        planItems.push({
+          ico: "check",
+          tag: "DONE",
+          title: l.title,
+          meta: topEnrollment!.course.title,
+          state: "done",
+          href: null,
+        });
+      }
+    }
+
+    // Due, not-yet-done assignments (max 2).
+    for (const a of assignments.filter((a) => !a.done).slice(0, 2)) {
+      planItems.push({
+        ico: "check",
+        tag: "ASSIGNMENT",
+        title: a.t,
+        meta: `${a.due} · +${a.xp} XP`,
+        state: "next",
+        href: a.lessonSlug ? `/student/lesson/${a.lessonSlug}` : null,
+      });
+    }
+
+    // Next uncompleted lesson in the most-recent course.
+    if (topEnrollment) {
+      const completedInTop = new Set(
+        (
+          await ctx.db.lessonProgress.findMany({
+            where: {
+              userId: me.id,
+              lesson: { unit: { courseId: topEnrollment.courseId } },
+            },
+            select: { lessonId: true },
+          })
+        ).map((r) => r.lessonId)
+      );
+      const nextLesson = topLessons.find(
+        (l) => !completedInTop.has(l.id) && l.slug
+      );
+      if (nextLesson) {
+        planItems.push({
+          ico: "play",
+          tag: "CONTINUE",
+          title: nextLesson.title,
+          meta: `${topEnrollment.course.title}${
+            nextLesson.durationMin ? ` · ${nextLesson.durationMin} min` : ""
+          }`,
+          state: "next",
+          href: `/student/lesson/${nextLesson.slug}`,
+        });
+      }
+    }
+
+    // Weakest skill → practice nudge (links into the skill tree).
+    const weakest = [...skillMastery].sort((a, b) => a.level - b.level)[0];
+    if (weakest) {
+      planItems.push({
+        ico: "sparkles",
+        tag: "PRACTICE",
+        title: `Practice ${weakest.skill.title}`,
+        meta: `Your weakest skill · ${Math.round(weakest.level * 100)}% mastered`,
+        state: "next",
+        href: "/student/skill-tree",
+      });
+    }
+
+    // Streak saver — only when there IS a streak and nothing happened
+    // today yet (an attempt or a completion both count as activity).
+    const activeToday =
+      doneTodayIds.size > 0 ||
+      weekAttempts.some(
+        (a) => a.createdAt.toISOString().slice(0, 10) === todayKey
+      );
+    if ((streak?.current ?? 0) > 0 && !activeToday) {
+      planItems.push({
+        ico: "book",
+        tag: "STREAK",
+        title: `Keep your ${streak!.current}-day streak alive`,
+        meta: "Any lesson or quiz today counts",
+        state: "next",
+        href: null,
+      });
+    }
+
+    const todaysPlan = planItems.slice(0, 5);
+    const firstActionable = todaysPlan.findIndex((p) => p.state === "next");
+    if (firstActionable !== -1) {
+      todaysPlan[firstActionable] = {
+        ...todaysPlan[firstActionable],
+        state: "now",
+      };
+    }
 
     // Real per-skill mastery only — the prototype used to pad with a
     // hardcoded "Number sense / Fractions / Geometry / …" filler when
