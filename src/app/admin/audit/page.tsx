@@ -7,6 +7,10 @@ const KIND_LABELS: Record<string, { label: string; color: string }> = {
   "ai.course_outline": { label: "AI Course Outline", color: "var(--wf-ai)" },
   "ai.regenerate_unit": { label: "AI Unit Regen", color: "var(--wf-ai)" },
   "ai.generate_questions": { label: "AI Quiz Gen", color: "var(--wf-ai)" },
+  "ai.grade_free_response": {
+    label: "AI Response Grading",
+    color: "var(--wf-ai)",
+  },
   "ai.marketplace_search": { label: "AI Search", color: "var(--wf-ai)" },
   "ai.why_path": { label: "AI Why-Path", color: "var(--wf-ai)" },
   "ai.suggest_fix": { label: "AI Suggest Fix", color: "var(--wf-ai)" },

@@ -7,6 +7,7 @@ export type AuditKind =
   | "ai.course_outline"
   | "ai.regenerate_unit"
   | "ai.generate_questions"
+  | "ai.grade_free_response"
   | "ai.marketplace_search"
   | "ai.why_path"
   | "ai.suggest_fix"

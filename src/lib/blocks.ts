@@ -22,7 +22,8 @@ export type BlockType =
   | "POLL"
   | "SECTION"
   | "DISCUSSION"
-  | "LIVE";
+  | "LIVE"
+  | "FREE_RESPONSE";
 
 export type BlockMeta = {
   type: BlockType;
@@ -52,6 +53,12 @@ export const BLOCK_GROUPS: ReadonlyArray<{
       { type: "MCQ", icon: "check", label: "Multiple choice" },
       { type: "SPEAK", icon: "mic", label: "Speak / record" },
       { type: "AI_QUIZ", icon: "sparkles", label: "AI quiz", ai: true },
+      {
+        type: "FREE_RESPONSE",
+        icon: "chat",
+        label: "Free response · AI graded",
+        ai: true,
+      },
     ],
   },
   {
@@ -220,6 +227,15 @@ export type SpeakSettings = CommonSettings & {
   expected?: string;
   language?: string;
 };
+/** FREE_RESPONSE: student writes a short answer; the server grades it
+ *  against `rubric` (AI when a provider key is set, keyword heuristic in
+ *  demo mode). The rubric is teacher-only — never sent to the reader. */
+export type FreeResponseSettings = CommonSettings & {
+  /** The writing prompt the student answers. Required for grading. */
+  prompt?: string;
+  /** What a strong answer covers — drives the grader. */
+  rubric?: string;
+};
 
 type SettingsMap = {
   VIDEO: VideoSettings;
@@ -237,6 +253,7 @@ type SettingsMap = {
   SECTION: SectionSettings;
   DISCUSSION: DiscussionSettings;
   LIVE: LiveSettings;
+  FREE_RESPONSE: FreeResponseSettings;
 };
 
 // Compile-time exhaustiveness check. If a `BlockType` enum value gets

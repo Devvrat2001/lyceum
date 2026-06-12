@@ -196,6 +196,13 @@ function renderBody(block: BlockReaderProps) {
           settings={settingsFor("BRANCHING", block.settings)}
         />
       );
+    case "FREE_RESPONSE":
+      return (
+        <FreeResponseBody
+          blockId={block.id}
+          settings={settingsFor("FREE_RESPONSE", block.settings)}
+        />
+      );
     default:
       return (
         <div
@@ -1688,6 +1695,208 @@ function getSpeechRecognitionCtor(): { new (): SpeechRecognitionLike } | null {
     webkitSpeechRecognition?: { new (): SpeechRecognitionLike };
   };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+/* ── FREE_RESPONSE ───────────────────────────────────────── */
+
+/**
+ * Student writes a short answer; the server grades it against the
+ * teacher's rubric (AI when a key is set, honest keyword heuristic in
+ * demo mode) and returns a 0-100 score + feedback. Resubmits allowed —
+ * each shows the fresh grade; the per-user AI quota is the brake.
+ */
+function FreeResponseBody({
+  blockId,
+  settings,
+}: {
+  blockId: string;
+  settings: SettingsFor<"FREE_RESPONSE">;
+}) {
+  const [answer, setAnswer] = useState("");
+  const grade = trpc.lesson.gradeFreeResponse.useMutation();
+  const result = grade.data ?? null;
+
+  const prompt =
+    typeof settings.prompt === "string" && settings.prompt.trim()
+      ? settings.prompt.trim()
+      : null;
+  const words = answer.trim().split(/\s+/).filter(Boolean).length;
+  const tooShort = answer.trim().length < 20;
+
+  if (!prompt) {
+    return (
+      <div
+        style={{
+          padding: 12,
+          border: "1px dashed var(--wf-hairline)",
+          borderRadius: 3,
+          fontSize: 12,
+          color: "var(--wf-mute)",
+          lineHeight: 1.5,
+        }}
+      >
+        This free-response block isn&apos;t configured yet — the teacher
+        needs to add a writing prompt.
+      </div>
+    );
+  }
+
+  const scoreColor =
+    result === null
+      ? "var(--wf-mute)"
+      : result.score >= 80
+        ? "var(--wf-good)"
+        : result.score >= 60
+          ? "var(--wf-warn)"
+          : "var(--wf-accent)";
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 10 }}>
+        {prompt}
+      </div>
+      <textarea
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        rows={6}
+        maxLength={5_000}
+        disabled={grade.isPending}
+        placeholder="Write your answer in your own words…"
+        style={{
+          width: "100%",
+          fontSize: 13,
+          lineHeight: 1.6,
+          padding: 10,
+          border: "1px solid var(--wf-hairline)",
+          borderRadius: 3,
+          background: "white",
+          outline: "none",
+          resize: "vertical",
+          fontFamily: "var(--font-sans-stack)",
+        }}
+      />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginTop: 8,
+        }}
+      >
+        <button
+          type="button"
+          disabled={grade.isPending || tooShort}
+          onClick={() => grade.mutate({ blockId, answer })}
+          style={{
+            padding: "7px 14px",
+            borderRadius: 4,
+            border: "none",
+            background: "var(--wf-ink)",
+            color: "white",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: grade.isPending || tooShort ? "default" : "pointer",
+            opacity: grade.isPending || tooShort ? 0.55 : 1,
+          }}
+        >
+          {grade.isPending
+            ? "Grading…"
+            : result
+              ? "Resubmit for a fresh grade"
+              : "Submit for feedback"}
+        </button>
+        <span
+          className="wf-mono"
+          style={{ fontSize: 10, color: "var(--wf-mute)" }}
+        >
+          {words} {words === 1 ? "word" : "words"}
+          {tooShort && answer.length > 0 ? " · write a bit more" : ""}
+        </span>
+      </div>
+
+      {grade.error && (
+        <div
+          style={{
+            marginTop: 10,
+            fontSize: 12,
+            color: "var(--wf-accent)",
+            padding: "6px 10px",
+            border: "1px solid var(--wf-accent)",
+            background: "var(--wf-accent-soft)",
+            borderRadius: 4,
+          }}
+        >
+          {grade.error.message}
+        </div>
+      )}
+
+      {result && (
+        <div
+          style={{
+            marginTop: 12,
+            padding: "12px 14px",
+            border: "1px solid var(--wf-hairline)",
+            borderLeft: `3px solid ${scoreColor}`,
+            borderRadius: 4,
+            background: "var(--wf-fillsoft)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: 10,
+              marginBottom: 6,
+            }}
+          >
+            <span
+              className="wf-serif"
+              style={{ fontSize: 20, fontWeight: 700, color: scoreColor }}
+            >
+              {result.score}/100
+            </span>
+            {result.points > 0 && (
+              <span
+                className="wf-mono"
+                style={{ fontSize: 10, color: "var(--wf-good)" }}
+              >
+                +{result.points + result.bonusPoints} XP
+              </span>
+            )}
+            {result.mode === "demo" && (
+              <span
+                className="wf-mono"
+                style={{ fontSize: 9, color: "var(--wf-mute)" }}
+              >
+                DEMO GRADER
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+            {result.feedback}
+          </div>
+          {result.strengths.length > 0 && (
+            <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>
+              {result.strengths.map((s, i) => (
+                <div key={i} style={{ color: "var(--wf-good)" }}>
+                  ✓ {s}
+                </div>
+              ))}
+            </div>
+          )}
+          {result.improvements.length > 0 && (
+            <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.6 }}>
+              {result.improvements.map((s, i) => (
+                <div key={i} style={{ color: "var(--wf-body)" }}>
+                  → {s}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function SpeakBody({ settings }: { settings: Record<string, unknown> }) {

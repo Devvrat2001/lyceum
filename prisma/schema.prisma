@@ -41,6 +41,7 @@ enum BlockType {
   SECTION
   DISCUSSION
   LIVE
+  FREE_RESPONSE
 }
 
 model User {
@@ -480,6 +481,13 @@ model Attempt {
   // string-parse chosenKey.
   chosenIndex Int?
   subIndex    Int?
+  // Free-response grading (R24): the typed answer, the grader's feedback
+  // prose, and the 0-100 score. NULL for choice-based attempts. Kept as
+  // typed columns (not a Json bag) so teacher review + analytics can
+  // query them directly.
+  freeText   String?   @db.Text
+  aiFeedback String?   @db.Text
+  score      Int?
   correct    Boolean
   hintsUsed  Int       @default(0)
   timeMs     Int

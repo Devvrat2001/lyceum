@@ -11,6 +11,19 @@ import { awardCorrectAttempt } from "../services/awardForAttempt";
 import { ensureEnrollment } from "../services/enrollment";
 import { settingsFor } from "@/lib/blocks";
 import { audit } from "@/lib/audit";
+import { checkAIQuota } from "@/lib/rateLimit";
+import {
+  completeStructured,
+  isLlmEnabled,
+  type LlmMode,
+} from "@/lib/ai/llm";
+import {
+  FREE_RESPONSE_GRADER_SYSTEM_PROMPT,
+  GradeSchema,
+  buildDemoGrade,
+  buildGradingPrompt,
+  type FreeResponseGrade,
+} from "@/lib/ai/prompts/freeResponseGrader";
 import {
   isMuxSignedPlaybackEnabled,
   signMuxPlaybackToken,
@@ -374,6 +387,160 @@ export const lessonRouter = router({
         correctIndex,
         streak: award?.streak ?? null,
         badgeAwarded: award?.badgeAwarded ?? null,
+      };
+    }),
+
+  /**
+   * Grade a FREE_RESPONSE block's written answer (REQUIREMENTS R24).
+   * AI-graded against the teacher's rubric when a provider key is set;
+   * keyword-heuristic demo grade otherwise (honest about it). Every
+   * submission writes an Attempt row with the answer + feedback +
+   * 0-100 score (typed columns, not chosenKey overloading), so teacher
+   * review can read them later. Resubmits are allowed — each is a new
+   * Attempt; the AI quota is the cost brake.
+   */
+  gradeFreeResponse: protectedProcedure
+    .input(
+      z.object({
+        blockId: z.string(),
+        answer: z
+          .string()
+          .trim()
+          .min(20, "Write a few sentences before submitting.")
+          .max(5_000),
+        timeMs: z.number().int().nonnegative().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await checkAIQuota({ actorId: ctx.user.id });
+      const block = await ctx.db.block.findUnique({
+        where: { id: input.blockId },
+        select: {
+          id: true,
+          type: true,
+          settings: true,
+          lessonId: true,
+          lesson: {
+            select: {
+              title: true,
+              unit: { select: { course: { select: { title: true } } } },
+            },
+          },
+        },
+      });
+      if (!block) throw new TRPCError({ code: "NOT_FOUND" });
+      if (block.type !== "FREE_RESPONSE") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Block is not a free-response block",
+        });
+      }
+      const settings = settingsFor("FREE_RESPONSE", block.settings);
+      const promptText = (settings.prompt ?? "").trim();
+      const rubric = (settings.rubric ?? "").trim();
+      if (!promptText) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "This block isn't configured yet — the teacher needs to set a writing prompt.",
+        });
+      }
+
+      const t0 = Date.now();
+      let grade: FreeResponseGrade;
+      let mode: LlmMode;
+      if (isLlmEnabled()) {
+        const result = await completeStructured({
+          schema: GradeSchema,
+          system: FREE_RESPONSE_GRADER_SYSTEM_PROMPT,
+          prompt: buildGradingPrompt({
+            courseTitle: block.lesson.unit.course.title,
+            lessonTitle: block.lesson.title,
+            prompt: promptText,
+            rubric,
+            answer: input.answer,
+          }),
+          maxTokens: 1024,
+        });
+        // Belt-and-braces clamp — the schema asks for 0-100 but the
+        // money path here is XP, so don't trust the model arithmetic.
+        grade = {
+          ...result.data,
+          score: Math.max(0, Math.min(100, result.data.score)),
+        };
+        mode = result.mode;
+      } else {
+        grade = buildDemoGrade({
+          rubric: rubric || promptText,
+          answer: input.answer,
+        });
+        mode = "demo";
+      }
+
+      const correct = grade.score >= 60;
+      const points = correct ? xpForCorrect(0) : 0;
+      // Flatten the structured feedback into one prose blob for the
+      // Attempt row (teacher review reads a single column); the client
+      // gets the structured shape in the return value.
+      const feedbackBlob = [
+        grade.feedback,
+        grade.strengths.length > 0
+          ? `Strengths: ${grade.strengths.join(" · ")}`
+          : null,
+        grade.improvements.length > 0
+          ? `Improve: ${grade.improvements.join(" · ")}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      await ctx.db.attempt.create({
+        data: {
+          userId: ctx.user.id,
+          lessonId: block.lessonId,
+          blockId: block.id,
+          chosenKey: null,
+          correct,
+          hintsUsed: 0,
+          timeMs: input.timeMs,
+          freeText: input.answer,
+          aiFeedback: feedbackBlob,
+          score: grade.score,
+        },
+      });
+
+      const award =
+        points > 0
+          ? await awardCorrectAttempt(
+              ctx.db,
+              ctx.user.id,
+              points,
+              "block_free_response_correct",
+              block.id
+            )
+          : null;
+
+      await audit({
+        actorId: ctx.user.id,
+        kind: "ai.grade_free_response",
+        lessonId: block.lessonId,
+        payload: {
+          blockId: block.id,
+          score: grade.score,
+          answerChars: input.answer.length,
+          mode,
+          elapsedMs: Date.now() - t0,
+        },
+      });
+
+      return {
+        ...grade,
+        correct,
+        points,
+        bonusPoints: award?.bonusPoints ?? 0,
+        streak: award?.streak ?? null,
+        badgeAwarded: award?.badgeAwarded ?? null,
+        mode,
       };
     }),
 

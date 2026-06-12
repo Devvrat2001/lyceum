@@ -88,6 +88,8 @@ export type BlockSettingsShape = {
   language?: string;
   // BRANCHING (choose-your-own-adventure graph). nodes[0] is the start.
   nodes?: BranchingNode[];
+  // FREE_RESPONSE (AI-graded short answer; `prompt` is shared above)
+  rubric?: string;
   // APPEARANCE — "how the block looks" (Course Builder v2 inspector).
   // Persisted forward-compatibly; the student reader honors these as it
   // grows. `accent` is a hex string.
@@ -527,6 +529,10 @@ function renderTypeFields(
       return <SpeakFields {...fieldsFor<"SPEAK">(draft, update)} />;
     case "BRANCHING":
       return <BranchingFields {...fieldsFor<"BRANCHING">(draft, update)} />;
+    case "FREE_RESPONSE":
+      return (
+        <FreeResponseFields {...fieldsFor<"FREE_RESPONSE">(draft, update)} />
+      );
     default:
       return (
         <div
@@ -2219,6 +2225,36 @@ function DragMatchFields({ draft, update }: FieldsProps<"DRAG_MATCH">) {
           + Add pair ({pairs.length}/8)
         </button>
       </div>
+    </>
+  );
+}
+
+function FreeResponseFields({ draft, update }: FieldsProps<"FREE_RESPONSE">) {
+  // Two parts: the prompt students answer, and the rubric the AI grades
+  // against. The rubric never reaches the student client — the grading
+  // mutation reads it server-side from Block.settings.
+  return (
+    <>
+      <TextAreaField
+        label="WRITING PROMPT"
+        value={typeof draft.prompt === "string" ? draft.prompt : ""}
+        onChange={(v) => update("prompt", v)}
+        placeholder="In your own words, explain why the moon has phases."
+        rows={3}
+        maxLength={1000}
+        hint="The question students answer in a few sentences."
+      />
+      <TextAreaField
+        label="RUBRIC · WHAT A STRONG ANSWER COVERS"
+        value={typeof draft.rubric === "string" ? draft.rubric : ""}
+        onChange={(v) => update("rubric", v)}
+        placeholder={
+          "- The moon orbits Earth\n- We see the sunlit half from different angles\n- A full cycle takes about a month"
+        }
+        rows={5}
+        maxLength={2000}
+        hint="The AI grades against this. Students never see it. Blank = grade against the prompt's plain intent."
+      />
     </>
   );
 }

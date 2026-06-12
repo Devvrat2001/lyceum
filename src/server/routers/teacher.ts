@@ -1145,6 +1145,7 @@ export const teacherRouter = router({
           "SECTION",
           "DISCUSSION",
           "LIVE",
+          "FREE_RESPONSE",
         ]),
         /** Optional starter template id (see `lib/blockTemplates.ts`).
          *  When set, server seeds Block.settings with the template's
