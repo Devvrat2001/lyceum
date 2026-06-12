@@ -176,12 +176,16 @@ export const lessonRouter = router({
       );
       const points = correct ? xpForCorrect(input.hintsUsed) : 0;
 
+      // Typed mirror of the lettered key (R16): "B" → 1. -1 (unknown
+      // key) stores null rather than a bogus position.
+      const chosenIdx = answers.findIndex((a) => a.key === input.chosenKey);
       await ctx.db.attempt.create({
         data: {
           userId: ctx.user.id,
           lessonId: q.lessonId,
           questionId: q.id,
           chosenKey: input.chosenKey,
+          chosenIndex: chosenIdx >= 0 ? chosenIdx : null,
           correct,
           hintsUsed: input.hintsUsed,
           timeMs: input.timeMs,
@@ -343,6 +347,9 @@ export const lessonRouter = router({
           lessonId: block.lessonId,
           blockId: block.id,
           chosenKey,
+          // Typed columns (R16) — analytics read these, not chosenKey.
+          chosenIndex: input.chosenIndex,
+          subIndex: input.subIndex ?? null,
           correct,
           hintsUsed: input.hintsUsed,
           timeMs: input.timeMs,

@@ -464,6 +464,14 @@ model Attempt {
   lessonId   String
   lesson     Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   chosenKey  String?
+  // Typed mirrors of chosenKey's overloaded encodings (REQUIREMENTS R16
+  // / KNOWN_ISSUES S2-3): chosenIndex = the picked option's position
+  // within the answer list; subIndex = the question position within a
+  // QUIZ/AI_QUIZ deck. Null for non-choice attempts (DRAG_MATCH score
+  // strings, BRANCHING terminals). Analytics should read these, never
+  // string-parse chosenKey.
+  chosenIndex Int?
+  subIndex    Int?
   correct    Boolean
   hintsUsed  Int       @default(0)
   timeMs     Int
