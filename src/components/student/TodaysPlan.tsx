@@ -92,7 +92,7 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
               row.href ? (
                 <Link
                   href={row.href}
-                  className="no-underline"
+                  className="st-pop no-underline"
                   onClick={() => advance(i)}
                 >
                   <Btn sm variant="primary">
@@ -100,7 +100,12 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
                   </Btn>
                 </Link>
               ) : (
-                <Btn sm variant="primary" onClick={() => advance(i)}>
+                <Btn
+                  sm
+                  variant="primary"
+                  className="st-pop"
+                  onClick={() => advance(i)}
+                >
                   {t("done")}
                 </Btn>
               )

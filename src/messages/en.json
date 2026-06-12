@@ -35,6 +35,7 @@
     "dayStreak": "DAY STREAK",
     "totalXp": "TOTAL XP",
     "level": "LEVEL",
+    "xpToNext": "{xp} XP to L{level}",
     "leaderboard": "Class leaderboard",
     "thisWeek": "THIS WEEK",
     "recentBadges": "Recent badges",

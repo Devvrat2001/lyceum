@@ -19,7 +19,7 @@ export function ContinueLearningCard({ c }: { c: C }) {
       href={href}
       style={{ textDecoration: "none", color: "inherit" }}
     >
-      <Card p={0}>
+      <Card p={0} className="st-card">
         <ImageBox h={88} kind="video" />
         <div style={{ padding: 14 }}>
           <Eyebrow style={{ marginBottom: 4 }}>{c.sub}</Eyebrow>

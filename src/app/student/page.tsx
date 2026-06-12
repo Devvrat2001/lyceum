@@ -77,7 +77,7 @@ export default async function StudentDashboard() {
           <div>
             <Eyebrow>{dateLabel}</Eyebrow>
             <div className="mt-1.5 flex flex-wrap items-baseline gap-3.5">
-              <h1 className="wf-h1 text-[30px]">
+              <h1 className="wf-h1 text-[32px]">
                 {t("welcome", { name: dashboard.me.firstName })}
               </h1>
             </div>
@@ -123,7 +123,7 @@ export default async function StudentDashboard() {
 
           {/* Skills + assignments */}
           <section className="wf-grid-cards-2">
-            <Card>
+            <Card className="st-card">
               <div className="mb-3 flex justify-between">
                 <h3 className="m-0 text-sm font-semibold">
                   {t("skillMastery")}
@@ -149,7 +149,7 @@ export default async function StudentDashboard() {
                 ))
               )}
             </Card>
-            <Card>
+            <Card className="st-card">
               <div className="mb-3 flex justify-between">
                 <h3 className="m-0 text-sm font-semibold">
                   {t("dueThisWeek")}
@@ -196,8 +196,9 @@ export default async function StudentDashboard() {
 
         {/* RIGHT */}
         <aside className="flex flex-col gap-4">
-          {/* Streak card */}
-          <Card>
+          {/* Streak card — the daily ritual (R19): big tactile circles,
+              today pulses until the first activity lands. */}
+          <Card className="st-card">
             <div className="mb-3.5 flex items-center justify-between">
               <h3 className="m-0 text-sm font-semibold">{t("yourWeek")}</h3>
             </div>
@@ -209,17 +210,17 @@ export default async function StudentDashboard() {
                 // up to "today", fabricating a perfect week.
                 const filled = dashboard.weekActivity[i] ?? false;
                 return (
-                  <div key={i} className="w-[30px] text-center">
+                  <div key={i} className="w-[38px] text-center">
                     <div
-                      className={`mx-auto mb-1 flex h-[26px] w-[26px] items-center justify-center rounded-full text-[10px] ${
+                      className={`mx-auto mb-1 flex h-[34px] w-[34px] items-center justify-center rounded-full text-[10px] ${
                         filled ? "bg-accent text-white" : "bg-fill text-mute"
                       } ${
                         i === todayIdx
                           ? "border-2 border-ink"
                           : "border border-hairline"
-                      }`}
+                      } ${i === todayIdx && !filled ? "st-pulse-today" : ""}`}
                     >
-                      {filled && <Icon name="flame" size={12} color="white" />}
+                      {filled && <Icon name="flame" size={16} color="white" />}
                     </div>
                     <span className="font-mono text-[9px] text-mute">{d}</span>
                   </div>
@@ -228,7 +229,7 @@ export default async function StudentDashboard() {
             </div>
             <div className="flex justify-between border-t border-hairline pt-3">
               <div>
-                <div className="font-serif text-[22px] font-bold text-accent">
+                <div className="font-serif text-[28px] font-bold text-accent">
                   {dashboard.stats.streak}
                 </div>
                 <div className="font-mono text-[10px] text-mute">
@@ -252,12 +253,37 @@ export default async function StudentDashboard() {
                 </div>
               </div>
             </div>
+            {/* Level-progress ritual — honest math: levelInto/levelSpan
+                come from the same 350-XP constant the router levels by. */}
+            <div className="mt-3">
+              <div className="mb-1 flex justify-between">
+                <span className="font-mono text-[9px] text-mute">
+                  L{dashboard.stats.level}
+                </span>
+                <span className="font-mono text-[9px] text-mute">
+                  {t("xpToNext", {
+                    xp: dashboard.stats.levelSpan - dashboard.stats.levelInto,
+                    level: dashboard.stats.level + 1,
+                  })}
+                </span>
+              </div>
+              <div className="wf-meter wf-meter--accent">
+                <i
+                  style={{
+                    width: `${Math.round(
+                      (dashboard.stats.levelInto / dashboard.stats.levelSpan) *
+                        100
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
           </Card>
 
           <TutorMiniCard />
 
           {/* Leaderboard */}
-          <Card>
+          <Card className="st-card">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="m-0 text-sm font-semibold">{t("leaderboard")}</h3>
               <span className="font-mono text-[9px] text-mute">
@@ -296,7 +322,7 @@ export default async function StudentDashboard() {
 
           {/* Badges */}
           {dashboard.badges.length > 0 && (
-            <Card>
+            <Card className="st-card">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="m-0 text-sm font-semibold">
                   {t("recentBadges")}

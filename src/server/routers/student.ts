@@ -364,6 +364,11 @@ export const studentRouter = router({
         xp: xpTotal,
         streak: streak?.current ?? 0,
         level: Math.max(1, 1 + Math.floor(xpTotal / 350)),
+        // XP into the current level + the level span — the dashboard's
+        // level-progress bar derives "N XP to L(n+1)" from these, so
+        // the 350-per-level constant has one source of truth.
+        levelInto: xpTotal % 350,
+        levelSpan: 350,
       },
       continueLearning,
       todaysPlan,

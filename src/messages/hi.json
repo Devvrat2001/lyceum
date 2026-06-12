@@ -35,6 +35,7 @@
     "dayStreak": "दिन की स्ट्रीक",
     "totalXp": "कुल XP",
     "level": "स्तर",
+    "xpToNext": "L{level} तक {xp} XP",
     "leaderboard": "क्लास लीडरबोर्ड",
     "thisWeek": "इस हफ़्ते",
     "recentBadges": "हाल के बैज",

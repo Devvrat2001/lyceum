@@ -35,6 +35,7 @@
     "dayStreak": "DÍAS DE RACHA",
     "totalXp": "XP TOTAL",
     "level": "NIVEL",
+    "xpToNext": "{xp} XP para N{level}",
     "leaderboard": "Tabla de la clase",
     "thisWeek": "ESTA SEMANA",
     "recentBadges": "Insignias recientes",

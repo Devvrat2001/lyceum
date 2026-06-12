@@ -520,3 +520,47 @@ button {
   .wf-reader-cols { grid-template-columns: minmax(0, 1fr); }
   .wf-reader-cols > *:last-child { display: none; }
 }
+
+/* ── R19 · Student persona layer ──────────────────────────────────
+   Game-like energy for STUDENT surfaces only (teacher/admin stay
+   information-dense): tactile lift/press on cards, and the streak
+   ritual's pulse on today's empty circle. All motion is disabled
+   under prefers-reduced-motion. */
+.st-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.st-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(31, 29, 26, 0.08);
+}
+.st-pop {
+  transition: transform 0.1s ease;
+}
+.st-pop:active {
+  transform: scale(0.96);
+}
+@keyframes st-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 91, 31, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(255, 91, 31, 0);
+  }
+}
+.st-pulse-today {
+  animation: st-pulse 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-card,
+  .st-pop {
+    transition: none;
+  }
+  .st-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .st-pulse-today {
+    animation: none;
+  }
+}
