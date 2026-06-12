@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketChrome } from "@/components/layouts/MarketChrome";
 import { Annot, Avatar, Card, Icon } from "@/components/wf/primitives";
-import { courseGradient } from "@/lib/thumbnail";
+import { courseGradient, subjectGlyph } from "@/lib/thumbnail";
 import { getServerCaller } from "@/lib/trpc/server";
 import { auth } from "@/lib/auth";
 import { TRPCError } from "@trpc/server";
@@ -149,8 +149,15 @@ export default async function CourseDetailPage({
                   borderRadius: 6,
                   border: "1px solid var(--wf-hairline)",
                   marginBottom: 24,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
-              />
+              >
+                <span style={{ fontSize: 84, opacity: 0.4 }}>
+                  {subjectGlyph(course.subject)}
+                </span>
+              </div>
             )}
 
             {learn.length > 0 && (

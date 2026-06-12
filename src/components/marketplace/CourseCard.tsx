@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/wf/primitives";
 import { formatPrice } from "@/lib/currency";
 import { fmtCount } from "@/lib/format";
-import { courseGradient } from "@/lib/thumbnail";
+import { courseGradient, subjectGlyph } from "@/lib/thumbnail";
 
 export type CourseCardData = {
   id: string;
@@ -14,6 +14,9 @@ export type CourseCardData = {
   priceCents: number;
   tag: string | null;
   thumbnailUrl: string | null;
+  /** Drives the fallback art's subject glyph; optional so older callers
+   *  keep compiling (they just get the generic book mark). */
+  subject?: string | null;
 };
 
 /**
@@ -62,8 +65,15 @@ export function CourseCard({
               height: 130,
               background: courseGradient(course.slug),
               borderBottom: "1px solid var(--wf-hairline)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-          />
+          >
+            <span style={{ fontSize: 44, opacity: 0.4 }}>
+              {subjectGlyph(course.subject)}
+            </span>
+          </div>
         )}
         <div style={{ padding: 12 }}>
           <div

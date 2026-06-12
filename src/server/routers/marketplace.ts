@@ -184,6 +184,7 @@ export const marketplaceRouter = router({
         slug: true,
         title: true,
         authorLabel: true,
+        subject: true,
         ratingAvg: true,
         ratingCount: true,
         priceCents: true,

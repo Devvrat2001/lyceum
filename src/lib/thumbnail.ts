@@ -19,3 +19,27 @@ export function courseGradient(seed: string): string {
   const h2 = (h1 + 40 + (h % 80)) % 360;
   return `linear-gradient(135deg, hsl(${h1} 45% 80%) 0%, hsl(${h2} 50% 62%) 100%)`;
 }
+
+/**
+ * Subject watermark for gradient-fallback art (R17): with gradient-only
+ * fallbacks every card read as the same pastel rectangle — a big
+ * low-opacity glyph gives each subject an identity at a glance, still
+ * zero assets. Unknown subjects fall back to the open book. AI-generated
+ * cover art at publish time is the noted v2.
+ */
+export function subjectGlyph(subject: string | null | undefined): string {
+  const MAP: Record<string, string> = {
+    math: "➗",
+    science: "🔬",
+    ela: "📖",
+    english: "📖",
+    reading: "📖",
+    coding: "💻",
+    art: "🎨",
+    music: "🎵",
+    spanish: "🗣️",
+    history: "🏛️",
+    geography: "🗺️",
+  };
+  return MAP[(subject ?? "").toLowerCase()] ?? "📚";
+}
