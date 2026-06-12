@@ -43,6 +43,12 @@ test("fresh signup → buy → confirm lands enrolled on success page", async ({
   await passwordInputs.nth(0).fill(password);
   await passwordInputs.nth(1).fill(password);
   // STUDENT is the default; no role click needed.
+  // Consent gate (R11): students pick an age band + accept the terms.
+  // Role-based locator on purpose: the label WRAPS the select, so
+  // getByLabel's label-text match would include the option text
+  // ("AGESelect your age range…") and never equal /^age$/.
+  await page.getByRole("combobox", { name: /age/i }).selectOption("13to17");
+  await page.getByRole("checkbox").check();
   await Promise.all([
     page.waitForURL(/\/student(\b|\/|$)/, { timeout: 30_000 }),
     page.getByRole("button", { name: /create account/i }).click(),

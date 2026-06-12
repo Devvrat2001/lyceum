@@ -81,6 +81,13 @@ model User {
   tutorLogOptOut Boolean     @default(false)
   // When the user acknowledged data / AI-processing consent (self-serve).
   coppaConsentAt DateTime?
+  // Signup consent gate (R11). ageBand: "under13" | "13to17" | "18plus"
+  // as self-reported at signup (string, not enum — bands may change with
+  // policy). parentEmail is captured for under-13 signups so the
+  // verifiable-parental-consent upgrade (DPDP/COPPA) has an address to
+  // verify against later.
+  ageBand        String?
+  parentEmail    String?
 
   // Auth.js relations
   accounts       Account[]

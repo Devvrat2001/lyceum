@@ -33,10 +33,25 @@ export const authRouter = router({
         // Phase 1 keeps signup limited to STUDENT and TEACHER. Admin/Parent
         // are provisioned by an admin (Phase 4: invite flow).
         role: z.enum(["STUDENT", "TEACHER"]).default("STUDENT"),
+        // Consent gate (R11). The SignupForm requires all of these in the
+        // UI; the API keeps them optional for back-compat (existing tests,
+        // invite links) — an under-13 band without a parent email is the
+        // one hard server-side rejection.
+        ageBand: z.enum(["under13", "13to17", "18plus"]).optional(),
+        parentEmail: z.string().email().max(160).optional(),
+        consent: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const email = input.email.trim().toLowerCase();
+
+      if (input.ageBand === "under13" && !input.parentEmail) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Under-13 signups need a parent or guardian email address.",
+        });
+      }
 
       const existing = await ctx.db.user.findUnique({ where: { email } });
       if (existing) {
@@ -55,6 +70,9 @@ export const authRouter = router({
           firstName: input.firstName ?? null,
           name: input.firstName ?? email.split("@")[0],
           role: input.role,
+          ageBand: input.ageBand ?? null,
+          parentEmail: input.parentEmail?.trim().toLowerCase() ?? null,
+          coppaConsentAt: input.consent ? new Date() : null,
         },
         select: { id: true, email: true, name: true, role: true },
       });

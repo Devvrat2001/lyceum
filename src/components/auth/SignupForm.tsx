@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc/react";
 import { safeRedirect } from "@/lib/roles";
 
 type Role = "STUDENT" | "TEACHER";
+type AgeBand = "under13" | "13to17" | "18plus";
 
 export function SignupForm({ next }: { next?: string }) {
   const router = useRouter();
@@ -16,7 +17,14 @@ export function SignupForm({ next }: { next?: string }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [role, setRole] = useState<Role>("STUDENT");
+  const [ageBand, setAgeBand] = useState<AgeBand | "">("");
+  const [parentEmail, setParentEmail] = useState("");
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Teachers are adults — the age band only applies to students.
+  const needsAge = role === "STUDENT";
+  const isUnder13 = needsAge && ageBand === "under13";
 
   const signup = trpc.auth.signup.useMutation({
     onSuccess: async () => {
@@ -53,11 +61,26 @@ export function SignupForm({ next }: { next?: string }) {
           setError("Password must be at least 8 characters.");
           return;
         }
+        if (needsAge && !ageBand) {
+          setError("Pick your age range.");
+          return;
+        }
+        if (isUnder13 && !parentEmail.includes("@")) {
+          setError("Under-13 signups need a parent or guardian email.");
+          return;
+        }
+        if (!consent) {
+          setError("Please accept the terms to continue.");
+          return;
+        }
         signup.mutate({
           email: email.trim(),
           password,
           firstName: firstName.trim() || undefined,
           role,
+          ...(needsAge && ageBand ? { ageBand } : {}),
+          ...(isUnder13 ? { parentEmail: parentEmail.trim() } : {}),
+          consent,
         });
       }}
       style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -153,6 +176,62 @@ export function SignupForm({ next }: { next?: string }) {
         </div>
       </Field>
 
+      {needsAge && (
+        <Field label="AGE">
+          <select
+            value={ageBand}
+            onChange={(e) => setAgeBand(e.target.value as AgeBand | "")}
+            required
+            style={{ ...inputStyle, appearance: "auto" }}
+          >
+            <option value="" disabled>
+              Select your age range
+            </option>
+            <option value="under13">Under 13</option>
+            <option value="13to17">13–17</option>
+            <option value="18plus">18 or older</option>
+          </select>
+        </Field>
+      )}
+
+      {isUnder13 && (
+        <Field label="PARENT / GUARDIAN EMAIL">
+          <input
+            type="email"
+            value={parentEmail}
+            onChange={(e) => setParentEmail(e.target.value)}
+            placeholder="parent@example.com"
+            required
+            style={inputStyle}
+          />
+        </Field>
+      )}
+
+      <label
+        style={{
+          display: "flex",
+          gap: 10,
+          alignItems: "flex-start",
+          fontSize: 12,
+          color: "var(--wf-body)",
+          lineHeight: 1.45,
+          cursor: "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+          required
+          style={{ marginTop: 2 }}
+        />
+        <span>
+          {isUnder13
+            ? "My parent or guardian has reviewed and agrees to Lyceum's terms of service and privacy policy on my behalf."
+            : "I agree to Lyceum's terms of service and privacy policy (with my parent or guardian's consent where required)."}
+        </span>
+      </label>
+
       {error && (
         <div
           style={{
@@ -177,17 +256,6 @@ export function SignupForm({ next }: { next?: string }) {
         {signup.isPending ? "Creating account…" : "Create account →"}
       </Btn>
 
-      <p
-        style={{
-          fontSize: 11,
-          color: "var(--wf-mute)",
-          textAlign: "center",
-          margin: 0,
-        }}
-      >
-        By creating an account, you agree to Lyceum&apos;s terms of service
-        and privacy policy. K-12 users require parent consent.
-      </p>
     </form>
   );
 }
