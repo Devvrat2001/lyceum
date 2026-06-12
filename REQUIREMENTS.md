@@ -171,7 +171,13 @@ set, or AI-generated course art at publish time (cache to blob storage).
   objects are why mobile + theming are hard. Migrate hot paths to Tailwind
   classes / shared primitives as they're touched (R7 first). Prereq for any
   serious redesign.
-- **R19 · Persona-split visual language** — student surfaces go game-like
+- **R19 · Persona-split visual language** · Status: PILOT DONE (cont.34 —
+  `st-*` persona layer in globals.css [st-card hover lift, st-pop press,
+  st-pulse streak ritual; all off under prefers-reduced-motion] applied to
+  the dashboard: 34px week circles with today pulsing until first activity,
+  bigger streak figure, honest level-progress bar fed by stats.levelInto/
+  levelSpan. Next surfaces: lesson reader celebration moments, library,
+  skill tree.) — student surfaces go game-like
   (big, tactile, motion, streak ritual — Duolingo/Brilliant energy);
   teacher/admin stay information-dense. Sharpest available differentiation
   vs incumbents.
@@ -184,8 +190,13 @@ set, or AI-generated course art at publish time (cache to blob storage).
   client rendering or request-scoped getTranslations in routers. Next
   surfaces: chrome nav, lesson reader, /browse.) — string extraction first
   (next-intl), Hindi pilot, then regional. Huge India differentiator.
-- **R21 · Board alignment** — CBSE/ICSE/state-board tags on Course +
-  filters/search facets; it's how Indian parents actually shop.
+- **R21 · Board alignment** · Status: DONE (cont.34 — `Course.board`
+  column [cbse/icse/state/ib/cambridge] with seed backfill in the
+  migration; Board chip on the shared homepage+/browse filter row via
+  catalogWhere; card tag line + course-hero breadcrumb show it; teachers
+  set it via a validated Board select in the builder details panel.
+  v2: board-aware search/recs weighting.) — CBSE/ICSE/state-board tags on
+  Course + filters/search facets; it's how Indian parents actually shop.
 - **R22 · Offline-first lessons** — extend the existing service worker to
   pre-cache enrolled-course reader content; low-bandwidth mode (no video
   autoload).
@@ -197,8 +208,14 @@ set, or AI-generated course art at publish time (cache to blob storage).
   section, topics→units / subtopics→lessons; 20K-char cap; unit chunks
   inherit structure via the skeleton so token cost is flat. v2: feed a
   trimmed syllabus slice into unit chunks for terminology fidelity.
-  **Still OPEN:** free-response auto-grading; adaptive difficulty on quiz
-  decks; citations-backed tutor as the schools-trust story.) —
+  **Free-response auto-grading DONE (cont.34):** FREE_RESPONSE block —
+  teacher prompt + private rubric, AI-graded 0-100 with feedback/
+  strengths/improvements via completeStructured (keyword-heuristic demo
+  grade keyless), Attempt rows carry typed freeText/aiFeedback/score
+  columns, ≥60 awards XP; v2 = teacher review surface over the stored
+  answers. **Adaptive difficulty:** already live via AI_QUIZ weak-spot
+  regeneration. **Citations tutor:** already live (findCitation).
+  R24's list is now covered end-to-end.) —
   syllabus-paste → full unit drafts;
   free-response auto-grading; adaptive difficulty on quiz decks; the
   citations-backed tutor as the schools-trust story.
