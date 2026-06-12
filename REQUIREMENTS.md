@@ -197,7 +197,14 @@ set, or AI-generated course art at publish time (cache to blob storage).
   set it via a validated Board select in the builder details panel.
   v2: board-aware search/recs weighting.) — CBSE/ICSE/state-board tags on
   Course + filters/search facets; it's how Indian parents actually shop.
-- **R22 · Offline-first lessons** — extend the existing service worker to
+- **R22 · Offline-first lessons** · Status: DONE-v1 (cont.35 — visited
+  lessons were already cached by the SW's navigate handler; new "Save
+  offline" control on library cards pre-caches EVERY lesson of a course
+  via a PRECACHE_LESSONS message handler [MessageChannel progress,
+  same-origin /student/lesson/ allowlist, SW v3]. Offline attempts queue
+  via the existing offlineAttemptQueue. Known limit: videos stream-only —
+  a low-bandwidth no-autoload mode is the remaining leg.) — extend the
+  existing service worker to
   pre-cache enrolled-course reader content; low-bandwidth mode (no video
   autoload).
 - **R23 · WhatsApp notification channel** — streak nudges, assignment due,
@@ -222,12 +229,26 @@ set, or AI-generated course art at publish time (cache to blob storage).
 - **R25 · Cohort/live delivery mechanics** — `Course.format` ("live" |
   "cohort") exists with zero scheduling/meeting machinery behind it. Either
   build (schedule + meet links + calendar) or hide the formats until real.
-- **R26 · Parent self-service linking** — invite-token flow (parent links
-  their own kid); admin-only today (`admin.linkParentToChild`).
-- **R27 · Earnings-export polish** — `/api/teacher/1099` is US-framed
-  (`dollars()`, "1099") on an INR product. Rename to earnings export,
-  format via `lib/currency.ts`. Cosmetic.
-- **R28 · Stripe dormant-path polish** — drop `payment_method_types:
+- **R26 · Parent self-service linking** · Status: DONE (cont.35 — family
+  codes: student generates a 6-char single-use code in Settings → Family
+  [VerificationToken `parentlink:` namespace, 7-day expiry,
+  regenerate-replaces]; parent redeems on /parent [replaced the COMING
+  SOON stub]; same ParentChild row as the admin flow; possession = the
+  authorization, so no email infra needed — codes travel by WhatsApp.
+  v2: notify the child when a parent links.) — invite-token flow (parent
+  links their own kid); admin-only today (`admin.linkParentToChild`).
+- **R27 · Earnings-export polish** · Status: DONE (cont.35 — route renamed
+  to `/api/teacher/earnings-export`; the CSV was already currency-neutral
+  [currency column + minor-units÷100], so only naming + 1099 copy
+  changed. Gotcha: a route rename leaves stale `.next/{dev/,}types`
+  validators — clear them or tsc fails on ghosts.) — `/api/teacher/1099`
+  is US-framed on an INR product. Cosmetic.
+- **R28 · Stripe dormant-path polish** · Status: DONE-v1 (cont.35 —
+  `payment_method_types: ["card"]` dropped from both Checkout creates so
+  Stripe picks dynamic methods from dashboard config. Refunds stay
+  dashboard-driven by design — the charge.refunded webhook already syncs
+  order/enrollment state; an API-initiated refund button is a
+  wake-Stripe-up follow-up.) — drop `payment_method_types:
   ["card"]` (let Stripe pick dynamic methods) and wire real Stripe refunds
   via the API when the international phase wakes Stripe up.
 
