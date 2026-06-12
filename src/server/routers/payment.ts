@@ -170,7 +170,9 @@ export const paymentRouter = router({
         }
         const session = await stripe.checkout.sessions.create({
           mode: "payment",
-          payment_method_types: ["card"],
+          // No payment_method_types — omitting it lets Stripe pick
+          // dynamic methods per buyer (cards, wallets, local rails)
+          // from the dashboard configuration (R28).
           success_url: `${successUrl}&sid={CHECKOUT_SESSION_ID}`,
           cancel_url: cancelUrl,
           client_reference_id: order.id,
@@ -344,7 +346,7 @@ export const paymentRouter = router({
         }
         const session = await stripe.checkout.sessions.create({
           mode: "payment",
-          payment_method_types: ["card"],
+          // Dynamic payment methods — see the course-checkout twin above.
           success_url: `${successUrl}&sid={CHECKOUT_SESSION_ID}`,
           cancel_url: cancelUrl,
           client_reference_id: order.id,

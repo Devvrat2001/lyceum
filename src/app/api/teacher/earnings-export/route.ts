@@ -2,15 +2,16 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 /**
- * Annual earnings CSV export for teachers (Tier 2.4 — 1099 data).
+ * Annual earnings CSV export for teachers (R27 — currency-neutral;
+ * formerly /api/teacher/1099, renamed because the product is INR-first
+ * and the export was never US-tax-specific).
  *
- * GET /api/teacher/1099.csv?year=YYYY
+ * GET /api/teacher/earnings-export?year=YYYY
  *
  * Returns one row per PAID Order with paidAt in the requested year,
- * plus a totals footer. Amounts in dollars (cents/100, fixed-2). The
- * teacher takes this to their accountant; the platform doesn't issue
- * 1099-NEC forms itself (Stripe Connect's annual 1099-K covers the
- * payouts side independently).
+ * plus a totals footer. Amounts are major currency units (paise/cents
+ * ÷ 100, fixed-2) with the order's currency in its own column — the
+ * teacher takes this to their accountant in any jurisdiction.
  *
  * Auth: TEACHER or ADMIN only. Admin gets THEIR rows (admins also
  * accumulate orders if seeded); querying-as-another-teacher is not
@@ -32,7 +33,9 @@ function csvField(s: string | number | null | undefined): string {
   return v;
 }
 
-function dollars(cents: number): string {
+/** Minor units → major units (paise→₹, cents→$), 2dp. Currency-agnostic
+ *  by design — the currency code travels in its own CSV column. */
+function majorUnits(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
@@ -116,9 +119,9 @@ export async function GET(req: Request) {
         o.course?.title ?? (o.path ? `Bundle: ${o.path.title}` : "—"),
         o.user.name ?? o.user.firstName ?? "Anonymous",
         o.user.email,
-        dollars(o.grossCents),
-        dollars(o.feeCents),
-        dollars(o.netCents),
+        majorUnits(o.grossCents),
+        majorUnits(o.feeCents),
+        majorUnits(o.netCents),
         o.currency.toUpperCase(),
         o.provider,
       ]
@@ -138,9 +141,9 @@ export async function GET(req: Request) {
       "",
       "",
       "TOTALS:",
-      dollars(totalGross),
-      dollars(totalFee),
-      dollars(totalNet),
+      majorUnits(totalGross),
+      majorUnits(totalFee),
+      majorUnits(totalNet),
       "",
       "",
     ]

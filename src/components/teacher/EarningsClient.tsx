@@ -288,7 +288,7 @@ function AnnualExportCard() {
   // for in-progress totals.
   const [year, setYear] = useState<number>(currentYear - 1);
 
-  const href = `/api/teacher/1099?year=${year}`;
+  const href = `/api/teacher/earnings-export?year=${year}`;
 
   return (
     <Card p={16}>
@@ -306,9 +306,9 @@ function AnnualExportCard() {
           <div
             style={{ fontSize: 13, marginTop: 2, color: "var(--wf-body)" }}
           >
-            One row per PAID order in {year}, plus totals. Take it to your
-            accountant — the platform doesn&apos;t issue 1099-NEC forms
-            (Stripe Connect handles 1099-K independently).
+            One row per PAID order in {year} — gross, platform fee, and
+            your net, with totals and each order&apos;s currency. Take it
+            to your accountant; Lyceum doesn&apos;t issue tax forms.
           </div>
         </div>
         <select
