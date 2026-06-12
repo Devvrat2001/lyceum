@@ -5,6 +5,7 @@ import { getLocale } from "next-intl/server";
 import "./globals.css";
 import { TRPCProvider } from "@/lib/trpc/react";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 
 const interTight = Inter_Tight({
   variable: "--font-sans",
@@ -58,7 +59,11 @@ export default async function RootLayout({
     >
       <body className="min-h-full">
         <NextIntlClientProvider>
-          <TRPCProvider>{children}</TRPCProvider>
+          <TRPCProvider>
+            {children}
+            {/* Global ⌘K palette — needs the tRPC provider for search. */}
+            <CommandPalette />
+          </TRPCProvider>
         </NextIntlClientProvider>
         <ServiceWorkerRegister />
       </body>
