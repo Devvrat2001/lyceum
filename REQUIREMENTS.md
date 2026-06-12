@@ -33,7 +33,7 @@ the demo branch; razorpay/stripe orders throw a clear "issue the refund from
 the provider dashboard" error. **Accept:** vitest — refundOrder on a
 razorpay-provider order throws; demo order still refunds.
 
-### R3 · Razorpay dashboard refunds never sync back · Status: OPEN
+### R3 · Razorpay dashboard refunds never sync back · Status: DONE (cont.29 — refund.processed/payment.refunded branch + shared revokePaidOrder; partial refunds revoke fully, matching the stripe branch)
 **Where:** `src/app/api/razorpay/webhook/route.ts` handles paid events only.
 A refund issued in the Razorpay dashboard leaves Order=PAID + enrollment
 intact forever. **Fix:** handle `refund.processed` (and `payment.refunded`):
@@ -65,7 +65,7 @@ because legit assistant turns can exceed 4k chars. **v2 (optional, note):**
 rebuild history from `TutorMessage` rows instead — but that gives
 `tutorLogOptOut` users per-message amnesia, so it needs a product decision.
 
-### R6 · Anonymous AI quota is one GLOBAL bucket · Status: OPEN
+### R6 · Anonymous AI quota is one GLOBAL bucket · Status: DONE (cont.29 — ctx.anonKey = sha256(ip+secret) per-caller bucket, stamped into audit payload; global ceiling 20/150/500 stays as backstop)
 **Where:** `src/lib/rateLimit.ts` — anon callers count rows
 `where actorId: null`, i.e. **all anonymous users share one** 4/min ·
 30/hr · 100/day budget platform-wide. One crawler exhausts AI search for
@@ -78,7 +78,7 @@ in-memory/Upstash counter. Keep the global cap as a second ceiling.
 
 ## P1 — launch-blocking UX / product
 
-### R7 · Mobile reflow for student-facing pages · Status: OPEN
+### R7 · Mobile reflow for student-facing pages · Status: PARTIAL (cont.29 — `.wf-grid-cards-*`/`.wf-two-col`/`.wf-hero-split`/`.wf-cta-split` utilities in globals.css; applied to marketplace home + student dashboard. REMAINING: course detail, /browse grid, lesson reader, /student/library)
 Chrome/nav is responsive (`useMediaQuery` in all five `*Chrome` layouts) but
 **page content is not**: `globals.css` has zero `@media` rules and grids are
 hardcoded (`repeat(4, 1fr)` marketplace `src/app/page.tsx:370`,
@@ -91,7 +91,7 @@ two-column layouts under ~720px; clean at 360px wide. Don't boil the ocean —
 R20 (tokenization) is the structural fix; this pass just makes the top
 screens usable.
 
-### R8 · Delete the 3 fake UI remnants on /student · Status: OPEN
+### R8 · Delete the 3 fake UI remnants on /student · Status: DONE (cont.29 — dead search span removed [real search lives in StudentChrome]; "Your week" driven by Attempt/LessonProgress days; badge "of 47" → real earned/total counts)
 `src/app/student/page.tsx`: **(a)** ~line 63 — the "search" bar is a dead
 `<span>` (no input, no handler): wire it to the existing semantic search
 (`HeaderSearchCombobox` / `marketplace.semanticSearch`) or remove it;
