@@ -190,3 +190,53 @@ export function orderIdFromRazorpayEvent(event: unknown): string | null {
     null
   );
 }
+
+/**
+ * Refund-event resolution (`refund.processed` / `payment.refunded`,
+ * fired when a refund is issued from the Razorpay Dashboard). Both
+ * deliveries normally include the payment entity, whose notes carry our
+ * orderId (stamped at link creation) — that's the direct path. Some
+ * delivery shapes carry only the refund entity; for those we return its
+ * `payment_id` so the webhook can resolve notes via `fetchPayment`.
+ * Returns null for non-refund events.
+ */
+export function refundInfoFromRazorpayEvent(
+  event: unknown
+): { orderId: string | null; paymentId: string | null } | null {
+  if (typeof event !== "object" || event === null) return null;
+  const e = event as RazorpayWebhookEvent & {
+    payload?: {
+      refund?: { entity?: { payment_id?: string } };
+    };
+  };
+  if (e.event !== "refund.processed" && e.event !== "payment.refunded") {
+    return null;
+  }
+  return {
+    orderId: e.payload?.payment?.entity?.notes?.orderId ?? null,
+    paymentId:
+      e.payload?.refund?.entity?.payment_id ??
+      (e.payload?.payment?.entity as { id?: string } | undefined)?.id ??
+      null,
+  };
+}
+
+/**
+ * Fetch one payment (pay_…) — used by the refund webhook to recover our
+ * Order.id from payment notes when the delivery didn't include the
+ * payment entity inline.
+ */
+export async function fetchPayment(
+  paymentId: string
+): Promise<{ notes?: Record<string, string> } | null> {
+  const res = await fetch(`${API_BASE}/payments/${paymentId}`, {
+    headers: { Authorization: authHeader() },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(
+      `Razorpay get payment failed (${res.status}): ${body.slice(0, 300)}`
+    );
+  }
+  return (await res.json()) as { notes?: Record<string, string> };
+}

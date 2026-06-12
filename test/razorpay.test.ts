@@ -12,6 +12,7 @@ import crypto from "node:crypto";
 import {
   orderIdFromRazorpayEvent,
   paymentIdFromRazorpayEvent,
+  refundInfoFromRazorpayEvent,
   verifyRazorpaySignature,
 } from "@/lib/payments/razorpay";
 
@@ -79,6 +80,52 @@ describe("orderIdFromRazorpayEvent", () => {
     expect(
       orderIdFromRazorpayEvent({ event: "payment_link.paid", payload: {} })
     ).toBeNull();
+  });
+});
+
+describe("refundInfoFromRazorpayEvent", () => {
+  it("reads orderId from payment notes on payment.refunded", () => {
+    expect(
+      refundInfoFromRazorpayEvent({
+        event: "payment.refunded",
+        payload: {
+          payment: {
+            entity: { id: "pay_1", notes: { orderId: "order_abc" } },
+          },
+        },
+      })
+    ).toEqual({ orderId: "order_abc", paymentId: "pay_1" });
+  });
+
+  it("reads orderId from the inline payment entity on refund.processed", () => {
+    expect(
+      refundInfoFromRazorpayEvent({
+        event: "refund.processed",
+        payload: {
+          refund: { entity: { payment_id: "pay_2" } },
+          payment: {
+            entity: { id: "pay_2", notes: { orderId: "order_xyz" } },
+          },
+        },
+      })
+    ).toEqual({ orderId: "order_xyz", paymentId: "pay_2" });
+  });
+
+  it("falls back to the refund entity's payment_id when no payment entity ships", () => {
+    expect(
+      refundInfoFromRazorpayEvent({
+        event: "refund.processed",
+        payload: { refund: { entity: { payment_id: "pay_3" } } },
+      })
+    ).toEqual({ orderId: null, paymentId: "pay_3" });
+  });
+
+  it("returns null for non-refund events and junk", () => {
+    expect(
+      refundInfoFromRazorpayEvent({ event: "payment.captured", payload: {} })
+    ).toBeNull();
+    expect(refundInfoFromRazorpayEvent(null)).toBeNull();
+    expect(refundInfoFromRazorpayEvent("refund.processed")).toBeNull();
   });
 });
 

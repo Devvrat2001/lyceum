@@ -3,11 +3,17 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
-import { fulfillPaidOrder } from "@/server/services/fulfillOrder";
+import {
+  fulfillPaidOrder,
+  revokePaidOrder,
+} from "@/server/services/fulfillOrder";
 import {
   createRouteTransfer,
+  fetchPayment,
+  isRazorpayEnabled,
   orderIdFromRazorpayEvent,
   paymentIdFromRazorpayEvent,
+  refundInfoFromRazorpayEvent,
   verifyRazorpaySignature,
 } from "@/lib/payments/razorpay";
 
@@ -141,6 +147,54 @@ export async function POST(req: Request) {
             });
           }
         }
+      }
+    }
+
+    // Refund sync (refund.processed / payment.refunded — fired when a
+    // refund is issued from the Razorpay Dashboard; in-app Razorpay
+    // refunds aren't wired, so this IS the razorpay refund path).
+    // Resolve our Order.id from the payment entity's notes, falling
+    // back to an API fetch of the payment when the delivery carried
+    // only the refund entity. v1 semantics match the Stripe
+    // charge.refunded branch: ANY refund (partial included) revokes
+    // the order's enrollment(s).
+    const refundInfo = refundInfoFromRazorpayEvent(event);
+    if (refundInfo) {
+      let refundOrderId = refundInfo.orderId;
+      if (!refundOrderId && refundInfo.paymentId && isRazorpayEnabled()) {
+        try {
+          const payment = await fetchPayment(refundInfo.paymentId);
+          refundOrderId = payment?.notes?.orderId ?? null;
+        } catch (err) {
+          console.error(
+            "[razorpay.webhook] payment fetch for refund failed",
+            err
+          );
+        }
+      }
+      const order = refundOrderId
+        ? await db.order.findUnique({ where: { id: refundOrderId } })
+        : null;
+      if (!order) {
+        console.warn("[razorpay.webhook] refund event: no order matched", {
+          orderId: refundOrderId,
+          paymentId: refundInfo.paymentId,
+        });
+      }
+      if (order && order.status === "PAID") {
+        await revokePaidOrder(db, order);
+        await audit({
+          actorId: order.userId,
+          kind: "course.publish",
+          payload: {
+            variant: "checkout_refunded",
+            provider: "razorpay",
+            orderId: order.id,
+            grossCents: order.grossCents,
+            netCents: order.netCents,
+          },
+          courseId: order.courseId,
+        });
       }
     }
     // Unknown / irrelevant events get a 200 so Razorpay doesn't retry.

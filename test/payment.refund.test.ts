@@ -9,6 +9,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { ensureEnrollment } from "@/server/services/enrollment";
+import { revokePaidOrder } from "@/server/services/fulfillOrder";
 import { cleanupTestUsers, createTestUser } from "./helpers";
 
 beforeAll(async () => {
@@ -208,5 +209,78 @@ describe("payment.refundOrder (demo mode)", () => {
       select: { enrollCount: true },
     });
     expect(counter.enrollCount).toBe(1);
+  });
+});
+
+describe("revokePaidOrder (the webhook refund path)", () => {
+  it("revokes every course of a bundle order + decrements each counter", async () => {
+    const teacher = await createTestUser({ role: "TEACHER" });
+    const buyer = await createTestUser({ role: "STUDENT" });
+    const mk = (n: number) =>
+      db.course.create({
+        data: {
+          slug: `test-vitest-bundle-${n}-${crypto.randomUUID()}`,
+          title: `Bundle Course ${n}`,
+          description: ".",
+          subject: "Math",
+          grade: "6",
+          authorId: teacher.id,
+          priceCents: 9900,
+          status: "PUBLISHED",
+        },
+      });
+    const [c1, c2] = await Promise.all([mk(1), mk(2)]);
+    const path = await db.path.create({
+      data: {
+        slug: `test-vitest-path-${crypto.randomUUID()}`,
+        title: "Bundle Fixture",
+        priceCents: 14900,
+        authorId: teacher.id,
+        courses: {
+          create: [
+            { courseId: c1.id, order: 1 },
+            { courseId: c2.id, order: 2 },
+          ],
+        },
+      },
+    });
+    const order = await db.order.create({
+      data: {
+        userId: buyer.id,
+        pathId: path.id,
+        teacherId: teacher.id,
+        grossCents: 14900,
+        feeCents: 2235,
+        netCents: 12665,
+        currency: "inr",
+        status: "PAID",
+        provider: "razorpay",
+        externalId: `plink_bundle_${crypto.randomUUID()}`,
+        paidAt: new Date(),
+      },
+    });
+    await ensureEnrollment(db, buyer.id, c1.id);
+    await ensureEnrollment(db, buyer.id, c2.id);
+
+    await revokePaidOrder(db, order);
+
+    const after = await db.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
+    expect(after.status).toBe("REFUNDED");
+    expect(after.refundedAt).not.toBeNull();
+    const enrollments = await db.enrollment.findMany({
+      where: { userId: buyer.id, courseId: { in: [c1.id, c2.id] } },
+    });
+    expect(enrollments).toHaveLength(0);
+    const counters = await db.course.findMany({
+      where: { id: { in: [c1.id, c2.id] } },
+      select: { enrollCount: true },
+    });
+    expect(counters.map((c) => c.enrollCount)).toEqual([0, 0]);
+
+    // Path rows aren't user-owned — clean up explicitly (cleanupTestUsers
+    // cascades courses/orders via the user, but Path.author is SetNull).
+    await db.path.delete({ where: { id: path.id } });
   });
 });

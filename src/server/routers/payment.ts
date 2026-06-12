@@ -19,8 +19,10 @@ import { CURRENCY } from "@/lib/currency";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { sendOrderReceipt } from "@/lib/email";
-import { fulfillPaidOrder } from "../services/fulfillOrder";
-import { removeEnrollment } from "../services/enrollment";
+import {
+  fulfillPaidOrder,
+  revokePaidOrder,
+} from "../services/fulfillOrder";
 
 /**
  * Stripe Checkout Session shape (subset we use). Imported as a structural
@@ -603,16 +605,10 @@ export const paymentRouter = router({
         });
       }
 
-      // Demo refund: flip status + drop the enrollment (and its
-      // enrollCount tick — removeEnrollment keeps the counter honest)
-      // atomically.
-      await ctx.db.$transaction(async (tx) => {
-        await tx.order.update({
-          where: { id: order.id },
-          data: { status: "REFUNDED", refundedAt: new Date() },
-        });
-        await removeEnrollment(tx, order.userId, refundCourseId);
-      });
+      // Demo refund: shared revocation (REFUNDED flip + enrollment +
+      // honest enrollCount decrement in one tx — same service the
+      // Stripe/Razorpay refund webhooks use).
+      await revokePaidOrder(ctx.db, order);
 
       await audit({
         actorId: ctx.user.id,
