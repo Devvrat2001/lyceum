@@ -28,12 +28,12 @@ export default async function StudentDashboard() {
   if (!dashboard) {
     return (
       <StudentChrome active="home">
-        <div style={{ padding: 32 }}>
+        <div className="p-8">
           <Eyebrow>Heads up</Eyebrow>
-          <h1 className="wf-h1" style={{ fontSize: 22, marginTop: 4 }}>
+          <h1 className="wf-h1 mt-1 text-[22px]">
             Couldn&apos;t load your dashboard.
           </h1>
-          <p style={{ fontSize: 13, color: "var(--wf-body)", maxWidth: 560 }}>
+          <p className="max-w-[560px] text-[13px] text-body">
             Your session may have expired. Try signing out and back in.
           </p>
         </div>
@@ -50,56 +50,24 @@ export default async function StudentDashboard() {
 
   return (
     <StudentChrome active="home">
-      <header
-        style={{
-          height: 56,
-          padding: "0 28px",
-          borderBottom: "1px solid var(--wf-hairline)",
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          flexShrink: 0,
-        }}
-      >
+      <header className="flex h-14 shrink-0 items-center gap-4 border-b border-hairline px-7">
         {/* Search lives in the StudentChrome sidebar/header (the real
             HeaderSearchCombobox) — this header used to render a dead
             look-alike search box here with no input behind it. */}
-        <div style={{ flex: 1 }} />
+        <div className="flex-1" />
         <StreakChip days={dashboard.stats.streak} />
         <XPChip value={dashboard.stats.xp} />
         <NotificationBell />
         <Avatar initials={dashboard.me.avatarInitials || "ME"} />
       </header>
 
-      <div
-        className="wf-two-col"
-        style={{
-          padding: "24px 28px 28px",
-          overflow: "auto",
-          alignContent: "start",
-        }}
-      >
+      <div className="wf-two-col content-start overflow-auto px-7 pb-7 pt-6">
         {/* LEFT */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 20,
-            minWidth: 0,
-          }}
-        >
+        <div className="flex min-w-0 flex-col gap-5">
           <div>
             <Eyebrow>{dateLabel}</Eyebrow>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 14,
-                marginTop: 6,
-                flexWrap: "wrap",
-              }}
-            >
-              <h1 className="wf-h1" style={{ fontSize: 30 }}>
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-3.5">
+              <h1 className="wf-h1 text-[30px]">
                 Welcome back, {dashboard.me.firstName}.
               </h1>
             </div>
@@ -107,28 +75,13 @@ export default async function StudentDashboard() {
 
           {/* Continue learning */}
           <section>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                marginBottom: 10,
-              }}
-            >
-              <h2 className="wf-h2" style={{ fontSize: 16 }}>
-                Continue learning
-              </h2>
+            <div className="mb-2.5 flex items-baseline justify-between">
+              <h2 className="wf-h2 text-base">Continue learning</h2>
             </div>
             {dashboard.continueLearning.length === 0 ? (
-              <Card p={28} style={{ textAlign: "center" }}>
+              <Card p={28} className="text-center">
                 <Eyebrow>Nothing in progress yet</Eyebrow>
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontSize: 13,
-                    color: "var(--wf-body)",
-                  }}
-                >
+                <div className="mt-1.5 text-[13px] text-body">
                   Browse the marketplace to enroll in a course.
                 </div>
               </Card>
@@ -143,29 +96,14 @@ export default async function StudentDashboard() {
 
           {dashboard.todaysPlan.length === 0 ? (
             <section>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  justifyContent: "space-between",
-                  marginBottom: 10,
-                }}
-              >
-                <h2 className="wf-h2" style={{ fontSize: 16 }}>
-                  Today&apos;s plan
-                </h2>
-                <Annot ai>AI-curated</Annot>
+              <div className="mb-2.5 flex items-baseline justify-between">
+                <h2 className="wf-h2 text-base">Today&apos;s plan</h2>
+                <Annot>Planned from your progress</Annot>
               </div>
-              <Card p={20} style={{ textAlign: "center" }}>
+              <Card p={20} className="text-center">
                 <Eyebrow>Nothing scheduled yet</Eyebrow>
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontSize: 13,
-                    color: "var(--wf-body)",
-                  }}
-                >
-                  Enroll in a course and your AI-curated plan will appear here.
+                <div className="mt-1.5 text-[13px] text-body">
+                  Enroll in a course and your daily plan will appear here.
                 </div>
               </Card>
             </section>
@@ -176,53 +114,22 @@ export default async function StudentDashboard() {
           {/* Skills + assignments */}
           <section className="wf-grid-cards-2">
             <Card>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 12,
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: 14,
-                    margin: 0,
-                    fontWeight: 600,
-                  }}
-                >
+              <div className="mb-3 flex justify-between">
+                <h3 className="m-0 text-sm font-semibold">
                   Skill mastery this week
                 </h3>
               </div>
               {dashboard.skills.length === 0 ? (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--wf-mute)",
-                    padding: "10px 0",
-                    lineHeight: 1.5,
-                  }}
-                >
+                <div className="py-2.5 text-xs leading-normal text-mute">
                   Complete a few lessons and your skill mastery will track
                   here per strand.
                 </div>
               ) : (
                 dashboard.skills.map((s) => (
-                  <div key={s.name} style={{ marginBottom: 10 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 11,
-                        marginBottom: 3,
-                      }}
-                    >
+                  <div key={s.name} className="mb-2.5">
+                    <div className="mb-[3px] flex justify-between text-[11px]">
                       <span>{s.name}</span>
-                      <span
-                        className="wf-mono"
-                        style={{ color: "var(--wf-mute)" }}
-                      >
-                        {s.v}%
-                      </span>
+                      <span className="font-mono text-mute">{s.v}%</span>
                     </div>
                     <div
                       className={`wf-meter ${s.v < 50 ? "wf-meter--accent" : ""}`}
@@ -234,33 +141,12 @@ export default async function StudentDashboard() {
               )}
             </Card>
             <Card>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 12,
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: 14,
-                    margin: 0,
-                    fontWeight: 600,
-                  }}
-                >
-                  Due this week
-                </h3>
+              <div className="mb-3 flex justify-between">
+                <h3 className="m-0 text-sm font-semibold">Due this week</h3>
                 <Annot>From teacher</Annot>
               </div>
               {dashboard.assignments.length === 0 ? (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--wf-mute)",
-                    padding: "10px 0",
-                    lineHeight: 1.5,
-                  }}
-                >
+                <div className="py-2.5 text-xs leading-normal text-mute">
                   No assignments due. Teachers can post weekly work here.
                 </div>
               ) : (
@@ -270,42 +156,17 @@ export default async function StudentDashboard() {
                     href={
                       a.lessonSlug ? `/student/lesson/${a.lessonSlug}` : "#"
                     }
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "10px 0",
-                      borderBottom:
-                        i < dashboard.assignments.length - 1
-                          ? "1px solid var(--wf-hairline)"
-                          : "none",
-                      textDecoration: "none",
-                      color: "inherit",
-                    }}
+                    className="flex items-center gap-2.5 border-b border-hairline py-2.5 text-inherit no-underline last:border-b-0"
                   >
-                    <div
-                      className="wf-mono"
-                      style={{
-                        width: 36,
-                        textAlign: "center",
-                        fontSize: 10,
-                        color: "var(--wf-mute)",
-                      }}
-                    >
+                    <div className="w-9 text-center font-mono text-[10px] text-mute">
                       {a.d}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 500 }}>
-                        {a.t}
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium">{a.t}</div>
                       <div
-                        style={{
-                          fontSize: 10,
-                          color: a.done
-                            ? "var(--wf-good)"
-                            : "var(--wf-mute)",
-                          marginTop: 2,
-                        }}
+                        className={`mt-0.5 text-[10px] ${
+                          a.done ? "text-good" : "text-mute"
+                        }`}
                       >
                         {a.done ? "Done ✓" : a.due} · +{a.xp} XP
                       </div>
@@ -323,28 +184,13 @@ export default async function StudentDashboard() {
         </div>
 
         {/* RIGHT */}
-        <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <aside className="flex flex-col gap-4">
           {/* Streak card */}
           <Card>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 14,
-              }}
-            >
-              <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
-                Your week
-              </h3>
+            <div className="mb-3.5 flex items-center justify-between">
+              <h3 className="m-0 text-sm font-semibold">Your week</h3>
             </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 14,
-              }}
-            >
+            <div className="mb-3.5 flex justify-between">
               {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => {
                 const todayIdx = (today.getDay() + 6) % 7; // Mon=0..Sun=6
                 // Real activity only (attempts / lesson completions in
@@ -352,92 +198,43 @@ export default async function StudentDashboard() {
                 // up to "today", fabricating a perfect week.
                 const filled = dashboard.weekActivity[i] ?? false;
                 return (
-                  <div key={i} style={{ width: 30, textAlign: "center" }}>
+                  <div key={i} className="w-[30px] text-center">
                     <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        margin: "0 auto 4px",
-                        borderRadius: "50%",
-                        background: filled
-                          ? "var(--wf-accent)"
-                          : "var(--wf-fill)",
-                        border:
-                          i === todayIdx
-                            ? "2px solid var(--wf-ink)"
-                            : "1px solid var(--wf-hairline)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: filled ? "white" : "var(--wf-mute)",
-                        fontSize: 10,
-                      }}
+                      className={`mx-auto mb-1 flex h-[26px] w-[26px] items-center justify-center rounded-full text-[10px] ${
+                        filled ? "bg-accent text-white" : "bg-fill text-mute"
+                      } ${
+                        i === todayIdx
+                          ? "border-2 border-ink"
+                          : "border border-hairline"
+                      }`}
                     >
                       {filled && <Icon name="flame" size={12} color="white" />}
                     </div>
-                    <span
-                      className="wf-mono"
-                      style={{ fontSize: 9, color: "var(--wf-mute)" }}
-                    >
-                      {d}
-                    </span>
+                    <span className="font-mono text-[9px] text-mute">{d}</span>
                   </div>
                 );
               })}
             </div>
-            <div
-              style={{
-                borderTop: "1px solid var(--wf-hairline)",
-                paddingTop: 12,
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
+            <div className="flex justify-between border-t border-hairline pt-3">
               <div>
-                <div
-                  className="wf-serif"
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 700,
-                    color: "var(--wf-accent)",
-                  }}
-                >
+                <div className="font-serif text-[22px] font-bold text-accent">
                   {dashboard.stats.streak}
                 </div>
-                <div
-                  className="wf-mono"
-                  style={{ fontSize: 10, color: "var(--wf-mute)" }}
-                >
+                <div className="font-mono text-[10px] text-mute">
                   DAY STREAK
                 </div>
               </div>
               <div>
-                <div
-                  className="wf-serif"
-                  style={{ fontSize: 22, fontWeight: 700 }}
-                >
+                <div className="font-serif text-[22px] font-bold">
                   {dashboard.stats.xp.toLocaleString()}
                 </div>
-                <div
-                  className="wf-mono"
-                  style={{ fontSize: 10, color: "var(--wf-mute)" }}
-                >
-                  TOTAL XP
-                </div>
+                <div className="font-mono text-[10px] text-mute">TOTAL XP</div>
               </div>
               <div>
-                <div
-                  className="wf-serif"
-                  style={{ fontSize: 22, fontWeight: 700 }}
-                >
+                <div className="font-serif text-[22px] font-bold">
                   L{dashboard.stats.level}
                 </div>
-                <div
-                  className="wf-mono"
-                  style={{ fontSize: 10, color: "var(--wf-mute)" }}
-                >
-                  LEVEL
-                </div>
+                <div className="font-mono text-[10px] text-mute">LEVEL</div>
               </div>
             </div>
           </Card>
@@ -446,46 +243,21 @@ export default async function StudentDashboard() {
 
           {/* Leaderboard */}
           <Card>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
-              <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
-                Class leaderboard
-              </h3>
-              <span
-                className="wf-mono"
-                style={{ fontSize: 9, color: "var(--wf-mute)" }}
-              >
-                THIS WEEK
-              </span>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="m-0 text-sm font-semibold">Class leaderboard</h3>
+              <span className="font-mono text-[9px] text-mute">THIS WEEK</span>
             </div>
-            {dashboard.leaderboard.map((u, i) => (
+            {dashboard.leaderboard.map((u) => (
               <div
                 key={u.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "8px 0",
-                  borderBottom:
-                    i < dashboard.leaderboard.length - 1
-                      ? "1px solid var(--wf-hairline)"
-                      : "none",
-                  fontWeight: u.me ? 700 : 500,
-                }}
+                className={`flex items-center gap-2.5 border-b border-hairline py-2 last:border-b-0 ${
+                  u.me ? "font-bold" : "font-medium"
+                }`}
               >
                 <span
-                  className="wf-mono"
-                  style={{
-                    width: 18,
-                    fontSize: 11,
-                    color: u.r <= 3 ? "var(--wf-accent)" : "var(--wf-mute)",
-                  }}
+                  className={`w-[18px] font-mono text-[11px] ${
+                    u.r <= 3 ? "text-accent" : "text-mute"
+                  }`}
                 >
                   {u.r}
                 </span>
@@ -497,11 +269,8 @@ export default async function StudentDashboard() {
                     .slice(0, 2)}
                   size={22}
                 />
-                <span style={{ flex: 1, fontSize: 12 }}>{u.name}</span>
-                <span
-                  className="wf-mono"
-                  style={{ fontSize: 11, color: "var(--wf-body)" }}
-                >
+                <span className="flex-1 text-xs">{u.name}</span>
+                <span className="font-mono text-[11px] text-body">
                   {u.xp.toLocaleString()} XP
                 </span>
               </div>
@@ -511,51 +280,19 @@ export default async function StudentDashboard() {
           {/* Badges */}
           {dashboard.badges.length > 0 && (
             <Card>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 12,
-                }}
-              >
-                <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
-                  Recent badges
-                </h3>
-                <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="m-0 text-sm font-semibold">Recent badges</h3>
+                <span className="text-[11px] text-mute">
                   {dashboard.badgeCounts.earned} of {dashboard.badgeCounts.total}
                 </span>
               </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: 8,
-                }}
-              >
+              <div className="grid grid-cols-3 gap-2">
                 {dashboard.badges.slice(0, 3).map((b) => (
                   <div
                     key={b.slug}
-                    style={{
-                      textAlign: "center",
-                      padding: "8px 4px",
-                      border: "1px solid var(--wf-hairline)",
-                      borderRadius: 4,
-                    }}
+                    className="rounded border border-hairline px-1 py-2 text-center"
                   >
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        margin: "0 auto 6px",
-                        borderRadius: "50%",
-                        background: "var(--wf-accent-soft)",
-                        border: "1px solid var(--wf-accent)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
+                    <div className="mx-auto mb-1.5 flex h-8 w-8 items-center justify-center rounded-full border border-accent bg-accent-soft">
                       <Icon
                         name={
                           (BADGE_ICON_FOR_SLUG[b.slug] ?? b.icon) as "flame"
@@ -564,9 +301,7 @@ export default async function StudentDashboard() {
                         color="var(--wf-accent)"
                       />
                     </div>
-                    <div style={{ fontSize: 10, fontWeight: 500 }}>
-                      {b.name}
-                    </div>
+                    <div className="text-[10px] font-medium">{b.name}</div>
                   </div>
                 ))}
               </div>

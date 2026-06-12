@@ -32,17 +32,8 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
 
   return (
     <section>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          marginBottom: 10,
-        }}
-      >
-        <h2 className="wf-h2" style={{ fontSize: 16 }}>
-          Today&apos;s plan
-        </h2>
+      <div className="mb-2.5 flex items-baseline justify-between">
+        <h2 className="wf-h2 text-base">Today&apos;s plan</h2>
         {/* Honest label — the plan is rule-built from real progress
             (next lesson / assignments / weakest skill), not AI, and the
             old "· 35 min" estimate + dead Customize button were props. */}
@@ -52,30 +43,14 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
         {plan.map((row, i) => (
           <div
             key={i}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              padding: "12px 16px",
-              borderBottom:
-                i < plan.length - 1
-                  ? "1px solid var(--wf-hairline)"
-                  : "none",
-              opacity: row.state === "done" ? 0.55 : 1,
-            }}
+            className={`flex items-center gap-3.5 border-b border-hairline px-4 py-3 last:border-b-0 ${
+              row.state === "done" ? "opacity-55" : ""
+            }`}
           >
             <div
-              style={{
-                width: 28,
-                height: 28,
-                border: "1px solid var(--wf-hairline)",
-                borderRadius: 4,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background:
-                  row.state === "now" ? "var(--wf-ai-soft)" : "white",
-              }}
+              className={`flex h-7 w-7 items-center justify-center rounded border border-hairline ${
+                row.state === "now" ? "bg-ai-soft" : "bg-white"
+              }`}
             >
               <Icon
                 name={row.ico}
@@ -85,24 +60,9 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
                 }
               />
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 3,
-                  flexWrap: "wrap",
-                }}
-              >
-                <span
-                  className="wf-mono"
-                  style={{
-                    fontSize: 9,
-                    letterSpacing: ".08em",
-                    color: "var(--wf-mute)",
-                  }}
-                >
+            <div className="min-w-0 flex-1">
+              <div className="mb-[3px] flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[9px] tracking-[0.08em] text-mute">
                   {row.tag}
                 </span>
                 {row.state === "now" && (
@@ -112,24 +72,15 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
                 {row.tag === "SPEAK" && <Annot ai>AI conversation partner</Annot>}
               </div>
               <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: row.state === "done" ? 400 : 600,
-                  textDecoration:
-                    row.state === "done" ? "line-through" : "none",
-                }}
+                className={`text-[13px] ${
+                  row.state === "done"
+                    ? "font-normal line-through"
+                    : "font-semibold"
+                }`}
               >
                 {row.title}
               </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "var(--wf-mute)",
-                  marginTop: 2,
-                }}
-              >
-                {row.meta}
-              </div>
+              <div className="mt-0.5 text-[11px] text-mute">{row.meta}</div>
             </div>
             {row.state === "done" ? (
               <Icon name="check" size={16} color="var(--wf-good)" />
@@ -137,7 +88,7 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
               row.href ? (
                 <Link
                   href={row.href}
-                  style={{ textDecoration: "none" }}
+                  className="no-underline"
                   onClick={() => advance(i)}
                 >
                   <Btn sm variant="primary">

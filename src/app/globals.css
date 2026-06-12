@@ -39,6 +39,7 @@
   --color-ai: var(--wf-ai);
   --color-ai-soft: var(--wf-ai-soft);
   --color-good: var(--wf-good);
+  --color-warn: var(--wf-warn);
   --font-sans: var(--font-sans-stack);
   --font-mono: var(--font-mono-stack);
   --font-serif: var(--font-serif-stack);
