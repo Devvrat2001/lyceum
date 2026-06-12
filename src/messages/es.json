@@ -11,6 +11,42 @@
   "Language": {
     "label": "Idioma",
     "english": "English",
+    "hindi": "Hindi",
     "spanish": "Español"
+  },
+  "StudentDashboard": {
+    "headsUp": "Atención",
+    "loadFailedTitle": "No pudimos cargar tu panel.",
+    "loadFailedBody": "Puede que tu sesión haya expirado. Cierra sesión y vuelve a entrar.",
+    "welcome": "¡Hola de nuevo, {name}!",
+    "continueLearning": "Continúa aprendiendo",
+    "nothingInProgress": "Nada en curso todavía",
+    "browseToEnroll": "Explora el mercado para inscribirte en un curso.",
+    "nothingScheduled": "Nada programado todavía",
+    "enrollForPlan": "Inscríbete en un curso y tu plan diario aparecerá aquí.",
+    "skillMastery": "Dominio de habilidades esta semana",
+    "skillEmpty": "Completa algunas lecciones y tu dominio por área aparecerá aquí.",
+    "dueThisWeek": "Para esta semana",
+    "fromTeacher": "De tu profe",
+    "assignmentsEmpty": "No hay tareas pendientes. Los profesores pueden publicar trabajo semanal aquí.",
+    "doneCheck": "Hecho ✓",
+    "yourWeek": "Tu semana",
+    "weekLetters": ["L", "M", "X", "J", "V", "S", "D"],
+    "dayStreak": "DÍAS DE RACHA",
+    "totalXp": "XP TOTAL",
+    "level": "NIVEL",
+    "leaderboard": "Tabla de la clase",
+    "thisWeek": "ESTA SEMANA",
+    "recentBadges": "Insignias recientes",
+    "badgeCount": "{earned} de {total}"
+  },
+  "TodaysPlan": {
+    "title": "Plan de hoy",
+    "planned": "Basado en tu progreso",
+    "now": "Ahora",
+    "start": "Empezar",
+    "done": "Hecho",
+    "adaptsDifficulty": "Ajusta la dificultad",
+    "aiPartner": "Compañero de conversación IA"
   }
 }

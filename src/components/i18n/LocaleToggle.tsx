@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { LOCALES, type Locale } from "@/i18n/locales";
 import { setLocale } from "@/i18n/setLocale";
 
-const SHORT: Record<Locale, string> = { en: "EN", es: "ES" };
+const SHORT: Record<Locale, string> = { en: "EN", hi: "हिं", es: "ES" };
 
 /**
  * Cookie-based language switcher. Calls a server action to persist the `locale`

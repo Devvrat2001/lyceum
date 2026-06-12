@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { getLocale, getTranslations } from "next-intl/server";
 import { StudentChrome } from "@/components/layouts/StudentChrome";
+import { LocaleToggle } from "@/components/i18n/LocaleToggle";
 import {
   Annot,
   Avatar,
@@ -23,18 +25,24 @@ const BADGE_ICON_FOR_SLUG: Record<string, string> = {
 
 export default async function StudentDashboard() {
   const trpc = await getServerCaller();
-  const dashboard = await trpc.student.dashboard();
+  // Locale + catalogs resolve alongside the data — the dashboard is the
+  // i18n pilot surface (REQUIREMENTS R20), so every static string below
+  // comes from messages/<locale>.json.
+  const [dashboard, locale, t, tPlan] = await Promise.all([
+    trpc.student.dashboard(),
+    getLocale(),
+    getTranslations("StudentDashboard"),
+    getTranslations("TodaysPlan"),
+  ]);
 
   if (!dashboard) {
     return (
       <StudentChrome active="home">
         <div className="p-8">
-          <Eyebrow>Heads up</Eyebrow>
-          <h1 className="wf-h1 mt-1 text-[22px]">
-            Couldn&apos;t load your dashboard.
-          </h1>
+          <Eyebrow>{t("headsUp")}</Eyebrow>
+          <h1 className="wf-h1 mt-1 text-[22px]">{t("loadFailedTitle")}</h1>
           <p className="max-w-[560px] text-[13px] text-body">
-            Your session may have expired. Try signing out and back in.
+            {t("loadFailedBody")}
           </p>
         </div>
       </StudentChrome>
@@ -42,11 +50,12 @@ export default async function StudentDashboard() {
   }
 
   const today = new Date();
-  const dateLabel = today.toLocaleDateString(undefined, {
+  const dateLabel = today.toLocaleDateString(locale, {
     weekday: "long",
     month: "short",
     day: "numeric",
   });
+  const weekLetters = t.raw("weekLetters") as string[];
 
   return (
     <StudentChrome active="home">
@@ -55,6 +64,7 @@ export default async function StudentDashboard() {
             HeaderSearchCombobox) — this header used to render a dead
             look-alike search box here with no input behind it. */}
         <div className="flex-1" />
+        <LocaleToggle />
         <StreakChip days={dashboard.stats.streak} />
         <XPChip value={dashboard.stats.xp} />
         <NotificationBell />
@@ -68,7 +78,7 @@ export default async function StudentDashboard() {
             <Eyebrow>{dateLabel}</Eyebrow>
             <div className="mt-1.5 flex flex-wrap items-baseline gap-3.5">
               <h1 className="wf-h1 text-[30px]">
-                Welcome back, {dashboard.me.firstName}.
+                {t("welcome", { name: dashboard.me.firstName })}
               </h1>
             </div>
           </div>
@@ -76,13 +86,13 @@ export default async function StudentDashboard() {
           {/* Continue learning */}
           <section>
             <div className="mb-2.5 flex items-baseline justify-between">
-              <h2 className="wf-h2 text-base">Continue learning</h2>
+              <h2 className="wf-h2 text-base">{t("continueLearning")}</h2>
             </div>
             {dashboard.continueLearning.length === 0 ? (
               <Card p={28} className="text-center">
-                <Eyebrow>Nothing in progress yet</Eyebrow>
+                <Eyebrow>{t("nothingInProgress")}</Eyebrow>
                 <div className="mt-1.5 text-[13px] text-body">
-                  Browse the marketplace to enroll in a course.
+                  {t("browseToEnroll")}
                 </div>
               </Card>
             ) : (
@@ -97,13 +107,13 @@ export default async function StudentDashboard() {
           {dashboard.todaysPlan.length === 0 ? (
             <section>
               <div className="mb-2.5 flex items-baseline justify-between">
-                <h2 className="wf-h2 text-base">Today&apos;s plan</h2>
-                <Annot>Planned from your progress</Annot>
+                <h2 className="wf-h2 text-base">{tPlan("title")}</h2>
+                <Annot>{tPlan("planned")}</Annot>
               </div>
               <Card p={20} className="text-center">
-                <Eyebrow>Nothing scheduled yet</Eyebrow>
+                <Eyebrow>{t("nothingScheduled")}</Eyebrow>
                 <div className="mt-1.5 text-[13px] text-body">
-                  Enroll in a course and your daily plan will appear here.
+                  {t("enrollForPlan")}
                 </div>
               </Card>
             </section>
@@ -116,13 +126,12 @@ export default async function StudentDashboard() {
             <Card>
               <div className="mb-3 flex justify-between">
                 <h3 className="m-0 text-sm font-semibold">
-                  Skill mastery this week
+                  {t("skillMastery")}
                 </h3>
               </div>
               {dashboard.skills.length === 0 ? (
                 <div className="py-2.5 text-xs leading-normal text-mute">
-                  Complete a few lessons and your skill mastery will track
-                  here per strand.
+                  {t("skillEmpty")}
                 </div>
               ) : (
                 dashboard.skills.map((s) => (
@@ -142,12 +151,14 @@ export default async function StudentDashboard() {
             </Card>
             <Card>
               <div className="mb-3 flex justify-between">
-                <h3 className="m-0 text-sm font-semibold">Due this week</h3>
-                <Annot>From teacher</Annot>
+                <h3 className="m-0 text-sm font-semibold">
+                  {t("dueThisWeek")}
+                </h3>
+                <Annot>{t("fromTeacher")}</Annot>
               </div>
               {dashboard.assignments.length === 0 ? (
                 <div className="py-2.5 text-xs leading-normal text-mute">
-                  No assignments due. Teachers can post weekly work here.
+                  {t("assignmentsEmpty")}
                 </div>
               ) : (
                 dashboard.assignments.map((a, i) => (
@@ -168,7 +179,7 @@ export default async function StudentDashboard() {
                           a.done ? "text-good" : "text-mute"
                         }`}
                       >
-                        {a.done ? "Done ✓" : a.due} · +{a.xp} XP
+                        {a.done ? t("doneCheck") : a.due} · +{a.xp} XP
                       </div>
                     </div>
                     <Icon
@@ -188,10 +199,10 @@ export default async function StudentDashboard() {
           {/* Streak card */}
           <Card>
             <div className="mb-3.5 flex items-center justify-between">
-              <h3 className="m-0 text-sm font-semibold">Your week</h3>
+              <h3 className="m-0 text-sm font-semibold">{t("yourWeek")}</h3>
             </div>
             <div className="mb-3.5 flex justify-between">
-              {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => {
+              {weekLetters.map((d, i) => {
                 const todayIdx = (today.getDay() + 6) % 7; // Mon=0..Sun=6
                 // Real activity only (attempts / lesson completions in
                 // the dashboard payload) — this used to fill every day
@@ -221,20 +232,24 @@ export default async function StudentDashboard() {
                   {dashboard.stats.streak}
                 </div>
                 <div className="font-mono text-[10px] text-mute">
-                  DAY STREAK
+                  {t("dayStreak")}
                 </div>
               </div>
               <div>
                 <div className="font-serif text-[22px] font-bold">
                   {dashboard.stats.xp.toLocaleString()}
                 </div>
-                <div className="font-mono text-[10px] text-mute">TOTAL XP</div>
+                <div className="font-mono text-[10px] text-mute">
+                  {t("totalXp")}
+                </div>
               </div>
               <div>
                 <div className="font-serif text-[22px] font-bold">
                   L{dashboard.stats.level}
                 </div>
-                <div className="font-mono text-[10px] text-mute">LEVEL</div>
+                <div className="font-mono text-[10px] text-mute">
+                  {t("level")}
+                </div>
               </div>
             </div>
           </Card>
@@ -244,8 +259,10 @@ export default async function StudentDashboard() {
           {/* Leaderboard */}
           <Card>
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="m-0 text-sm font-semibold">Class leaderboard</h3>
-              <span className="font-mono text-[9px] text-mute">THIS WEEK</span>
+              <h3 className="m-0 text-sm font-semibold">{t("leaderboard")}</h3>
+              <span className="font-mono text-[9px] text-mute">
+                {t("thisWeek")}
+              </span>
             </div>
             {dashboard.leaderboard.map((u) => (
               <div
@@ -281,9 +298,14 @@ export default async function StudentDashboard() {
           {dashboard.badges.length > 0 && (
             <Card>
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="m-0 text-sm font-semibold">Recent badges</h3>
+                <h3 className="m-0 text-sm font-semibold">
+                  {t("recentBadges")}
+                </h3>
                 <span className="text-[11px] text-mute">
-                  {dashboard.badgeCounts.earned} of {dashboard.badgeCounts.total}
+                  {t("badgeCount", {
+                    earned: dashboard.badgeCounts.earned,
+                    total: dashboard.badgeCounts.total,
+                  })}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2">

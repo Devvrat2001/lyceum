@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { LOCALES } from "@/i18n/locales";
 import en from "@/messages/en.json";
 import es from "@/messages/es.json";
+import hi from "@/messages/hi.json";
 
 type Json = Record<string, unknown>;
 
@@ -21,7 +22,7 @@ function keyPaths(obj: Json, prefix = ""): string[] {
   });
 }
 
-const catalogs: Record<string, Json> = { en, es };
+const catalogs: Record<string, Json> = { en, es, hi };
 
 describe("i18n message catalogs", () => {
   it("ships a catalog for every registered locale", () => {

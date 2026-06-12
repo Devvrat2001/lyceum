@@ -1,0 +1,52 @@
+{
+  "Progress": {
+    "eyebrow": "प्रगति",
+    "title": "आपकी पढ़ाई, एक नज़र में",
+    "downloadReport": "रिपोर्ट डाउनलोड करें",
+    "totalXp": "कुल XP",
+    "dayStreak": "दिन की स्ट्रीक",
+    "level": "स्तर",
+    "badges": "बैज"
+  },
+  "Language": {
+    "label": "भाषा",
+    "english": "English",
+    "hindi": "हिन्दी",
+    "spanish": "Español"
+  },
+  "StudentDashboard": {
+    "headsUp": "ध्यान दें",
+    "loadFailedTitle": "आपका डैशबोर्ड लोड नहीं हो पाया।",
+    "loadFailedBody": "शायद आपका सेशन समाप्त हो गया है। साइन आउट करके दोबारा साइन इन करें।",
+    "welcome": "वापसी पर स्वागत है, {name}!",
+    "continueLearning": "सीखना जारी रखें",
+    "nothingInProgress": "अभी कुछ शुरू नहीं हुआ",
+    "browseToEnroll": "किसी कोर्स में दाखिले के लिए मार्केटप्लेस देखें।",
+    "nothingScheduled": "अभी कुछ तय नहीं है",
+    "enrollForPlan": "किसी कोर्स में दाखिला लें — आपकी दैनिक योजना यहाँ दिखेगी।",
+    "skillMastery": "इस हफ़्ते की कौशल महारत",
+    "skillEmpty": "कुछ पाठ पूरे करें — हर स्ट्रैंड की आपकी कौशल प्रगति यहाँ दिखेगी।",
+    "dueThisWeek": "इस हफ़्ते के असाइनमेंट",
+    "fromTeacher": "शिक्षक की ओर से",
+    "assignmentsEmpty": "कोई असाइनमेंट बाकी नहीं। शिक्षक यहाँ हफ़्ते का काम पोस्ट कर सकते हैं।",
+    "doneCheck": "पूरा ✓",
+    "yourWeek": "आपका हफ़्ता",
+    "weekLetters": ["सो", "मं", "बु", "गु", "शु", "श", "र"],
+    "dayStreak": "दिन की स्ट्रीक",
+    "totalXp": "कुल XP",
+    "level": "स्तर",
+    "leaderboard": "क्लास लीडरबोर्ड",
+    "thisWeek": "इस हफ़्ते",
+    "recentBadges": "हाल के बैज",
+    "badgeCount": "{total} में से {earned}"
+  },
+  "TodaysPlan": {
+    "title": "आज की योजना",
+    "planned": "आपकी प्रगति के आधार पर",
+    "now": "अभी",
+    "start": "शुरू करें",
+    "done": "हो गया",
+    "adaptsDifficulty": "कठिनाई के अनुसार ढलता है",
+    "aiPartner": "AI बातचीत साथी"
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Annot, Btn, Card, Icon } from "@/components/wf/primitives";
 
 type IconName = "play" | "sparkles" | "book" | "mic" | "check" | "arrow";
@@ -17,6 +18,7 @@ type PlanItem = {
 };
 
 export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
+  const t = useTranslations("TodaysPlan");
   const [plan, setPlan] = useState<PlanItem[]>(initialPlan);
 
   const advance = (idx: number) => {
@@ -33,11 +35,11 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
   return (
     <section>
       <div className="mb-2.5 flex items-baseline justify-between">
-        <h2 className="wf-h2 text-base">Today&apos;s plan</h2>
+        <h2 className="wf-h2 text-base">{t("title")}</h2>
         {/* Honest label — the plan is rule-built from real progress
             (next lesson / assignments / weakest skill), not AI, and the
             old "· 35 min" estimate + dead Customize button were props. */}
-        <Annot>Planned from your progress</Annot>
+        <Annot>{t("planned")}</Annot>
       </div>
       <Card p={0}>
         {plan.map((row, i) => (
@@ -66,10 +68,12 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
                   {row.tag}
                 </span>
                 {row.state === "now" && (
-                  <span className="wf-ai-pill">Now</span>
+                  <span className="wf-ai-pill">{t("now")}</span>
                 )}
-                {row.tag === "PRACTICE" && <Annot ai>Adapts difficulty</Annot>}
-                {row.tag === "SPEAK" && <Annot ai>AI conversation partner</Annot>}
+                {row.tag === "PRACTICE" && (
+                  <Annot ai>{t("adaptsDifficulty")}</Annot>
+                )}
+                {row.tag === "SPEAK" && <Annot ai>{t("aiPartner")}</Annot>}
               </div>
               <div
                 className={`text-[13px] ${
@@ -92,12 +96,12 @@ export function TodaysPlan({ initialPlan }: { initialPlan: PlanItem[] }) {
                   onClick={() => advance(i)}
                 >
                   <Btn sm variant="primary">
-                    Start
+                    {t("start")}
                   </Btn>
                 </Link>
               ) : (
                 <Btn sm variant="primary" onClick={() => advance(i)}>
-                  Done
+                  {t("done")}
                 </Btn>
               )
             ) : (

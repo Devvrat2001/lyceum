@@ -11,6 +11,42 @@
   "Language": {
     "label": "Language",
     "english": "English",
+    "hindi": "Hindi",
     "spanish": "Español"
+  },
+  "StudentDashboard": {
+    "headsUp": "Heads up",
+    "loadFailedTitle": "Couldn't load your dashboard.",
+    "loadFailedBody": "Your session may have expired. Try signing out and back in.",
+    "welcome": "Welcome back, {name}.",
+    "continueLearning": "Continue learning",
+    "nothingInProgress": "Nothing in progress yet",
+    "browseToEnroll": "Browse the marketplace to enroll in a course.",
+    "nothingScheduled": "Nothing scheduled yet",
+    "enrollForPlan": "Enroll in a course and your daily plan will appear here.",
+    "skillMastery": "Skill mastery this week",
+    "skillEmpty": "Complete a few lessons and your skill mastery will track here per strand.",
+    "dueThisWeek": "Due this week",
+    "fromTeacher": "From teacher",
+    "assignmentsEmpty": "No assignments due. Teachers can post weekly work here.",
+    "doneCheck": "Done ✓",
+    "yourWeek": "Your week",
+    "weekLetters": ["M", "T", "W", "T", "F", "S", "S"],
+    "dayStreak": "DAY STREAK",
+    "totalXp": "TOTAL XP",
+    "level": "LEVEL",
+    "leaderboard": "Class leaderboard",
+    "thisWeek": "THIS WEEK",
+    "recentBadges": "Recent badges",
+    "badgeCount": "{earned} of {total}"
+  },
+  "TodaysPlan": {
+    "title": "Today's plan",
+    "planned": "Planned from your progress",
+    "now": "Now",
+    "start": "Start",
+    "done": "Done",
+    "adaptsDifficulty": "Adapts difficulty",
+    "aiPartner": "AI conversation partner"
   }
 }
