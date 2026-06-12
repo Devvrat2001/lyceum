@@ -160,7 +160,14 @@ set, or AI-generated course art at publish time (cache to blob storage).
 
 ## P3 — strategic bets
 
-- **R18 · Design-system tokenization** — thousands of inline `style={{}}`
+- **R18 · Design-system tokenization** · Status: PILOT DONE (cont.33 —
+  /student + TodaysPlan fully converted to Tailwind utilities over the
+  existing `@theme inline` token map; `--color-warn` added so the map covers
+  the whole wf palette. **The conversion template:** Tailwind classes for
+  static styles, inline `style` only for dynamic values, shared `wf-*`
+  classes untouched [they're unlayered so they beat utilities in the
+  cascade]; row-divider conditionals become `last:border-b-0`. Convert other
+  hot paths as they're touched.) — thousands of inline `style={{}}`
   objects are why mobile + theming are hard. Migrate hot paths to Tailwind
   classes / shared primitives as they're touched (R7 first). Prereq for any
   serious redesign.
@@ -168,8 +175,15 @@ set, or AI-generated course art at publish time (cache to blob storage).
   (big, tactile, motion, streak ritual — Duolingo/Brilliant energy);
   teacher/admin stay information-dense. Sharpest available differentiation
   vs incumbents.
-- **R20 · i18n + Hindi/vernacular** — string extraction first (next-intl),
-  Hindi pilot, then regional. Huge India differentiator.
+- **R20 · i18n + Hindi/vernacular** · Status: PILOT DONE (cont.33 — `hi`
+  locale live in the cookie-based next-intl setup; /student dashboard +
+  TodaysPlan extracted [second surface after /student/progress]; date header
+  + week letters localize; LocaleToggle in the dashboard header; catalogs
+  parity- AND ICU-compile-tested. **v1 limit:** tRPC-built strings [plan
+  item titles, assignment due labels] stay English — fix is tag-based
+  client rendering or request-scoped getTranslations in routers. Next
+  surfaces: chrome nav, lesson reader, /browse.) — string extraction first
+  (next-intl), Hindi pilot, then regional. Huge India differentiator.
 - **R21 · Board alignment** — CBSE/ICSE/state-board tags on Course +
   filters/search facets; it's how Indian parents actually shop.
 - **R22 · Offline-first lessons** — extend the existing service worker to
@@ -177,7 +191,15 @@ set, or AI-generated course art at publish time (cache to blob storage).
   autoload).
 - **R23 · WhatsApp notification channel** — streak nudges, assignment due,
   parent weekly digest. India table stakes; needs WhatsApp Business API.
-- **R24 · AI moat expansions** — syllabus-paste → full unit drafts;
+- **R24 · AI moat expansions** · Status: syllabus-paste DONE-v1 (cont.33 —
+  optional paste box on the AI builder [replaced the three dead chips];
+  rides GenerationJob.input into the skeleton prompt as a source-of-truth
+  section, topics→units / subtopics→lessons; 20K-char cap; unit chunks
+  inherit structure via the skeleton so token cost is flat. v2: feed a
+  trimmed syllabus slice into unit chunks for terminology fidelity.
+  **Still OPEN:** free-response auto-grading; adaptive difficulty on quiz
+  decks; citations-backed tutor as the schools-trust story.) —
+  syllabus-paste → full unit drafts;
   free-response auto-grading; adaptive difficulty on quiz decks; the
   citations-backed tutor as the schools-trust story.
 - **R25 · Cohort/live delivery mechanics** — `Course.format` ("live" |
