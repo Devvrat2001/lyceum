@@ -106,7 +106,7 @@ hardcoded: return `db.badge.count()` in the dashboard payload.
 their own free course and 5-star it. Add `course.authorId === ctx.user.id →
 FORBIDDEN` + test. (Marketplace trust = the product's currency.)
 
-### R10 · Password reset + email verification · Status: OPEN
+### R10 · Password reset + email verification · Status: DONE (cont.31 — requestPasswordReset [no-enumeration, anon rate-limited, single live token] / resetPassword [1h TTL, single-use, marks email verified] / verifyEmail [24h TTL, sent at signup]; pages /forgot-password /reset-password /verify-email; login link gated on isEmailEnabled. Mail dormant until RESEND_API_KEY lands)
 No forgot-password flow; signup never verifies the address. The
 `VerificationToken` table exists, unused. Gate on `RESEND_API_KEY` like
 every other integration (hidden link when email is dormant). Includes:
@@ -140,20 +140,17 @@ The single most-requested K-12 primitive; the UI is already waiting.
 risk. 3–5 items, tested. The dashboard already renders `TodaysPlan` when
 non-empty.
 
-### R14 · Real recommendations · Status: OPEN
+### R14 · Real recommendations · Status: DONE (cont.31, commit says "R13" — enrolled users get unowned courses from their subjects/grades, rating-ranked, top-rated fill; `personalized` flag keeps homepage copy honest. v2: weight by weak skills)
 `marketplace.recommendedFor` ignores the user (top-rated only; honest copy
 admits it). Personalize: subjects/grades from enrollments + weak skills from
 attempt accuracy → matching published courses; fall back to top-rated for
 anon.
 
-### R15 · ⌘K command palette · Status: OPEN
+### R15 · ⌘K command palette · Status: DONE (cont.31 — global CommandPalette in root layout: ⌘K/Ctrl-K, debounced semanticSearch + safe nav jumps, arrow/enter/esc keyboard nav. v2: role-aware links, lessons, "ask tutor")
 Header search exists per-chrome; a global cmd-K palette (courses, lessons,
 "ask tutor", nav) is cheap differentiation — wire R8(a) into it.
 
-### R16 · Typed attempt columns (KNOWN_ISSUES S2-3) · Status: OPEN
-`Attempt.chosenKey` overloads 5 string encodings; add `chosenIndex`/
-`subIndex` int columns + backfill **before** building any analytics that
-parses answers.
+### R16 · Typed attempt columns (KNOWN_ISSUES S2-3) · Status: DONE (cont.31 — chosenIndex/subIndex Int? + backfill migration for the 3 choice encodings; write side populates both; drag/branch stay NULL by design. KNOWN_ISSUES S2-3 marked resolved)
 
 ### R17 · Course thumbnail imagery story · Status: OPEN
 Gradient fallback is tasteful but uniform. Options: per-subject illustration
