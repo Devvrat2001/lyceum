@@ -27,6 +27,7 @@ const KIND_LABELS: Record<string, { label: string; color: string }> = {
     label: "Discussion Moderation",
     color: "var(--wf-accent)",
   },
+  "parent.self_link": { label: "Parent Self-Link", color: "var(--wf-good)" },
   "payment.razorpay_account_linked": {
     label: "Payout Account Linked",
     color: "var(--wf-good)",

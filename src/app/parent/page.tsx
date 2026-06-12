@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Avatar, Card, Eyebrow, Icon, Meter } from "@/components/wf/primitives";
 import { ParentHeader } from "@/components/layouts/ParentHeader";
+import { LinkChildForm } from "@/components/parent/LinkChildForm";
 
 /**
  * Parent dashboard (Tier 2.3, second commit). Shows each linked
@@ -126,58 +127,57 @@ export default async function ParentDashboardPage() {
           <Card
             p={28}
             style={{
-              textAlign: "center",
               maxWidth: 560,
               margin: "20px auto",
             }}
           >
-            <Icon
-              name="user"
-              size={28}
-              color="var(--wf-mute)"
-              style={{ marginBottom: 10 }}
-            />
-            <h2
-              className="wf-h2"
-              style={{ fontSize: 20, marginBottom: 8 }}
-            >
-              Ask your school to link your kids
-            </h2>
-            <p
-              style={{
-                fontSize: 13,
-                color: "var(--wf-body)",
-                lineHeight: 1.5,
-                marginBottom: 16,
-              }}
-            >
-              An admin at your school can connect your account to your
-              children&apos;s student accounts. Once they do, you&apos;ll
-              see each kid&apos;s progress, recent practice, and streaks
-              here.
-            </p>
-            <span
-              className="wf-mono"
-              style={{ fontSize: 11, color: "var(--wf-mute)" }}
-            >
-              SELF-INVITE FLOW · COMING SOON
-            </span>
+            <div style={{ textAlign: "center", marginBottom: 18 }}>
+              <Icon
+                name="user"
+                size={28}
+                color="var(--wf-mute)"
+                style={{ marginBottom: 10 }}
+              />
+              <h2
+                className="wf-h2"
+                style={{ fontSize: 20, marginBottom: 8 }}
+              >
+                Link your first child
+              </h2>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--wf-body)",
+                  lineHeight: 1.5,
+                  margin: 0,
+                }}
+              >
+                Once linked, you&apos;ll see each kid&apos;s progress,
+                recent practice, and streaks here.
+              </p>
+            </div>
+            <LinkChildForm />
           </Card>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              // min(420px, 100%) floors each column at the container width on
-              // phones, so a single card can't force horizontal scrolling.
-              gridTemplateColumns:
-                "repeat(auto-fill, minmax(min(420px, 100%), 1fr))",
-              gap: 16,
-            }}
-          >
-            {children.map((c) => (
-              <ChildCard key={c.id} child={c} />
-            ))}
-          </div>
+          <>
+            <div
+              style={{
+                display: "grid",
+                // min(420px, 100%) floors each column at the container width on
+                // phones, so a single card can't force horizontal scrolling.
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(min(420px, 100%), 1fr))",
+                gap: 16,
+              }}
+            >
+              {children.map((c) => (
+                <ChildCard key={c.id} child={c} />
+              ))}
+            </div>
+            <Card p={18} style={{ marginTop: 18, maxWidth: 480 }}>
+              <LinkChildForm />
+            </Card>
+          </>
         )}
       </div>
     </div>

@@ -14,6 +14,7 @@ import { insightRouter } from "./insight";
 import { paymentRouter } from "./payment";
 import { accountRouter } from "./account";
 import { assignmentRouter } from "./assignment";
+import { parentRouter } from "./parent";
 
 export const appRouter = router({
   health: publicProcedure.query(() => ({
@@ -35,6 +36,7 @@ export const appRouter = router({
   payment: paymentRouter,
   account: accountRouter,
   assignment: assignmentRouter,
+  parent: parentRouter,
 });
 
 export type AppRouter = typeof appRouter;

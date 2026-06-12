@@ -135,6 +135,7 @@ export function SettingsClient({
           </Card>
 
           <ProfileSection user={user} isTeacher={isTeacher} />
+          {user.role === "STUDENT" && <FamilySection />}
           <PasswordSection hasPassword={user.hasPassword} />
           <EmailSection initial={user.emailOptOut} />
           <PrivacySection
@@ -144,6 +145,109 @@ export function SettingsClient({
         </div>
       </div>
     </div>
+  );
+}
+
+/* ----------------------------------------------------------------- Family */
+
+/**
+ * Parent self-service linking (REQUIREMENTS R26): the student
+ * generates a short family code here and shares it out-of-band; the
+ * parent redeems it on /parent. Single-use, 7-day expiry, regenerating
+ * replaces the previous code.
+ */
+function FamilySection() {
+  const gen = trpc.student.generateParentCode.useMutation();
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <Card p={16} style={{ marginBottom: 16 }}>
+      <Eyebrow>Family</Eyebrow>
+      <div
+        style={{
+          fontSize: 12,
+          color: "var(--wf-body)",
+          margin: "8px 0 12px",
+          lineHeight: 1.5,
+        }}
+      >
+        Link a parent or guardian: generate a code, share it with them
+        (WhatsApp works fine), and they enter it on their Lyceum parent
+        dashboard. Each code works once and expires in 7 days —
+        generating a new one replaces the old.
+      </div>
+      {gen.data ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            className="wf-mono"
+            style={{
+              fontSize: 20,
+              fontWeight: 700,
+              letterSpacing: "0.2em",
+              padding: "6px 14px",
+              border: "1px dashed var(--wf-line)",
+              borderRadius: 4,
+              background: "var(--wf-fillsoft)",
+            }}
+          >
+            {gen.data.code}
+          </span>
+          <Btn
+            sm
+            variant="ghost"
+            onClick={() => {
+              navigator.clipboard
+                ?.writeText(gen.data!.code)
+                .then(() => setCopied(true))
+                .catch(() => {});
+            }}
+          >
+            {copied ? "✓ Copied" : "Copy"}
+          </Btn>
+          <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
+            expires{" "}
+            {new Date(gen.data.expiresAt).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+          <Btn
+            sm
+            variant="ghost"
+            disabled={gen.isPending}
+            onClick={() => {
+              setCopied(false);
+              gen.mutate();
+            }}
+          >
+            New code
+          </Btn>
+        </div>
+      ) : (
+        <Btn
+          sm
+          variant="primary"
+          disabled={gen.isPending}
+          onClick={() => gen.mutate()}
+        >
+          {gen.isPending ? "Generating…" : "Generate family code"}
+        </Btn>
+      )}
+      {gen.error && (
+        <div
+          style={{ marginTop: 8, fontSize: 11, color: "var(--wf-accent)" }}
+        >
+          {gen.error.message}
+        </div>
+      )}
+    </Card>
   );
 }
 

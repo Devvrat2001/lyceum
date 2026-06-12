@@ -47,4 +47,11 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next();
 });
 
+export const parentProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.user.role !== "PARENT" && ctx.user.role !== "ADMIN") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next();
+});
+
 export { TRPCError };

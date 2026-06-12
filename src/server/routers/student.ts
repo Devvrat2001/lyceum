@@ -1,4 +1,5 @@
-import { router, protectedProcedure } from "../trpc";
+import { randomInt } from "crypto";
+import { router, protectedProcedure, studentProcedure } from "../trpc";
 
 export const studentRouter = router({
   /** Whole-dashboard payload for the signed-in user. */
@@ -380,5 +381,34 @@ export const studentRouter = router({
       // Real earned/total so the page never hardcodes a badge count.
       badgeCounts: { earned: badgesEarned, total: badgeTotal },
     };
+  }),
+
+  /**
+   * Family code for parent self-service linking (REQUIREMENTS R26).
+   * The student generates a short code, shares it out-of-band
+   * (WhatsApp, paper), and the parent enters it on their dashboard —
+   * no email infrastructure needed. One live code per child
+   * (regenerating replaces it), single-use, 7-day expiry, stored in
+   * the same VerificationToken table the auth flows namespace.
+   */
+  generateParentCode: studentProcedure.mutation(async ({ ctx }) => {
+    const identifier = `parentlink:${ctx.user.id}`;
+    // 6 chars from a no-confusables alphabet (no I/L/O/0/1) ≈ 887M
+    // combos. Codes are single-use, expire in 7 days, and redeeming
+    // requires a signed-in PARENT — fine without a dedicated rate
+    // limit at this scale.
+    const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    const code = Array.from(
+      { length: 6 },
+      () => ALPHABET[randomInt(ALPHABET.length)]
+    ).join("");
+    const expires = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+    await ctx.db.$transaction([
+      ctx.db.verificationToken.deleteMany({ where: { identifier } }),
+      ctx.db.verificationToken.create({
+        data: { identifier, token: code, expires },
+      }),
+    ]);
+    return { code, expiresAt: expires.toISOString() };
   }),
 });
