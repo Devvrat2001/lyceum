@@ -114,10 +114,8 @@ export default async function MarketplacePage({
           <RoleHero role={role} displayName={displayName} />
         ) : (
         <section
+          className="wf-hero-split"
           style={{
-            display: "grid",
-            gridTemplateColumns: "1.4fr 1fr",
-            gap: 24,
             padding: "20px 0 28px",
             borderBottom: "1px solid var(--wf-hairline)",
             marginBottom: 28,
@@ -364,13 +362,7 @@ export default async function MarketplacePage({
               </div>
             </Card>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 12,
-              }}
-            >
+            <div className="wf-grid-cards-4">
               {featured.courses.map((c) => (
                 <CourseCard
                   key={c.slug}
@@ -407,13 +399,7 @@ export default async function MarketplacePage({
               </div>
             </div>
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 12,
-            }}
-          >
+          <div className="wf-grid-cards-3">
             {paths.map((p) => {
               const totalSlots = 12;
               const totalCourses = p.courses.length;
@@ -537,13 +523,7 @@ export default async function MarketplacePage({
               Teachers to follow
             </h2>
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 12,
-            }}
-          >
+          <div className="wf-grid-cards-4">
             {teachers.map((t) => (
               <Card key={t.id} p={14} style={{ textAlign: "center" }}>
                 <Link
@@ -596,13 +576,8 @@ export default async function MarketplacePage({
         {/* For schools */}
         <Card
           p={28}
-          style={{
-            background: "var(--wf-fillsoft)",
-            display: "grid",
-            gridTemplateColumns: "1fr auto",
-            alignItems: "center",
-            gap: 24,
-          }}
+          className="wf-cta-split"
+          style={{ background: "var(--wf-fillsoft)" }}
         >
           <div>
             <Eyebrow>For institutions</Eyebrow>

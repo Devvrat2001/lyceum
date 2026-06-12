@@ -60,24 +60,9 @@ export default async function StudentDashboard() {
           flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "6px 12px",
-            border: "1px solid var(--wf-hairline)",
-            borderRadius: 4,
-            maxWidth: 360,
-            color: "var(--wf-mute)",
-            fontSize: 12,
-          }}
-        >
-          <Icon name="search" size={14} color="var(--wf-mute)" />
-          <span>Search lessons, skills, or ask the AI tutor…</span>
-        </div>
-        <Annot ai>AI search · ⌘K</Annot>
+        {/* Search lives in the StudentChrome sidebar/header (the real
+            HeaderSearchCombobox) — this header used to render a dead
+            look-alike search box here with no input behind it. */}
         <div style={{ flex: 1 }} />
         <StreakChip days={dashboard.stats.streak} />
         <XPChip value={dashboard.stats.xp} />
@@ -86,12 +71,10 @@ export default async function StudentDashboard() {
       </header>
 
       <div
+        className="wf-two-col"
         style={{
           padding: "24px 28px 28px",
           overflow: "auto",
-          display: "grid",
-          gap: 20,
-          gridTemplateColumns: "minmax(0,1fr) 320px",
           alignContent: "start",
         }}
       >
@@ -149,13 +132,7 @@ export default async function StudentDashboard() {
                 </div>
               </Card>
             ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: 12,
-                }}
-              >
+              <div className="wf-grid-cards-3">
                 {dashboard.continueLearning.map((c) => (
                   <ContinueLearningCard key={c.slug} c={c} />
                 ))}
@@ -196,13 +173,7 @@ export default async function StudentDashboard() {
           )}
 
           {/* Skills + assignments */}
-          <section
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-            }}
-          >
+          <section className="wf-grid-cards-2">
             <Card>
               <div
                 style={{
@@ -364,7 +335,10 @@ export default async function StudentDashboard() {
             >
               {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => {
                 const todayIdx = (today.getDay() + 6) % 7; // Mon=0..Sun=6
-                const filled = i <= todayIdx;
+                // Real activity only (attempts / lesson completions in
+                // the dashboard payload) — this used to fill every day
+                // up to "today", fabricating a perfect week.
+                const filled = dashboard.weekActivity[i] ?? false;
                 return (
                   <div key={i} style={{ width: 30, textAlign: "center" }}>
                     <div
@@ -537,7 +511,7 @@ export default async function StudentDashboard() {
                   Recent badges
                 </h3>
                 <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                  {dashboard.badges.length} of 47
+                  {dashboard.badgeCounts.earned} of {dashboard.badgeCounts.total}
                 </span>
               </div>
               <div

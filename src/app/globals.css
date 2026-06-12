@@ -441,3 +441,57 @@ button {
 .wf-pulse {
   animation: wf-pulse 1.6s infinite ease-in-out;
 }
+
+/* ── Responsive layout utilities (REQUIREMENTS R7) ──────────────────
+   The page bodies were hardcoded desktop grids (`repeat(4, 1fr)` etc.)
+   with zero @media rules — unusable on phones. These utilities replace
+   the inline grid styles on the top student-facing surfaces; non-grid
+   styling stays inline per the wf convention. Breakpoints: 1100px
+   (4→3), 900px (→2 + stack the two-column shells), 600px (→1). */
+.wf-grid-cards-2,
+.wf-grid-cards-3,
+.wf-grid-cards-4 {
+  display: grid;
+  gap: 12px;
+}
+.wf-grid-cards-2 { grid-template-columns: repeat(2, 1fr); }
+.wf-grid-cards-3 { grid-template-columns: repeat(3, 1fr); }
+.wf-grid-cards-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* Content + 320px rail (student dashboard shell). */
+.wf-two-col {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+/* Marketplace hero: copy column + recommendation card. */
+.wf-hero-split {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1.4fr 1fr;
+}
+
+/* Wide CTA banner: text + action buttons ("For institutions"). */
+.wf-cta-split {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 24px;
+}
+
+@media (max-width: 1100px) {
+  .wf-grid-cards-4 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+  .wf-grid-cards-4,
+  .wf-grid-cards-3 { grid-template-columns: repeat(2, 1fr); }
+  .wf-two-col,
+  .wf-hero-split,
+  .wf-cta-split { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .wf-grid-cards-4,
+  .wf-grid-cards-3,
+  .wf-grid-cards-2 { grid-template-columns: 1fr; }
+}

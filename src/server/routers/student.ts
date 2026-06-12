@@ -15,6 +15,18 @@ export const studentRouter = router({
     });
     if (!me) return null;
 
+    // Monday 00:00 UTC of the current week — the "Your week" strip's
+    // activity window. UTC keeps it consistent with the streak engine
+    // and the admin analytics week buckets.
+    const weekStart = (() => {
+      const d = new Date();
+      const x = new Date(
+        Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+      );
+      x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+      return x;
+    })();
+
     const [
       xpTotal,
       streak,
@@ -22,6 +34,10 @@ export const studentRouter = router({
       classmatesRaw,
       badgesRaw,
       skillMastery,
+      weekAttempts,
+      weekProgress,
+      badgeTotal,
+      badgesEarned,
     ] = await Promise.all([
       ctx.db.xPEvent
         .aggregate({ where: { userId: me.id }, _sum: { points: true } })
@@ -74,7 +90,30 @@ export const studentRouter = router({
         orderBy: { skill: { col: "asc" } },
         take: 5,
       }),
+      ctx.db.attempt.findMany({
+        where: { userId: me.id, createdAt: { gte: weekStart } },
+        select: { createdAt: true },
+      }),
+      ctx.db.lessonProgress.findMany({
+        where: { userId: me.id, completedAt: { gte: weekStart } },
+        select: { completedAt: true },
+      }),
+      ctx.db.badge.count(),
+      ctx.db.userBadge.count({ where: { userId: me.id } }),
     ]);
+
+    // Real per-day activity for the "Your week" strip — a day lights up
+    // only if the student actually did something that day (a quiz
+    // attempt or a lesson completion), Mon..Sun of this UTC week. The
+    // page used to fill every circle up to "today" unconditionally,
+    // fabricating a perfect week for every account.
+    const weekActivity = Array.from({ length: 7 }, () => false);
+    for (const t of [
+      ...weekAttempts.map((a) => a.createdAt),
+      ...weekProgress.map((p) => p.completedAt),
+    ]) {
+      weekActivity[(t.getUTCDay() + 6) % 7] = true;
+    }
 
     // No Assignment model exists in the schema yet, so there's nothing
     // real to surface. The page renders a "no assignments" state when
@@ -174,6 +213,9 @@ export const studentRouter = router({
       assignments,
       leaderboard,
       badges,
+      weekActivity,
+      // Real earned/total so the page never hardcodes a badge count.
+      badgeCounts: { earned: badgesEarned, total: badgeTotal },
     };
   }),
 });
