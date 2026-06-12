@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { StudentChrome } from "@/components/layouts/StudentChrome";
 import {
   Annot,
@@ -264,8 +265,11 @@ export default async function StudentDashboard() {
                 </div>
               ) : (
                 dashboard.assignments.map((a, i) => (
-                  <div
-                    key={a.t}
+                  <Link
+                    key={`${a.t}-${i}`}
+                    href={
+                      a.lessonSlug ? `/student/lesson/${a.lessonSlug}` : "#"
+                    }
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -275,6 +279,8 @@ export default async function StudentDashboard() {
                         i < dashboard.assignments.length - 1
                           ? "1px solid var(--wf-hairline)"
                           : "none",
+                      textDecoration: "none",
+                      color: "inherit",
                     }}
                   >
                     <div
@@ -295,15 +301,21 @@ export default async function StudentDashboard() {
                       <div
                         style={{
                           fontSize: 10,
-                          color: "var(--wf-mute)",
+                          color: a.done
+                            ? "var(--wf-good)"
+                            : "var(--wf-mute)",
                           marginTop: 2,
                         }}
                       >
-                        {a.due} · +{a.xp} XP
+                        {a.done ? "Done ✓" : a.due} · +{a.xp} XP
                       </div>
                     </div>
-                    <Icon name="arrow" size={14} color="var(--wf-mute)" />
-                  </div>
+                    <Icon
+                      name={a.done ? "check" : "arrow"}
+                      size={14}
+                      color={a.done ? "var(--wf-good)" : "var(--wf-mute)"}
+                    />
+                  </Link>
                 ))
               )}
             </Card>

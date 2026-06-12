@@ -115,16 +115,61 @@ export const studentRouter = router({
       weekActivity[(t.getUTCDay() + 6) % 7] = true;
     }
 
-    // No Assignment model exists in the schema yet, so there's nothing
-    // real to surface. The page renders a "no assignments" state when
-    // this is empty — better than shipping fake teacher work that
-    // doesn't tie back to any course in the user's library.
-    const assignments: Array<{
-      d: string;
-      t: string;
-      xp: number;
-      due: string;
-    }> = [];
+    // Teacher-posted assignments across enrolled courses (R12): due in
+    // the future or within the last week (so a just-missed deadline is
+    // still visible), soonest first. Completion derives from
+    // LessonProgress on the target lesson.
+    const assignmentRows = await ctx.db.assignment.findMany({
+      where: {
+        course: { enrollments: { some: { userId: me.id } } },
+        dueAt: { gte: new Date(Date.now() - 7 * 24 * 3600 * 1000) },
+      },
+      orderBy: { dueAt: "asc" },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        xp: true,
+        dueAt: true,
+        lessonId: true,
+        lesson: { select: { slug: true } },
+      },
+    });
+    const doneLessonIds = new Set(
+      (assignmentRows.length
+        ? await ctx.db.lessonProgress.findMany({
+            where: {
+              userId: me.id,
+              lessonId: { in: assignmentRows.map((a) => a.lessonId) },
+            },
+            select: { lessonId: true },
+          })
+        : []
+      ).map((r) => r.lessonId)
+    );
+    const fmtDue = (d: Date) => {
+      const days = Math.ceil((d.getTime() - Date.now()) / (24 * 3600 * 1000));
+      if (days < 0) return "Past due";
+      if (days === 0) return "Due today";
+      if (days === 1) return "Due tomorrow";
+      if (days <= 6) {
+        return `Due ${d.toLocaleDateString("en-US", { weekday: "short" })}`;
+      }
+      return `Due ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+    };
+    const assignments = assignmentRows.map((a) => {
+      const done = doneLessonIds.has(a.lessonId);
+      return {
+        d: a.dueAt
+          .toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          .toUpperCase(),
+        t: a.title,
+        xp: a.xp,
+        due: done ? "Done" : fmtDue(a.dueAt),
+        done,
+        lessonSlug: a.lesson.slug,
+      };
+    });
 
     const leaderboard = classmatesRaw
       .map((u) => ({

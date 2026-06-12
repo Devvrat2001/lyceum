@@ -25,6 +25,12 @@ const NAV = [
     href: "/teacher/students",
   },
   {
+    id: "assignments",
+    icon: "check" as const,
+    label: "Assignments",
+    href: "/teacher/assignments",
+  },
+  {
     id: "analytics",
     icon: "chart" as const,
     label: "Analytics",

@@ -1165,6 +1165,36 @@ export const lessonRouter = router({
         lastActivityAt: new Date(),
       });
 
+      // Assignment bonus XP (R12): when a teacher assignment targets
+      // this lesson, award its XP exactly once per student — the
+      // (source, refId) XPEvent doubles as the idempotency marker, so
+      // re-completing the lesson never double-awards.
+      const linkedAssignments = await ctx.db.assignment.findMany({
+        where: { lessonId: input.lessonId, xp: { gt: 0 } },
+        select: { id: true, xp: true },
+      });
+      let assignmentXp = 0;
+      for (const a of linkedAssignments) {
+        const already = await ctx.db.xPEvent.findFirst({
+          where: {
+            userId: ctx.user.id,
+            source: "assignment_complete",
+            refId: a.id,
+          },
+          select: { id: true },
+        });
+        if (already) continue;
+        await ctx.db.xPEvent.create({
+          data: {
+            userId: ctx.user.id,
+            points: a.xp,
+            source: "assignment_complete",
+            refId: a.id,
+          },
+        });
+        assignmentXp += a.xp;
+      }
+
       // Find the next *playable* lesson in unit-then-lesson order. The
       // query already ordered by `unit.order` then `lesson.order`, so
       // the flat list is in playback sequence. We skip any lesson
@@ -1189,6 +1219,9 @@ export const lessonRouter = router({
         completed: isCourseComplete,
         nextLessonSlug: nextLesson?.slug ?? null,
         courseSlug,
+        // Bonus XP from teacher assignments completed by this lesson
+        // (0 when none). Clients may surface it in the completion toast.
+        assignmentXp,
       };
     }),
 });

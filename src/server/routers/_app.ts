@@ -13,6 +13,7 @@ import { generatorRouter } from "./generator";
 import { insightRouter } from "./insight";
 import { paymentRouter } from "./payment";
 import { accountRouter } from "./account";
+import { assignmentRouter } from "./assignment";
 
 export const appRouter = router({
   health: publicProcedure.query(() => ({
@@ -33,6 +34,7 @@ export const appRouter = router({
   insight: insightRouter,
   payment: paymentRouter,
   account: accountRouter,
+  assignment: assignmentRouter,
 });
 
 export type AppRouter = typeof appRouter;
