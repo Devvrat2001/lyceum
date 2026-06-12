@@ -12,7 +12,7 @@
  *
  * Bump VERSION to invalidate all caches on the next activation.
  */
-const VERSION = "lyceum-v2";
+const VERSION = "lyceum-v3";
 const PRECACHE = `${VERSION}-precache`;
 const RUNTIME = `${VERSION}-runtime`;
 const OFFLINE_URL = "/offline.html";
@@ -39,6 +39,68 @@ self.addEventListener("activate", (event) => {
         )
       )
       .then(() => self.clients.claim())
+  );
+});
+
+/*
+ * Course pre-caching (REQUIREMENTS R22). The library page posts
+ * { type: "PRECACHE_LESSONS", urls } with a MessageChannel port; we
+ * fetch each lesson page into the runtime cache (same store the
+ * navigate handler reads offline) and stream progress back through the
+ * port. Only same-origin /student/lesson/ URLs are accepted — the page
+ * can't use this to cache arbitrary responses. Failures are counted,
+ * not fatal: a flaky connection saves what it can.
+ */
+self.addEventListener("message", (event) => {
+  const data = event.data;
+  if (!data || data.type !== "PRECACHE_LESSONS" || !Array.isArray(data.urls)) {
+    return;
+  }
+  const port = event.ports && event.ports[0];
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(RUNTIME);
+      const urls = data.urls.slice(0, 200); // sanity ceiling
+      let done = 0;
+      let failed = 0;
+      for (const raw of urls) {
+        try {
+          const url = new URL(raw, self.location.origin);
+          if (
+            url.origin !== self.location.origin ||
+            !url.pathname.startsWith("/student/lesson/")
+          ) {
+            failed += 1;
+            continue;
+          }
+          const res = await fetch(url.href, { credentials: "include" });
+          if (res && res.status === 200) {
+            await cache.put(url.href, res);
+            done += 1;
+          } else {
+            failed += 1;
+          }
+        } catch {
+          failed += 1;
+        }
+        if (port) {
+          port.postMessage({
+            type: "PRECACHE_PROGRESS",
+            done,
+            failed,
+            total: urls.length,
+          });
+        }
+      }
+      if (port) {
+        port.postMessage({
+          type: "PRECACHE_DONE",
+          done,
+          failed,
+          total: urls.length,
+        });
+      }
+    })()
   );
 });
 

@@ -10,6 +10,7 @@ import {
 } from "@/components/wf/primitives";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { SaveCourseOffline } from "@/components/offline/SaveCourseOffline";
 
 export default async function StudentLibraryPage() {
   const session = await auth();
@@ -29,16 +30,17 @@ export default async function StudentLibraryPage() {
           authorLabel: true,
           ratingAvg: true,
           ratingCount: true,
+          // Every lesson slug (not just the first) — the Continue link
+          // wants the first one and SaveCourseOffline pre-caches them
+          // all. Slug-only select keeps the payload tiny.
           units: {
             orderBy: { order: "asc" },
             select: {
               lessons: {
                 orderBy: { order: "asc" },
-                select: { slug: true, title: true },
-                take: 1,
+                select: { slug: true },
               },
             },
-            take: 1,
           },
         },
       },
@@ -119,9 +121,11 @@ export default async function StudentLibraryPage() {
                 }}
               >
                 {inProgress.map((e) => {
-                  const firstLesson = e.course.units[0]?.lessons[0];
-                  const href = firstLesson?.slug
-                    ? `/student/lesson/${firstLesson.slug}`
+                  const lessonSlugs = e.course.units
+                    .flatMap((u) => u.lessons.map((l) => l.slug))
+                    .filter((s): s is string => !!s);
+                  const href = lessonSlugs[0]
+                    ? `/student/lesson/${lessonSlugs[0]}`
                     : `/course/${e.course.slug}`;
                   return (
                     <Link
@@ -175,6 +179,7 @@ export default async function StudentLibraryPage() {
                               justifyContent: "space-between",
                               marginTop: 8,
                               alignItems: "center",
+                              gap: 8,
                             }}
                           >
                             <span
@@ -186,6 +191,7 @@ export default async function StudentLibraryPage() {
                             >
                               {e.progressPct}%
                             </span>
+                            <SaveCourseOffline lessonSlugs={lessonSlugs} />
                             <span
                               style={{
                                 fontSize: 11,
