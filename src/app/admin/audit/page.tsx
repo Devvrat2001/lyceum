@@ -12,6 +12,12 @@ const KIND_LABELS: Record<string, { label: string; color: string }> = {
   "ai.suggest_fix": { label: "AI Suggest Fix", color: "var(--wf-ai)" },
   "ai.send_nudge": { label: "AI Nudge Draft", color: "var(--wf-ai)" },
   "auth.signup": { label: "User Signup", color: "var(--wf-body)" },
+  "auth.password_reset_request": {
+    label: "Password Reset Requested",
+    color: "var(--wf-body)",
+  },
+  "auth.password_reset": { label: "Password Reset", color: "var(--wf-body)" },
+  "auth.email_verified": { label: "Email Verified", color: "var(--wf-good)" },
   "course.publish": { label: "Course Publish", color: "var(--wf-good)" },
   "discussion.delete_comment": {
     label: "Discussion Moderation",

@@ -166,6 +166,110 @@ export async function sendOrderReceipt(orderId: string): Promise<void> {
   }
 }
 
+/** Sender identity for account/security mail (R10). */
+const ACCOUNT_FROM_ADDRESS = "Lyceum <account@lyceum.app>";
+
+/** Small shared template for account-action emails (reset / verify). */
+function actionEmailHtml(o: {
+  eyebrow: string;
+  heading: string;
+  body: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  footer: string;
+}): string {
+  return `<!doctype html>
+<html>
+  <body style="margin:0;background:#f5f4f0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a;">
+    <div style="max-width:520px;margin:0 auto;padding:32px 24px;">
+      <div style="font-size:20px;font-weight:700;margin-bottom:24px;">Lyceum</div>
+      <div style="background:#ffffff;border:1px solid #e5e3dd;border-radius:8px;padding:24px;">
+        <div style="font-size:11px;letter-spacing:0.08em;color:#8a8780;text-transform:uppercase;margin-bottom:8px;">${escapeHtml(
+          o.eyebrow
+        )}</div>
+        <h1 style="font-size:18px;margin:0 0 12px;">${escapeHtml(o.heading)}</h1>
+        <p style="font-size:14px;line-height:1.5;color:#555555;margin:0 0 20px;">${escapeHtml(
+          o.body
+        )}</p>
+        <a href="${o.ctaUrl}" style="display:inline-block;background:#1a1a1a;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 18px;border-radius:6px;">
+          ${escapeHtml(o.ctaLabel)} &rarr;
+        </a>
+      </div>
+      <p style="font-size:12px;color:#8a8780;line-height:1.5;margin:16px 4px 0;">${escapeHtml(
+        o.footer
+      )}</p>
+    </div>
+  </body>
+</html>`;
+}
+
+/**
+ * Password-reset link email. Fire-safe boolean like sendWeeklyDigest —
+ * the request mutation always answers the same regardless, so the
+ * response can't be used to probe which addresses exist.
+ */
+export async function sendPasswordResetEmail(o: {
+  to: string;
+  firstName: string;
+  resetUrl: string;
+}): Promise<boolean> {
+  try {
+    const resend = await getResend();
+    if (!resend) {
+      console.info("[email] password reset skipped — email not configured");
+      return false;
+    }
+    await resend.emails.send({
+      from: ACCOUNT_FROM_ADDRESS,
+      to: o.to,
+      subject: "Reset your Lyceum password",
+      html: actionEmailHtml({
+        eyebrow: "Password reset",
+        heading: `Hi ${o.firstName} — reset your password`,
+        body: "Someone (hopefully you) asked to reset the password for this Lyceum account. The link below works for 1 hour. If you didn't ask, you can safely ignore this email — nothing changes until the link is used.",
+        ctaLabel: "Choose a new password",
+        ctaUrl: o.resetUrl,
+        footer:
+          "This security email is sent to the account's address whenever a reset is requested.",
+      }),
+    });
+    return true;
+  } catch (err) {
+    console.error("[email] sendPasswordResetEmail failed", err);
+    return false;
+  }
+}
+
+/** Email-address verification link, sent on signup. Fire-safe. */
+export async function sendVerificationEmail(o: {
+  to: string;
+  firstName: string;
+  verifyUrl: string;
+}): Promise<boolean> {
+  try {
+    const resend = await getResend();
+    if (!resend) return false;
+    await resend.emails.send({
+      from: ACCOUNT_FROM_ADDRESS,
+      to: o.to,
+      subject: "Verify your Lyceum email",
+      html: actionEmailHtml({
+        eyebrow: "Verify your email",
+        heading: `Welcome, ${o.firstName}!`,
+        body: "Confirm this is your email address so we can send receipts and account notices to the right place. The link works for 24 hours.",
+        ctaLabel: "Verify my email",
+        ctaUrl: o.verifyUrl,
+        footer:
+          "You're getting this because this address was used to create a Lyceum account. If that wasn't you, ignore this email.",
+      }),
+    });
+    return true;
+  } catch (err) {
+    console.error("[email] sendVerificationEmail failed", err);
+    return false;
+  }
+}
+
 /** Sender identity for engagement (non-transactional) mail. */
 const DIGEST_FROM_ADDRESS = "Lyceum <hello@lyceum.app>";
 

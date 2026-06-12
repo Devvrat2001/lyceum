@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, isGoogleAuthEnabled } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { isEmailEnabled } from "@/lib/email";
 import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { QuickLoginButton } from "@/components/auth/QuickLoginButton";
@@ -130,6 +132,22 @@ export default async function LoginPage({
         )}
 
         <LoginForm next={sp.next} googleEnabled={isGoogleAuthEnabled()} />
+        {/* Reset links travel by email, so the entry point only shows
+            once email is configured (same gating as Google sign-in). */}
+        {isEmailEnabled() && (
+          <div style={{ marginTop: 14, fontSize: 12 }}>
+            <Link
+              href="/forgot-password"
+              style={{
+                color: "var(--wf-accent)",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              Forgot your password?
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Right: dev-only demo accounts panel — hidden entirely in production */}
