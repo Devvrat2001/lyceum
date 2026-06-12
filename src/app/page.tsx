@@ -176,7 +176,7 @@ export default async function MarketplacePage({
               }}
             >
               <Eyebrow>Recommended for {displayName ?? "you"}</Eyebrow>
-              <Annot>Top-rated</Annot>
+              <Annot>{recommended.personalized ? "For you" : "Top-rated"}</Annot>
             </div>
             <div
               style={{
@@ -185,14 +185,13 @@ export default async function MarketplacePage({
                 marginBottom: 14,
               }}
             >
-              {/* Used to read "Based on your last 5 quizzes, we picked
-                  a 2-week mini-path" — implied personalization that
-                  doesn't exist yet (the resolver returns top-rated
-                  courses, not quiz-based recs). Honest copy until
-                  adaptive recs ship. */}
-              Highest-rated courses across the marketplace right now:
+              {/* Copy follows the resolver's `personalized` flag so we
+                  never imply personalization that didn't happen. */}
+              {recommended.personalized
+                ? "Picked from the subjects and grades you're studying:"
+                : "Highest-rated courses across the marketplace right now:"}
             </div>
-            {recommended.map((p, i) => (
+            {recommended.items.map((p, i) => (
               <div
                 key={p.title}
                 style={{
@@ -200,7 +199,7 @@ export default async function MarketplacePage({
                   gap: 10,
                   padding: "10px 0",
                   borderBottom:
-                    i < recommended.length - 1
+                    i < recommended.items.length - 1
                       ? "1px solid var(--wf-hairline)"
                       : "none",
                   alignItems: "center",

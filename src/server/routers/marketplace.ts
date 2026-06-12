@@ -474,53 +474,98 @@ export const marketplaceRouter = router({
     }),
 
   /**
-   * Personalized recs for the homepage hero card. Returns the top
-   * highest-rated published courses with their REAL title + a meta
-   * line computed from the actual lesson count and total duration.
-   *
-   * The prototype version fetched real courses and then OVERWROTE
-   * their titles with hardcoded "Master Equivalent Fractions" /
-   * "Mini-game: Pizza Math" / "Project: Cookie recipe x2" strings,
-   * plus fake metas ("4 lessons · 1.5 hrs"). The displayed text
-   * never matched the course the link actually pointed to.
+   * Recs for the homepage hero card (R13). Signed-in users with
+   * enrollments get genuinely personalized picks: published courses
+   * they DON'T own yet, in the subjects/grades they actually study,
+   * ranked by rating. Anyone else (anon, or no enrollments yet) gets
+   * the top-rated catalog. `personalized` tells the page which copy to
+   * render — never imply personalization that didn't happen. Metas are
+   * computed from real lesson counts/durations (the prototype used to
+   * overwrite titles with hardcoded strings).
    */
-  recommendedFor: publicProcedure
-    .input(z.object({ userId: z.string().optional() }).optional())
-    .query(async ({ ctx }) => {
-      const sample = await ctx.db.course.findMany({
-        where: { status: "PUBLISHED" },
-        take: 3,
-        orderBy: [{ ratingAvg: "desc" }, { ratingCount: "desc" }],
+  recommendedFor: publicProcedure.query(async ({ ctx }) => {
+    const select = {
+      id: true,
+      slug: true,
+      title: true,
+      units: {
         select: {
-          slug: true,
-          title: true,
-          units: {
-            select: {
-              lessons: { select: { durationMin: true } },
-            },
-          },
+          lessons: { select: { durationMin: true } },
         },
-      });
-      return sample.map((c) => {
-        const lessons = c.units.flatMap((u) => u.lessons);
-        const lessonCount = lessons.length;
-        const totalMin = lessons.reduce(
-          (a, l) => a + (l.durationMin ?? 0),
-          0
-        );
-        const meta =
-          lessonCount === 0
-            ? "Outline ready"
-            : totalMin >= 60
+      },
+    } satisfies Prisma.CourseSelect;
+    const toItem = (c: {
+      slug: string;
+      title: string;
+      units: { lessons: { durationMin: number | null }[] }[];
+    }) => {
+      const lessons = c.units.flatMap((u) => u.lessons);
+      const lessonCount = lessons.length;
+      const totalMin = lessons.reduce((a, l) => a + (l.durationMin ?? 0), 0);
+      const meta =
+        lessonCount === 0
+          ? "Outline ready"
+          : totalMin >= 60
             ? `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} · ${(totalMin / 60).toFixed(1)} hrs`
             : `${lessonCount} lesson${lessonCount === 1 ? "" : "s"} · ${totalMin} min`;
-        return {
-          slug: c.slug,
-          title: c.title,
-          meta,
-        };
+      return { slug: c.slug, title: c.title, meta };
+    };
+
+    const userId = ctx.session?.user?.id ?? null;
+    let personalizedRows: Array<Parameters<typeof toItem>[0] & { id: string }> =
+      [];
+    let excludeIds: string[] = [];
+    if (userId) {
+      const enrollments = await ctx.db.enrollment.findMany({
+        where: { userId },
+        select: {
+          courseId: true,
+          course: { select: { subject: true, grade: true } },
+        },
       });
-    }),
+      if (enrollments.length > 0) {
+        excludeIds = enrollments.map((e) => e.courseId);
+        const subjects = [...new Set(enrollments.map((e) => e.course.subject))];
+        const grades = [...new Set(enrollments.map((e) => e.course.grade))];
+        personalizedRows = await ctx.db.course.findMany({
+          where: {
+            status: "PUBLISHED",
+            id: { notIn: excludeIds },
+            OR: [{ subject: { in: subjects } }, { grade: { in: grades } }],
+          },
+          take: 3,
+          orderBy: [{ ratingAvg: "desc" }, { enrollCount: "desc" }],
+          select,
+        });
+      }
+    }
+
+    // Top up with top-rated catalog picks when personalization found
+    // fewer than 3 (or wasn't possible at all).
+    const fillCount = 3 - personalizedRows.length;
+    const fillRows =
+      fillCount > 0
+        ? await ctx.db.course.findMany({
+            where: {
+              status: "PUBLISHED",
+              id: {
+                notIn: [
+                  ...excludeIds,
+                  ...personalizedRows.map((r) => r.id),
+                ],
+              },
+            },
+            take: fillCount,
+            orderBy: [{ ratingAvg: "desc" }, { ratingCount: "desc" }],
+            select,
+          })
+        : [];
+
+    return {
+      personalized: personalizedRows.length > 0,
+      items: [...personalizedRows, ...fillRows].map(toItem),
+    };
+  }),
 
   /**
    * Substring search — `WHERE title|tagline|description ILIKE %q%`.
