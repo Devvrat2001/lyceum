@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketChrome } from "@/components/layouts/MarketChrome";
 import { Annot, Avatar, Card, Icon } from "@/components/wf/primitives";
+import { boardLabel } from "@/lib/marketplace";
 import { courseGradient, subjectGlyph } from "@/lib/thumbnail";
 import { getServerCaller } from "@/lib/trpc/server";
 import { auth } from "@/lib/auth";
@@ -64,7 +65,9 @@ export default async function CourseDetailPage({
           >
             Browse
           </Link>{" "}
-          · {course.subject.toUpperCase()} · Grade {course.grade} ·{" "}
+          · {course.subject.toUpperCase()} ·{" "}
+          {boardLabel(course.board) ? `${boardLabel(course.board)} · ` : ""}
+          Grade {course.grade} ·{" "}
           <span style={{ color: "var(--wf-ink)" }}>{course.title}</span>
         </div>
         <div className="wf-two-col--wide">

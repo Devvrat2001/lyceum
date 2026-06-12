@@ -40,6 +40,7 @@ export default async function MarketplacePage({
     length?: string;
     rating?: string;
     format?: string;
+    board?: string;
     sort?: string;
   }>;
 }) {
@@ -56,6 +57,7 @@ export default async function MarketplacePage({
   const length = sp.length;
   const rating = sp.rating;
   const format = sp.format;
+  const board = sp.board;
   const sort = sp.sort;
 
   const trpc = await getServerCaller();
@@ -69,6 +71,7 @@ export default async function MarketplacePage({
         ...(length ? { length } : {}),
         ...(rating ? { rating } : {}),
         ...(format ? { format } : {}),
+        ...(board ? { board } : {}),
         ...(sort ? { sort } : {}),
         limit: 4,
       }),

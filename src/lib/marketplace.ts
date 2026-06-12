@@ -175,6 +175,32 @@ export function isMarketplaceFormat(value: string | undefined): boolean {
   return MARKETPLACE_FORMAT_BUCKETS.some((f) => f.value === value);
 }
 
+/**
+ * Curriculum-board options, filtering `Course.board` (REQUIREMENTS R21).
+ * Like format, the slug IS the stored value. Boards are how Indian
+ * parents actually shop — "is this aligned to my kid's CBSE syllabus?"
+ * comes before subject or price. `null`/unset courses are simply
+ * untagged and only fall out of the catalog when a board filter is
+ * active.
+ */
+export const MARKETPLACE_BOARD_BUCKETS: { value: string; label: string }[] = [
+  { value: "cbse", label: "CBSE" },
+  { value: "icse", label: "ICSE" },
+  { value: "state", label: "State board" },
+  { value: "ib", label: "IB" },
+  { value: "cambridge", label: "Cambridge" },
+];
+
+/** True when `value` is a known `Course.board` slug (URL + input guard). */
+export function isMarketplaceBoard(value: string | undefined): boolean {
+  return MARKETPLACE_BOARD_BUCKETS.some((b) => b.value === value);
+}
+
+/** Display label for a stored `Course.board` value; null when unset/unknown. */
+export function boardLabel(value: string | null | undefined): string | null {
+  return value ? labelFor(MARKETPLACE_BOARD_BUCKETS, value) : null;
+}
+
 export function labelFor<T extends { value: string; label: string }>(
   items: T[],
   value: string | undefined

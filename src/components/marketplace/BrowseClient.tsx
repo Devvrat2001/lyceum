@@ -34,6 +34,7 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
     length: sp?.get("length") ?? undefined,
     rating: sp?.get("rating") ?? undefined,
     format: sp?.get("format") ?? undefined,
+    board: sp?.get("board") ?? undefined,
     sort: sp?.get("sort") ?? undefined,
   };
 

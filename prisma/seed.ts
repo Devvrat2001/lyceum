@@ -326,6 +326,7 @@ async function main() {
     subject: string;
     grade: string;
     format?: string; // delivery format; defaults to "self_paced" when omitted
+    board?: string; // curriculum board tag ("cbse" | "icse" | "state" | …); omitted = untagged
     priceCents: number;
     tag: string;
     aiHint: string;
@@ -420,6 +421,9 @@ async function main() {
       authorLabel: "Khan Edu Group",
       subject: "math",
       grade: "6",
+      // Boards mirror the course_board migration's backfill so a local
+      // reseed and a migrated prod database agree.
+      board: "cbse",
       priceCents: 0,
       tag: "BESTSELLER",
       aiHint: "AI says: matches your skill level — start at Unit 2",
@@ -488,6 +492,7 @@ async function main() {
       authorLabel: "Mr. Adeyemi",
       subject: "math",
       grade: "6",
+      board: "cbse",
       priceCents: 49900,
       tag: "NEW",
       aiHint: "AI says: pace yourself — try 2 lessons per week",
@@ -586,6 +591,7 @@ async function main() {
       authorLabel: "Mrs. Reyes · Cedar Middle",
       subject: "science",
       grade: "6",
+      board: "state",
       priceCents: 0,
       tag: "POPULAR",
       aiHint: "AI says: matches your current science strand",
@@ -624,6 +630,7 @@ async function main() {
       authorLabel: "Ms. Chen",
       subject: "ela",
       grade: "6",
+      board: "icse",
       priceCents: 0,
       tag: "TEACHER PICK",
       aiHint: "AI says: pairs well with your reading log",
@@ -663,6 +670,7 @@ async function main() {
         subject: c.subject,
         grade: c.grade,
         format: c.format ?? "self_paced",
+        board: c.board ?? null,
         status: "PUBLISHED",
         priceCents: c.priceCents,
         tag: c.tag,
@@ -681,6 +689,7 @@ async function main() {
         subject: c.subject,
         grade: c.grade,
         format: c.format ?? "self_paced",
+        board: c.board ?? null,
         status: "PUBLISHED",
         priceCents: c.priceCents,
         tag: c.tag,

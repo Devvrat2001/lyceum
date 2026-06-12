@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/wf/primitives";
 import { formatPrice } from "@/lib/currency";
 import { fmtCount } from "@/lib/format";
+import { boardLabel } from "@/lib/marketplace";
 import { courseGradient, subjectGlyph } from "@/lib/thumbnail";
 
 export type CourseCardData = {
@@ -17,6 +18,8 @@ export type CourseCardData = {
   /** Drives the fallback art's subject glyph; optional so older callers
    *  keep compiling (they just get the generic book mark). */
   subject?: string | null;
+  /** Curriculum board slug ("cbse" | …); optional for older callers. */
+  board?: string | null;
 };
 
 /**
@@ -85,7 +88,14 @@ export function CourseCard({
               marginBottom: 4,
             }}
           >
-            {owned ? "✓ IN LIBRARY" : course.tag ?? ""}
+            {/* Marketing tag + board tag share the mono line ("BESTSELLER
+                · CBSE"); ownership replaces both — "in library" beats any
+                shopping signal. */}
+            {owned
+              ? "✓ IN LIBRARY"
+              : [course.tag, boardLabel(course.board)]
+                  .filter(Boolean)
+                  .join(" · ")}
           </div>
           <div
             style={{

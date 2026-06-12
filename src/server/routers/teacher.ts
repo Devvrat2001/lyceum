@@ -23,6 +23,7 @@ import {
 } from "@/lib/video/mux";
 import { slugify } from "@/lib/slugify";
 import { CURRENCY } from "@/lib/currency";
+import { isMarketplaceBoard } from "@/lib/marketplace";
 
 export const teacherRouter = router({
   /** Anyone can check follow state of a teacher (signed-in only). */
@@ -477,6 +478,8 @@ export const teacherRouter = router({
         tagline: z.string().max(160).optional(),
         subject: z.string().max(40).optional(),
         grade: z.string().max(40).optional(),
+        /** Curriculum board slug; empty string clears the tag. */
+        board: z.string().max(20).optional(),
         priceCents: z.number().int().min(0).max(1_000_000).optional(),
         // Card/hero art. Empty string clears (falls back to the
         // deterministic gradient); http(s)-shape is enforced in the
@@ -529,6 +532,17 @@ export const teacherRouter = router({
           });
         }
         data.grade = grade;
+      }
+      if (input.board !== undefined) {
+        const board = input.board.trim().toLowerCase();
+        if (board.length > 0 && !isMarketplaceBoard(board)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Unknown board — use CBSE, ICSE, State board, IB, or Cambridge.",
+          });
+        }
+        data.board = board.length > 0 ? board : null;
       }
       if (input.priceCents !== undefined) {
         data.priceCents = input.priceCents;

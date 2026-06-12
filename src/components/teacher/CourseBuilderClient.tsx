@@ -34,6 +34,7 @@ import {
 } from "@/components/teacher/BlockInspector";
 import { LessonVideoPlayer } from "@/components/video/LessonVideoPlayer";
 import { BLOCK_GROUPS, findBlockMeta, type BlockType } from "@/lib/blocks";
+import { MARKETPLACE_BOARD_BUCKETS } from "@/lib/marketplace";
 
 /**
  * Course Builder v2 — a Gamma-style WYSIWYG authoring surface, rebuilt
@@ -117,6 +118,7 @@ type CourseProps = {
   status: string;
   subject: string;
   grade: string;
+  board: string | null;
   priceCents: number;
   thumbnailUrl: string | null;
   updatedAt: string;
@@ -3719,6 +3721,7 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
   const [tagline, setTagline] = useState(course.tagline ?? "");
   const [subject, setSubject] = useState(course.subject);
   const [grade, setGrade] = useState(course.grade);
+  const [board, setBoard] = useState(course.board ?? "");
   const [price, setPrice] = useState((course.priceCents / 100).toString());
   const [thumbnailUrl, setThumbnailUrl] = useState(course.thumbnailUrl ?? "");
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
@@ -3739,6 +3742,7 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
     tagline !== (course.tagline ?? "") ||
     subject !== course.subject ||
     grade !== course.grade ||
+    board !== (course.board ?? "") ||
     priceCents !== course.priceCents ||
     thumbnailUrl !== (course.thumbnailUrl ?? "");
 
@@ -3756,6 +3760,15 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
           <DetailInput label="Subject" value={subject} onChange={setSubject} />
           <DetailInput label="Grade" value={grade} onChange={setGrade} />
         </div>
+        <DetailSelect
+          label="Board"
+          value={board}
+          onChange={setBoard}
+          options={[
+            { value: "", label: "None / not board-specific" },
+            ...MARKETPLACE_BOARD_BUCKETS,
+          ]}
+        />
         <DetailInput
           label="Price · USD"
           value={price}
@@ -3778,6 +3791,7 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
               tagline: tagline.trim(),
               subject: subject.trim(),
               grade: grade.trim(),
+              board,
               priceCents,
               thumbnailUrl: thumbnailUrl.trim(),
             })
@@ -3810,6 +3824,52 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
         )}
       </div>
     </Field>
+  );
+}
+
+function DetailSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        flex: 1,
+        minWidth: 0,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: tone.mono,
+          fontSize: 9,
+          color: tone.mute,
+          letterSpacing: "0.04em",
+        }}
+      >
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ ...inputStyle, padding: "6px 8px", fontSize: 12 }}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

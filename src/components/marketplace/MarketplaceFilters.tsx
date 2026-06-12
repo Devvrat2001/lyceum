@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { Popover, PopoverOption } from "@/components/ui/Popover";
 import {
+  MARKETPLACE_BOARD_BUCKETS,
   MARKETPLACE_FORMAT_BUCKETS,
   MARKETPLACE_GRADES,
   MARKETPLACE_LENGTH_BUCKETS,
@@ -34,6 +35,7 @@ export function MarketplaceFilters() {
   const pathname = usePathname() ?? "/";
   const sp = useSearchParams();
   const grade = sp?.get("grade") ?? null;
+  const board = sp?.get("board") ?? null;
   const subject = sp?.get("subject") ?? null;
   const price = sp?.get("price") ?? null;
   const length = sp?.get("length") ?? null;
@@ -52,19 +54,29 @@ export function MarketplaceFilters() {
   };
 
   const gradeLabel = labelFor(MARKETPLACE_GRADES, grade ?? undefined);
+  const boardLabel = labelFor(MARKETPLACE_BOARD_BUCKETS, board ?? undefined);
   const subjectLabel = labelFor(MARKETPLACE_SUBJECTS, subject ?? undefined);
   const priceLabel = labelFor(MARKETPLACE_PRICE_BUCKETS, price ?? undefined);
   const lengthLabel = labelFor(MARKETPLACE_LENGTH_BUCKETS, length ?? undefined);
   const ratingLabel = labelFor(MARKETPLACE_RATING_BUCKETS, rating ?? undefined);
   const formatLabel = labelFor(MARKETPLACE_FORMAT_BUCKETS, format ?? undefined);
 
-  const anyActive = !!(grade || subject || price || length || rating || format);
+  const anyActive = !!(
+    grade ||
+    board ||
+    subject ||
+    price ||
+    length ||
+    rating ||
+    format
+  );
 
   const clearAll = useMemo(() => {
     return () => {
       // Keep `topic` if present; clear our own dimensions only.
       const next = new URLSearchParams(sp?.toString() ?? "");
       next.delete("grade");
+      next.delete("board");
       next.delete("subject");
       next.delete("price");
       next.delete("length");
@@ -95,6 +107,28 @@ export function MarketplaceFilters() {
                 }}
               >
                 {g.label}
+              </PopoverOption>
+            ))}
+          </>
+        )}
+      </Popover>
+
+      <Popover
+        active={!!board}
+        triggerLabel={boardLabel ? `Board · ${boardLabel}` : "Board"}
+      >
+        {({ close }) => (
+          <>
+            {MARKETPLACE_BOARD_BUCKETS.map((b) => (
+              <PopoverOption
+                key={b.value}
+                active={board === b.value}
+                onClick={() => {
+                  updateParam("board", board === b.value ? null : b.value);
+                  close();
+                }}
+              >
+                {b.label}
               </PopoverOption>
             ))}
           </>

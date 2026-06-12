@@ -12,6 +12,7 @@ import {
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
 import {
+  isMarketplaceBoard,
   isMarketplaceFormat,
   lengthRangeFor,
   ratingMinFor,
@@ -130,12 +131,15 @@ function catalogWhere(input?: {
   price?: string;
   rating?: string;
   format?: string;
+  board?: string;
 }): Prisma.CourseWhereInput {
   const topicFragment = topicWhere(input?.topic);
   const priceFragment = priceWhere(input?.price);
   const ratingMin = ratingMinFor(input?.rating);
   const format =
     input?.format && isMarketplaceFormat(input.format) ? input.format : null;
+  const board =
+    input?.board && isMarketplaceBoard(input.board) ? input.board : null;
   return {
     status: "PUBLISHED",
     ...(topicFragment
@@ -147,6 +151,7 @@ function catalogWhere(input?: {
     ...(priceFragment ?? {}),
     ...(ratingMin !== null ? { ratingAvg: { gte: ratingMin } } : {}),
     ...(format ? { format } : {}),
+    ...(board ? { board } : {}),
   };
 }
 
@@ -167,6 +172,8 @@ export const marketplaceRouter = router({
           rating: z.string().optional(),
           /** Delivery format: "self_paced" | "live" | "cohort". */
           format: z.string().optional(),
+          /** Curriculum board: "cbse" | "icse" | "state" | "ib" | "cambridge". */
+          board: z.string().optional(),
           /** Sort slug: "popular" | "newest" | "rating" | "price_asc" | "price_desc". */
           sort: z.string().optional(),
           limit: z.number().int().min(1).max(24).default(4),
@@ -185,6 +192,7 @@ export const marketplaceRouter = router({
         title: true,
         authorLabel: true,
         subject: true,
+        board: true,
         ratingAvg: true,
         ratingCount: true,
         priceCents: true,
@@ -257,6 +265,7 @@ export const marketplaceRouter = router({
         length: z.string().optional(),
         rating: z.string().optional(),
         format: z.string().optional(),
+        board: z.string().optional(),
         sort: z.string().optional(),
         limit: z.number().int().min(1).max(48).default(24),
         cursor: z.string().nullish(),
@@ -298,6 +307,7 @@ export const marketplaceRouter = router({
         authorLabel: true,
         subject: true,
         grade: true,
+        board: true,
         ratingAvg: true,
         ratingCount: true,
         priceCents: true,
