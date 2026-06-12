@@ -765,7 +765,10 @@ export const marketplaceRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await checkAIQuota({ actorId: ctx.session?.user?.id ?? null });
+      await checkAIQuota({
+        actorId: ctx.session?.user?.id ?? null,
+        anonKey: ctx.anonKey ?? null,
+      });
       const t0 = Date.now();
 
       // Catalog snapshot. Cap to keep the prompt small + the demo
@@ -796,6 +799,11 @@ export const marketplaceRouter = router({
             kinds: result.items.map((i) => i.kind),
             mode,
             elapsedMs: Date.now() - t0,
+            // Hashed-IP key for anonymous callers — what checkAIQuota's
+            // per-caller anon bucket counts on. Never the raw IP.
+            ...(ctx.session?.user || !ctx.anonKey
+              ? {}
+              : { anonKey: ctx.anonKey }),
           },
         });
       };

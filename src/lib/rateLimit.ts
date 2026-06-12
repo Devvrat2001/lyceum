@@ -22,58 +22,100 @@ import { db } from "@/lib/db";
  */
 export async function checkAIQuota(args: {
   actorId: string | null;
+  /**
+   * Hashed-IP key for anonymous callers (ctx.anonKey). Without it every
+   * signed-out visitor shared ONE global allowance — a single crawler
+   * could drain AI search for the whole anonymous internet. With it,
+   * each anon caller gets their own bucket, and a (higher) global anon
+   * ceiling stays on as the distributed-abuse backstop.
+   */
+  anonKey?: string | null;
   /** Optional kind to scope the check (e.g. only count tutor calls). Default: all ai.* */
   kind?: string;
 }): Promise<void> {
   const now = Date.now();
-  const oneMinuteAgo = new Date(now - 60_000);
-  const oneHourAgo = new Date(now - 60 * 60_000);
-  const oneDayAgo = new Date(now - 24 * 60 * 60_000);
+  const windows = [
+    { name: "minute" as const, since: new Date(now - 60_000) },
+    { name: "hour" as const, since: new Date(now - 60 * 60_000) },
+    { name: "day" as const, since: new Date(now - 24 * 60 * 60_000) },
+  ];
 
-  // Override caps for anonymous callers.
   const isAnon = !args.actorId;
-  const limits = {
-    minute: isAnon ? 4 : 10,
-    hour: isAnon ? 30 : 60,
-    day: isAnon ? 100 : 300,
+  const kind = args.kind ?? { startsWith: "ai." };
+
+  // Each tier is (limits, where). Signed-in: one per-user tier. Anon
+  // with a key: a tight per-caller tier (keyed on payload.anonKey,
+  // which the AI surfaces stamp into their audit rows) + a loose global
+  // ceiling. Anon without a key (no request scope): the old tight
+  // global bucket, defensively.
+  type Tier = {
+    limits: { minute: number; hour: number; day: number };
+    where: object;
+    scope: "you" | "global";
   };
+  const tiers: Tier[] = !isAnon
+    ? [
+        {
+          limits: { minute: 10, hour: 60, day: 300 },
+          where: { actorId: args.actorId, kind },
+          scope: "you",
+        },
+      ]
+    : args.anonKey
+      ? [
+          {
+            limits: { minute: 4, hour: 30, day: 100 },
+            where: {
+              actorId: null,
+              kind,
+              payload: { path: ["anonKey"], equals: args.anonKey },
+            },
+            scope: "you",
+          },
+          {
+            limits: { minute: 20, hour: 150, day: 500 },
+            where: { actorId: null, kind },
+            scope: "global",
+          },
+        ]
+      : [
+          {
+            limits: { minute: 4, hour: 30, day: 100 },
+            where: { actorId: null, kind },
+            scope: "you",
+          },
+        ];
 
-  // We only consider AI events. Other audit kinds (auth.signup,
-  // course.publish, …) shouldn't burn the AI quota.
-  const baseWhere = {
-    actorId: args.actorId,
-    kind: args.kind ?? { startsWith: "ai." },
-  } as const;
-
-  const [perMinute, perHour, perDay] = await Promise.all([
-    db.auditLog.count({
-      where: { ...baseWhere, createdAt: { gte: oneMinuteAgo } },
-    }),
-    db.auditLog.count({
-      where: { ...baseWhere, createdAt: { gte: oneHourAgo } },
-    }),
-    db.auditLog.count({
-      where: { ...baseWhere, createdAt: { gte: oneDayAgo } },
-    }),
-  ]);
-
-  if (perMinute >= limits.minute) {
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: `Slow down — that's ${limits.minute} AI requests in the last minute. Try again in a moment.`,
-    });
-  }
-  if (perHour >= limits.hour) {
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: `You've hit the hourly AI quota (${limits.hour}/hr). Take a short break and come back.`,
-    });
-  }
-  if (perDay >= limits.day) {
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: `You've used your daily AI quota (${limits.day}/day). It resets at midnight UTC.`,
-    });
+  for (const tier of tiers) {
+    const counts = await Promise.all(
+      windows.map((w) =>
+        db.auditLog.count({
+          where: { ...tier.where, createdAt: { gte: w.since } },
+        })
+      )
+    );
+    for (let i = 0; i < windows.length; i++) {
+      const w = windows[i];
+      const limit = tier.limits[w.name];
+      if (counts[i] >= limit) {
+        const messages =
+          tier.scope === "global"
+            ? {
+                minute: `Anonymous AI traffic is briefly rate-limited (${limit}/min platform-wide). Try again in a moment.`,
+                hour: `Anonymous AI traffic has hit the hourly ceiling (${limit}/hr). Sign in for your own allowance.`,
+                day: `Anonymous AI traffic has used the daily ceiling (${limit}/day). It resets at midnight UTC.`,
+              }
+            : {
+                minute: `Slow down — that's ${limit} AI requests in the last minute. Try again in a moment.`,
+                hour: `You've hit the hourly AI quota (${limit}/hr). Take a short break and come back.`,
+                day: `You've used your daily AI quota (${limit}/day). It resets at midnight UTC.`,
+              };
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: messages[w.name],
+        });
+      }
+    }
   }
 }
 
