@@ -65,9 +65,16 @@ type Outline = {
   }[];
 };
 
+// Mirrors SYLLABUS_MAX_CHARS in lib/ai/prompts/courseGenerator.ts (the
+// tRPC input cap). Kept as a literal so this client page doesn't import
+// the server prompt module.
+const SYLLABUS_MAX = 20_000;
+
 export default function AIGeneratorPage() {
   const router = useRouter();
   const [brief, setBrief] = useState(DEFAULT_BRIEF);
+  const [syllabus, setSyllabus] = useState("");
+  const [showSyllabus, setShowSyllabus] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [editingSetting, setEditingSetting] = useState<keyof Settings | null>(
     null
@@ -276,16 +283,65 @@ export default function AIGeneratorPage() {
                   flexWrap: "wrap",
                 }}
               >
-                {[
-                  "+ Add lesson plan",
-                  "+ Reference textbook",
-                  "+ My standards",
-                ].map((c) => (
-                  <span key={c} className="wf-chip">
-                    {c}
-                  </span>
-                ))}
+                {/* Used to be three dead decorative chips ("+ Add lesson
+                    plan" etc.) — this one is real: it reveals a syllabus
+                    paste box whose text steers the outline's structure. */}
+                <button
+                  type="button"
+                  className="wf-chip"
+                  disabled={isRunning}
+                  onClick={() => {
+                    if (showSyllabus) setSyllabus("");
+                    setShowSyllabus((s) => !s);
+                  }}
+                >
+                  {showSyllabus ? "− Remove syllabus" : "+ Paste syllabus"}
+                </button>
               </div>
+              {showSyllabus && (
+                <div style={{ marginTop: 12 }}>
+                  <div
+                    className="wf-mono"
+                    style={{
+                      fontSize: 11,
+                      color: "var(--wf-mute)",
+                      letterSpacing: "0.04em",
+                      marginBottom: 6,
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>SYLLABUS · OPTIONAL</span>
+                    <span>
+                      {syllabus.length.toLocaleString()} /{" "}
+                      {SYLLABUS_MAX.toLocaleString()}
+                    </span>
+                  </div>
+                  <textarea
+                    value={syllabus}
+                    onChange={(e) => setSyllabus(e.target.value)}
+                    rows={9}
+                    disabled={isRunning}
+                    maxLength={SYLLABUS_MAX}
+                    placeholder={
+                      "Paste your syllabus, curriculum outline, or topic list.\nUnits and lessons will follow its structure — topics become units, subtopics become lessons."
+                    }
+                    style={{
+                      fontSize: 12,
+                      color: "var(--wf-ink)",
+                      lineHeight: 1.6,
+                      padding: 10,
+                      background: "var(--wf-fillsoft)",
+                      borderRadius: 3,
+                      border: "1px solid var(--wf-hairline)",
+                      width: "100%",
+                      outline: "none",
+                      resize: "vertical",
+                      fontFamily: "var(--font-sans-stack)",
+                    }}
+                  />
+                </div>
+              )}
             </Card>
 
             <Card p={16} style={{ marginBottom: 14 }}>
@@ -371,7 +427,11 @@ export default function AIGeneratorPage() {
                 setOutline(null);
                 setElapsedMs(null);
                 setJobId(null);
-                startOutlineJob.mutate({ brief, settings });
+                startOutlineJob.mutate({
+                  brief,
+                  settings,
+                  syllabus: syllabus.trim() ? syllabus : undefined,
+                });
               }}
             >
               {isRunning
@@ -537,7 +597,9 @@ export default function AIGeneratorPage() {
                   Describe your course, then hit Generate.
                 </div>
                 <div style={{ fontSize: 12, color: "var(--wf-mute)" }}>
-                  We&apos;ll suggest 4–6 units with a real-world capstone.
+                  We&apos;ll suggest 4–6 units with a real-world capstone —
+                  or paste your syllabus and the outline will follow its
+                  structure.
                 </div>
               </Card>
             ) : (

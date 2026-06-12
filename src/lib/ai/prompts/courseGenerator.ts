@@ -462,6 +462,45 @@ export const SettingsSchema = z.object({
 
 export type GeneratorSettings = z.infer<typeof SettingsSchema>;
 
+/**
+ * Hard cap on pasted-syllabus length, shared by the tRPC input schemas
+ * and the textarea maxLength. 20K chars ≈ 5K tokens — comfortably inside
+ * the skeleton call's input budget while still fitting a full-year
+ * curriculum document.
+ */
+export const SYLLABUS_MAX_CHARS = 20_000;
+
+/**
+ * Optional syllabus-paste section for outline-level prompts (R24). When
+ * the teacher pastes a syllabus / curriculum doc / topic list, the model
+ * mirrors its scope and sequence instead of inventing structure.
+ *
+ * Only the skeleton (structure) prompts get this — by the time the
+ * per-unit content chunks run, the skeleton's unit titles + lesson
+ * summaries already encode the syllabus, and re-sending up to 20K chars
+ * per unit would multiply input-token cost for little gain.
+ */
+export function syllabusPromptSection(syllabus?: string): string {
+  const text = syllabus?.trim();
+  if (!text) return "";
+  return `
+The teacher also pasted their syllabus / curriculum document. Treat it as the
+source of truth for scope and sequence:
+- Map its major topics to units, in the same order; subtopics become lessons
+  within those units.
+- Cover everything it lists at the depth it implies; don't invent unrelated
+  units.
+- Where the syllabus is silent, apply the usual pedagogy (warm-up first
+  lesson, project capstone) — but never at the cost of a listed topic.
+- If the syllabus conflicts with the settings above, the syllabus wins.
+
+Their syllabus:
+"""
+${text}
+"""
+`;
+}
+
 export const COURSE_GENERATOR_SYSTEM_PROMPT = `You are the Lyceum AI course architect.
 Your job: turn a teacher's brief into a strong course outline INCLUDING
 the lessons in each unit and a short reading passage per lesson.
@@ -503,8 +542,9 @@ Style guide for outputs:
 export function buildOutlineSkeletonPrompt(args: {
   brief: string;
   settings: GeneratorSettings;
+  syllabus?: string;
 }): string {
-  const { brief, settings } = args;
+  const { brief, settings, syllabus } = args;
   return `Course brief from the teacher:
 
 """
@@ -519,7 +559,7 @@ Settings to respect:
 - Style: ${settings.style}
 - Tone: ${settings.tone}
 - Difficulty curve: ${settings.difficulty}
-
+${syllabusPromptSection(syllabus)}
 Produce a course outline STRUCTURE ONLY: title, tagline, description, and
 4-6 units. Each unit has shortLabel ("Unit 1", "Unit 2", …), title, subtitle,
 durationLabel, and 3-10 lessons. Each lesson has title + summary ONLY
@@ -677,8 +717,9 @@ strings in lesson order.`;
 export function buildCourseGenPrompt(args: {
   brief: string;
   settings: GeneratorSettings;
+  syllabus?: string;
 }): string {
-  const { brief, settings } = args;
+  const { brief, settings, syllabus } = args;
   return `Course brief from the teacher:
 
 """
@@ -693,7 +734,7 @@ Settings to respect:
 - Style: ${settings.style}
 - Tone: ${settings.tone}
 - Difficulty curve: ${settings.difficulty}
-
+${syllabusPromptSection(syllabus)}
 Produce a structured course outline that matches the schema you've been
 given. Aim for 4–6 units. Make the last unit a project/capstone.`;
 }

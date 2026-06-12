@@ -9,6 +9,7 @@ import {
   OutlineUnitSchema,
   RichLessonBlockSchema,
   SettingsSchema,
+  SYLLABUS_MAX_CHARS,
   buildCourseGenPrompt,
   buildDemoOutline,
   type Outline,
@@ -209,17 +210,19 @@ function buildLessonBlocks(lesson: {
 }
 
 export const generatorRouter = router({
-  /** Generate a fresh outline from a brief + settings. */
+  /** Generate a fresh outline from a brief + settings (+ optional syllabus). */
   outline: teacherProcedure
     .input(
       z.object({
         brief: z.string().min(20).max(2000),
         settings: SettingsSchema.optional(),
+        syllabus: z.string().max(SYLLABUS_MAX_CHARS).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await checkAIQuota({ actorId: ctx.user.id });
       const settings = SettingsSchema.parse(input.settings ?? {});
+      const syllabus = input.syllabus?.trim() || undefined;
       const t0 = Date.now();
 
       let outline: Outline;
@@ -231,7 +234,7 @@ export const generatorRouter = router({
         const result = await completeStructured({
           schema: OutlineSchema,
           system: COURSE_GENERATOR_SYSTEM_PROMPT,
-          prompt: buildCourseGenPrompt({ brief: input.brief, settings }),
+          prompt: buildCourseGenPrompt({ brief: input.brief, settings, syllabus }),
           maxTokens: 8192,
         });
         outline = result.data;
@@ -248,6 +251,7 @@ export const generatorRouter = router({
         kind: "ai.course_outline",
         payload: {
           briefChars: input.brief.length,
+          syllabusChars: syllabus?.length ?? 0,
           unitCount: outline.units.length,
           mode,
           elapsedMs: Date.now() - t0,
@@ -271,13 +275,20 @@ export const generatorRouter = router({
       z.object({
         brief: z.string().min(20).max(2000),
         settings: SettingsSchema.optional(),
+        syllabus: z.string().max(SYLLABUS_MAX_CHARS).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await checkAIQuota({ actorId: ctx.user.id });
       const settings = SettingsSchema.parse(input.settings ?? {});
 
-      const jobInput: OutlineJobInput = { brief: input.brief, settings };
+      const jobInput: OutlineJobInput = {
+        brief: input.brief,
+        settings,
+        // Persisted on the job row so every chunk run (QStash webhook or
+        // inline) sees it; blank pastes are dropped here once.
+        syllabus: input.syllabus?.trim() || undefined,
+      };
       const job = await ctx.db.generationJob.create({
         data: {
           userId: ctx.user.id,

@@ -27,6 +27,8 @@ import { enqueueOutlineChunk, isQStashEnabled } from "@/lib/qstash";
 export interface OutlineJobInput {
   brief: string;
   settings: GeneratorSettings;
+  /** Optional pasted syllabus (R24) — drives the skeleton's structure. */
+  syllabus?: string;
 }
 
 /**
@@ -149,6 +151,9 @@ export async function processOutlineChunk(
         prompt: buildOutlineSkeletonPrompt({
           brief: input.brief,
           settings,
+          // Syllabus shapes the STRUCTURE only — unit content chunks
+          // inherit it via the skeleton's titles + summaries.
+          syllabus: input.syllabus,
         }),
         maxTokens: 4096,
       });
