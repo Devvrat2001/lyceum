@@ -350,10 +350,9 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
       </div>
 
       <div
+        className="wf-reader-cols"
         style={{
           flex: 1,
-          display: "grid",
-          gridTemplateColumns: "220px minmax(0,1fr) 320px",
           overflow: "hidden",
         }}
       >

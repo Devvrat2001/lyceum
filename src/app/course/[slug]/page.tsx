@@ -67,13 +67,7 @@ export default async function CourseDetailPage({
           · {course.subject.toUpperCase()} · Grade {course.grade} ·{" "}
           <span style={{ color: "var(--wf-ink)" }}>{course.title}</span>
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0,1fr) 360px",
-            gap: 28,
-          }}
-        >
+        <div className="wf-two-col--wide">
           <div>
             {course.tagline && (
               <Annot style={{ marginBottom: 10 }}>{course.tagline}</Annot>
@@ -168,12 +162,8 @@ export default async function CourseDetailPage({
                   What you&apos;ll master
                 </h2>
                 <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 10,
-                    marginBottom: 28,
-                  }}
+                  className="wf-grid-cards-2"
+                  style={{ gap: 10, marginBottom: 28 }}
                 >
                   {learn.map((s) => (
                     <div
@@ -246,13 +236,7 @@ export default async function CourseDetailPage({
                 >
                   What students say
                 </h2>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
-                  }}
-                >
+                <div className="wf-grid-cards-2">
                   {reviews.map((r) => (
                     <Card key={r.id} p={16}>
                       <div

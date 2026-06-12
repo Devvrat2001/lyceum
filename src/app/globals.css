@@ -495,3 +495,27 @@ button {
   .wf-grid-cards-3,
   .wf-grid-cards-2 { grid-template-columns: 1fr; }
 }
+
+/* R7 second pass: course-detail shell (360px enroll rail) + the lesson
+   reader's 3-column shell. The reader drops its outline rail first
+   (≤1100px) and the tutor rail on phones (≤900px) — a stacked 3-pane
+   reader in a fixed-height shell would give each pane a third of the
+   viewport, which is worse than content-first. */
+.wf-two-col--wide {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+.wf-reader-cols {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 320px;
+}
+@media (max-width: 1100px) {
+  .wf-reader-cols { grid-template-columns: minmax(0, 1fr) 320px; }
+  .wf-reader-cols > *:first-child { display: none; }
+}
+@media (max-width: 900px) {
+  .wf-two-col--wide { grid-template-columns: 1fr; }
+  .wf-reader-cols { grid-template-columns: minmax(0, 1fr); }
+  .wf-reader-cols > *:last-child { display: none; }
+}
