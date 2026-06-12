@@ -78,7 +78,7 @@ in-memory/Upstash counter. Keep the global cap as a second ceiling.
 
 ## P1 — launch-blocking UX / product
 
-### R7 · Mobile reflow for student-facing pages · Status: PARTIAL (cont.29 — `.wf-grid-cards-*`/`.wf-two-col`/`.wf-hero-split`/`.wf-cta-split` utilities in globals.css; applied to marketplace home + student dashboard. REMAINING: course detail, /browse grid, lesson reader, /student/library)
+### R7 · Mobile reflow for student-facing pages · Status: DONE (cont.29 utilities + cont.30 second pass: course detail [`.wf-two-col--wide`] + lesson reader [`.wf-reader-cols` — drops outline rail ≤1100px, tutor rail ≤900px] + both loading skeletons. /browse and /student/library were already auto-fill responsive. Stragglers for a later polish: /student/progress KPI row, community grid, reader-internal 1fr-1fr blocks)
 Chrome/nav is responsive (`useMediaQuery` in all five `*Chrome` layouts) but
 **page content is not**: `globals.css` has zero `@media` rules and grids are
 hardcoded (`repeat(4, 1fr)` marketplace `src/app/page.tsx:370`,
@@ -101,7 +101,7 @@ activity from `Attempt`/`LessonProgress` createdAt this ISO week (add to
 `student.dashboard` payload); **(c)** ~line 540 — badge count "of 47" is
 hardcoded: return `db.badge.count()` in the dashboard payload.
 
-### R9 · Author can review their own course · Status: OPEN
+### R9 · Author can review their own course · Status: DONE (cont.30 — authorId guard in submitReview + test)
 `course.submitReview` is enrollment-gated only — a teacher can enroll in
 their own free course and 5-star it. Add `course.authorId === ctx.user.id →
 FORBIDDEN` + test. (Marketplace trust = the product's currency.)
@@ -124,7 +124,7 @@ upgrade path exists.
 
 ## P2 — product depth
 
-### R12 · Assignment model + "Due this week" · Status: OPEN
+### R12 · Assignment model + "Due this week" · Status: DONE (cont.30 — migration 20260612044208; assignment router create/listMine/delete/lessonOptions; /teacher/assignments page + nav; dashboard card live with done-state + lesson links; markComplete awards bonus XP once via XPEvent source "assignment_complete". v2 ideas: class-scoped targeting, notifications on post, overdue nudges)
 `student.dashboard` returns hardcoded `assignments: []` ("No Assignment
 model exists yet") and the dashboard card renders an empty state shaped for
 it. Schema: `Assignment(id, teacherId, classId?/courseId?, lessonId?,
