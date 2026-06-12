@@ -45,6 +45,22 @@ describe("course.submitReview", () => {
     ).rejects.toThrow(/enroll/i);
   });
 
+  it("rejects the course's own author (no self-five-starring)", async () => {
+    const teacher = await createTestUser({ role: "TEACHER" });
+    const course = await makeCourse(teacher.id);
+    // Authors CAN enroll in their own free course — that was the hole.
+    await db.enrollment.create({
+      data: { userId: teacher.id, courseId: course.id },
+    });
+    await expect(
+      teacher.caller.course.submitReview({
+        courseId: course.id,
+        rating: 5,
+        body: "Best course ever, definitely unbiased",
+      })
+    ).rejects.toThrow(/own course/i);
+  });
+
   it("creates a review and recomputes the course aggregates", async () => {
     const teacher = await createTestUser({ role: "TEACHER" });
     const student = await createTestUser({ role: "STUDENT" });

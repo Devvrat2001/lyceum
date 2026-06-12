@@ -106,10 +106,25 @@ export const courseRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user.id;
-      const enrollment = await ctx.db.enrollment.findFirst({
-        where: { userId, courseId: input.courseId },
-        select: { id: true },
-      });
+      const [enrollment, course] = await Promise.all([
+        ctx.db.enrollment.findFirst({
+          where: { userId, courseId: input.courseId },
+          select: { id: true },
+        }),
+        ctx.db.course.findUnique({
+          where: { id: input.courseId },
+          select: { authorId: true },
+        }),
+      ]);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      // Marketplace integrity: the author can enroll in their own free
+      // course, which made self-five-starring possible (REQUIREMENTS R9).
+      if (course.authorId === userId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You can't review your own course.",
+        });
+      }
       if (!enrollment) {
         throw new TRPCError({
           code: "FORBIDDEN",
