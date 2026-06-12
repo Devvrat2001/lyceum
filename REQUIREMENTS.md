@@ -113,7 +113,7 @@ every other integration (hidden link when email is dormant). Includes:
 reset-request page, tokened reset page, verification email on signup with a
 "verified" nudge (don't hard-block login on it for K-12 friction reasons).
 
-### R11 · Signup age/consent gate (COPPA / India DPDP) · Status: OPEN
+### R11 · Signup age/consent gate (COPPA / India DPDP) · Status: DONE-v1 (cont.32 — age band select for students, parent-email required for under-13 [server-enforced], consent checkbox stamps coppaConsentAt; ageBand/parentEmail columns via migration signup_consent_fields. v2 = VERIFIABLE parental consent — email the parent a confirm link; needs legal sign-off on mechanism)
 `User.coppaConsentAt` exists but signup collects nothing. Minimum: age band
 at signup; under-threshold requires parent email + consent checkbox; stamp
 `coppaConsentAt`. India DPDP needs verifiable parental consent for <18 —
@@ -133,7 +133,7 @@ title, instructions, dueAt, xp)` (+ per-student done state — or compute from
 links into the lesson; XP on completion through the existing award pipeline.
 The single most-requested K-12 primitive; the UI is already waiting.
 
-### R13 · "Today's plan" generator · Status: OPEN
+### R13 · "Today's plan" generator · Status: DONE (cont.32 — deterministic in student.dashboard: done-today rows → due assignments → next uncompleted lesson of top course → weakest-skill practice → streak saver; first actionable = "now"; items carry hrefs and TodaysPlan's Start navigates. Honesty fix riding along: fake "AI-curated · 35 min" annot + dead Customize button removed)
 `student.dashboard.todaysPlan` is hardcoded `[]`. Deterministic v1 service
 (no AI needed): next lesson of most-recent in-progress course → weakest
 `Mastery` skill drill → due assignment (R12) → streak-saver if streak at
@@ -152,7 +152,7 @@ Header search exists per-chrome; a global cmd-K palette (courses, lessons,
 
 ### R16 · Typed attempt columns (KNOWN_ISSUES S2-3) · Status: DONE (cont.31 — chosenIndex/subIndex Int? + backfill migration for the 3 choice encodings; write side populates both; drag/branch stay NULL by design. KNOWN_ISSUES S2-3 marked resolved)
 
-### R17 · Course thumbnail imagery story · Status: OPEN
+### R17 · Course thumbnail imagery story · Status: DONE-v1 (cont.32 — subjectGlyph watermark over the gradient fallback on cards + course hero, zero assets; real thumbnailUrl still wins. v2 = AI cover art at publish, cached to blob storage)
 Gradient fallback is tasteful but uniform. Options: per-subject illustration
 set, or AI-generated course art at publish time (cache to blob storage).
 
