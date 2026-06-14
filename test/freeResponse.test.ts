@@ -106,11 +106,13 @@ describe("lesson.gradeFreeResponse", () => {
     expect(attempt.correct).toBe(true);
     expect(attempt.chosenKey).toBeNull();
 
+    // The submit award is keyed to the attempt id (R39 reconciliation
+    // relies on per-attempt refs), not the block id.
     const xp = await db.xPEvent.findFirst({
       where: {
         userId: student.id,
         source: "block_free_response_correct",
-        refId: block.id,
+        refId: attempt.id,
       },
     });
     expect(xp?.points).toBe(res.points);

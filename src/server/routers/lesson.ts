@@ -8,6 +8,10 @@ import {
   studentProcedure,
 } from "../trpc";
 import { awardCorrectAttempt } from "../services/awardForAttempt";
+import {
+  FREE_RESPONSE_PASS,
+  FREE_RESPONSE_XP,
+} from "../services/freeResponseXp";
 import { ensureEnrollment } from "../services/enrollment";
 import { settingsFor } from "@/lib/blocks";
 import { audit } from "@/lib/audit";
@@ -477,8 +481,8 @@ export const lessonRouter = router({
         mode = "demo";
       }
 
-      const correct = grade.score >= 60;
-      const points = correct ? xpForCorrect(0) : 0;
+      const correct = grade.score >= FREE_RESPONSE_PASS;
+      const points = correct ? FREE_RESPONSE_XP : 0;
       // Flatten the structured feedback into one prose blob for the
       // Attempt row (teacher review reads a single column); the client
       // gets the structured shape in the return value.
@@ -494,7 +498,7 @@ export const lessonRouter = router({
         .filter(Boolean)
         .join("\n");
 
-      await ctx.db.attempt.create({
+      const attempt = await ctx.db.attempt.create({
         data: {
           userId: ctx.user.id,
           lessonId: block.lessonId,
@@ -509,6 +513,10 @@ export const lessonRouter = router({
         },
       });
 
+      // Stamp the award with the attempt id (not the block id): a block
+      // can be re-attempted, and the R39 override reconciliation keys
+      // its delta off this attempt, so the refs must be unique per
+      // submission.
       const award =
         points > 0
           ? await awardCorrectAttempt(
@@ -516,7 +524,7 @@ export const lessonRouter = router({
               ctx.user.id,
               points,
               "block_free_response_correct",
-              block.id
+              attempt.id
             )
           : null;
 

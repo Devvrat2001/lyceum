@@ -14,6 +14,7 @@ import { checkAIQuota } from "@/lib/rateLimit";
 import { findBlockTemplate } from "@/lib/blockTemplates";
 import { settingsFor } from "@/lib/blocks";
 import { ensureEnrollment } from "../services/enrollment";
+import { reconcileFreeResponseXp } from "../services/freeResponseXp";
 import { refreshCourseEmbedding } from "@/lib/jobs/refreshCourseEmbedding";
 import {
   isMuxEnabled,
@@ -2303,9 +2304,14 @@ export const teacherRouter = router({
   /**
    * Override the AI score on a free-response Attempt (R33). Teacher must
    * own the block's course (ADMIN bypasses). Pass a 0-100 score to set
-   * the override, or null to clear it back to the AI grade. XP awarded at
-   * submit time isn't retroactively adjusted — overrides are a grading/
-   * feedback signal, not a re-scoring of the gamification ledger (v1).
+   * the override, or null to clear it back to the AI grade.
+   *
+   * The teacher grade is authoritative, so the XP ledger is reconciled
+   * to the final score (R39): crossing the pass threshold in either
+   * direction writes a delta XPEvent so the student's points match the
+   * human grade. Streaks and earned badges are left untouched — a
+   * student who practiced still practiced. When the XP actually moves,
+   * the student is notified.
    */
   overrideFreeResponse: teacherProcedure
     .input(
@@ -2319,11 +2325,19 @@ export const teacherRouter = router({
         where: { id: input.attemptId },
         select: {
           id: true,
+          userId: true,
+          score: true,
           block: {
             select: {
               type: true,
               lesson: {
-                select: { unit: { select: { course: { select: { authorId: true } } } } },
+                select: {
+                  title: true,
+                  slug: true,
+                  unit: {
+                    select: { course: { select: { authorId: true } } },
+                  },
+                },
               },
             },
           },
@@ -2340,6 +2354,31 @@ export const teacherRouter = router({
         where: { id: attempt.id },
         data: { scoreOverride: input.score, reviewedAt: new Date() },
       });
-      return { ok: true as const };
+
+      // Reconcile the XP ledger to the authoritative final grade, then
+      // tell the student only when their points actually changed.
+      const finalScore = input.score ?? attempt.score ?? 0;
+      const xpDelta = await reconcileFreeResponseXp(ctx.db, {
+        attemptId: attempt.id,
+        userId: attempt.userId,
+        finalScore,
+      });
+      if (xpDelta !== 0) {
+        const lessonTitle = attempt.block.lesson.title;
+        const slug = attempt.block.lesson.slug;
+        await ctx.db.notification.create({
+          data: {
+            userId: attempt.userId,
+            kind: "grade_updated",
+            title: "Your writing was re-graded",
+            body:
+              xpDelta > 0
+                ? `Your teacher raised your score on "${lessonTitle}" — +${xpDelta} XP.`
+                : `Your teacher adjusted your score on "${lessonTitle}" (${xpDelta} XP).`,
+            href: slug ? `/student/lesson/${slug}` : null,
+          },
+        });
+      }
+      return { ok: true as const, xpDelta };
     }),
 });

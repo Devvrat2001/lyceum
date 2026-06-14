@@ -9,6 +9,7 @@ const ICON_FOR_KIND: Record<string, "bell" | "trophy" | "sparkles" | "book"> = {
   badge_earned: "trophy",
   ai_tip: "sparkles",
   assignment_due: "book",
+  grade_updated: "book",
 };
 
 function timeAgo(date: Date): string {
