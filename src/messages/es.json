@@ -145,5 +145,18 @@
     "branding": "Marca",
     "billing": "Facturación",
     "audit": "Registro de auditoría"
+  },
+  "TeacherCourses": {
+    "title": "Mis cursos",
+    "count": "{count, plural, one {# curso} other {# cursos}}",
+    "newCourse": "Nuevo curso",
+    "emptyTitle": "Aún no hay cursos",
+    "emptyBody": "Empieza desde cero y construye tus unidades a tu manera, o genera un borrador con IA. Tú tienes el control.",
+    "createFirst": "Crea tu primer curso",
+    "published": "Publicado",
+    "draft": "Borrador",
+    "students": "{count, plural, one {# estudiante} other {# estudiantes}}",
+    "noRatings": "Sin valoraciones aún",
+    "edit": "Editar →"
   }
 }

@@ -145,5 +145,18 @@
     "branding": "Branding",
     "billing": "Billing",
     "audit": "Audit log"
+  },
+  "TeacherCourses": {
+    "title": "My courses",
+    "count": "{count, plural, one {# course} other {# courses}}",
+    "newCourse": "New course",
+    "emptyTitle": "No courses yet",
+    "emptyBody": "Start from a blank canvas and build your units your way — or generate a draft with AI. You're in control either way.",
+    "createFirst": "Create your first course",
+    "published": "Published",
+    "draft": "Draft",
+    "students": "{count, plural, one {# student} other {# students}}",
+    "noRatings": "No ratings yet",
+    "edit": "Edit →"
   }
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { formatPrice } from "@/lib/currency";
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
 import { Btn, Card, Icon } from "@/components/wf/primitives";
@@ -6,7 +7,15 @@ import { getServerCaller } from "@/lib/trpc/server";
 
 export const metadata = { title: "My courses · Lyceum" };
 
-function StatusPill({ status }: { status: string }) {
+function StatusPill({
+  status,
+  publishedLabel,
+  draftLabel,
+}: {
+  status: string;
+  publishedLabel: string;
+  draftLabel: string;
+}) {
   const published = status === "PUBLISHED";
   return (
     <span
@@ -22,7 +31,7 @@ function StatusPill({ status }: { status: string }) {
         size={10}
         color="currentColor"
       />
-      {published ? "Published" : "Draft"}
+      {published ? publishedLabel : draftLabel}
     </span>
   );
 }
@@ -34,7 +43,10 @@ function StatusPill({ status }: { status: string }) {
  */
 export default async function TeacherCoursesPage() {
   const trpc = await getServerCaller();
-  const courses = await trpc.teacher.myCourses();
+  const [courses, t] = await Promise.all([
+    trpc.teacher.myCourses(),
+    getTranslations("TeacherCourses"),
+  ]);
 
   return (
     <TeacherChrome active="courses">
@@ -49,10 +61,10 @@ export default async function TeacherCoursesPage() {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>My courses</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
         {courses.length > 0 && (
           <span className="wf-chip">
-            {courses.length} course{courses.length === 1 ? "" : "s"}
+            {t("count", { count: courses.length })}
           </span>
         )}
         <div style={{ flex: 1 }} />
@@ -62,7 +74,7 @@ export default async function TeacherCoursesPage() {
             sm
             icon={<Icon name="plus" size={12} color="white" />}
           >
-            New course
+            {t("newCourse")}
           </Btn>
         </Link>
       </header>
@@ -86,7 +98,7 @@ export default async function TeacherCoursesPage() {
                 marginBottom: 4,
               }}
             >
-              No courses yet
+              {t("emptyTitle")}
             </div>
             <div
               style={{
@@ -96,8 +108,7 @@ export default async function TeacherCoursesPage() {
                 marginBottom: 16,
               }}
             >
-              Start from a blank canvas and build your units your way — or
-              generate a draft with AI. You&apos;re in control either way.
+              {t("emptyBody")}
             </div>
             <Link
               href="/teacher/courses/new"
@@ -107,7 +118,7 @@ export default async function TeacherCoursesPage() {
                 variant="primary"
                 icon={<Icon name="plus" size={14} color="white" />}
               >
-                Create your first course
+                {t("createFirst")}
               </Btn>
             </Link>
           </Card>
@@ -139,14 +150,17 @@ export default async function TeacherCoursesPage() {
                     <span style={{ fontSize: 14, fontWeight: 600 }}>
                       {c.title}
                     </span>
-                    <StatusPill status={c.status} />
+                    <StatusPill
+                      status={c.status}
+                      publishedLabel={t("published")}
+                      draftLabel={t("draft")}
+                    />
                   </div>
                   <div style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                    {c.enrollCount} student
-                    {c.enrollCount === 1 ? "" : "s"}
+                    {t("students", { count: c.enrollCount })}
                     {c.ratingCount > 0
                       ? ` · ★ ${c.ratingAvg.toFixed(1)} (${c.ratingCount})`
-                      : " · No ratings yet"}
+                      : ` · ${t("noRatings")}`}
                     {" · "}
                     {formatPrice(c.priceCents)}
                   </div>
@@ -156,7 +170,7 @@ export default async function TeacherCoursesPage() {
                   style={{ textDecoration: "none" }}
                 >
                   <Btn sm variant="ghost">
-                    Edit →
+                    {t("edit")}
                   </Btn>
                 </Link>
               </div>

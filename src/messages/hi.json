@@ -145,5 +145,18 @@
     "branding": "ब्रांडिंग",
     "billing": "बिलिंग",
     "audit": "ऑडिट लॉग"
+  },
+  "TeacherCourses": {
+    "title": "मेरे कोर्स",
+    "count": "{count, plural, one {# कोर्स} other {# कोर्स}}",
+    "newCourse": "नया कोर्स",
+    "emptyTitle": "अभी कोई कोर्स नहीं",
+    "emptyBody": "खाली कैनवास से शुरू करें और अपनी यूनिट अपने तरीके से बनाएँ — या AI से ड्राफ़्ट बनाएँ। नियंत्रण आपके हाथ में है।",
+    "createFirst": "अपना पहला कोर्स बनाएँ",
+    "published": "प्रकाशित",
+    "draft": "ड्राफ़्ट",
+    "students": "{count, plural, one {# छात्र} other {# छात्र}}",
+    "noRatings": "अभी कोई रेटिंग नहीं",
+    "edit": "संपादित करें →"
   }
 }
