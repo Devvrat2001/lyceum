@@ -283,12 +283,12 @@ pick the highest item and work the normal cycle. Ordered by trust/impact.
   TOC progress → neutral authored-steps list; removed dead Pin/Notes/Offline
   header buttons. Reader header is now honest.) (P0-trust) — fabricated
   elements on the highest-trust surface, same de-vanity discipline as R8.
-- **R30 · i18n breadth** · Status: IN PROGRESS (cont.38 — +Nav [Student
-  chrome], +Browse [/browse, ICU plural], +CourseDetail; 9 surfaces now
-  localized en/es/hi. Remaining: teacher/admin chromes + the other
-  `*Chrome` nav + tRPC-built strings [plan titles, assignment due labels —
-  need request-scoped getTranslations or tag-based client rendering].) —
-  the big R20 continuation; extend namespace-by-namespace.
+- **R30 · i18n breadth** · Status: IN PROGRESS (cont.38 +Nav/Browse/
+  CourseDetail; cont.39 +TeacherNav/AdminNav chrome navs — **11 surfaces
+  localized** en/es/hi. Remaining: deeper teacher/admin page bodies +
+  tRPC-built strings [plan titles, assignment due labels — need
+  request-scoped getTranslations or tag-based client rendering].) — the
+  big R20 continuation; extend namespace-by-namespace.
 - **R31 · Wire the WhatsApp senders** (unblocks the day R23's keys land) —
   connect `lib/whatsapp.ts` to the streak-rollover cron (streak_reminder),
   the assignment post (assignment_due), and a new parent-digest cron
@@ -301,15 +301,20 @@ pick the highest item and work the normal cycle. Ordered by trust/impact.
   schema.org Course JSON-LD [rating/price/provider]. Build renders
   sitemap.xml with all 6 courses + robots.txt. v2: dynamic OG images,
   per-locale alternates.) — was zero SEO surface; pure growth lever.
-- **R33 · Free-response teacher review** (R24 v2) — answers + AI scores
-  persist on Attempt but no teacher surface reads them. Build a review page
-  (per assignment/lesson) listing submissions with the AI grade + an
-  override control; the columns are already there.
+- **R33 · Free-response teacher review** · Status: DONE (cont.39 —
+  `teacher.freeResponseSubmissions` [own courses, ADMIN all] +
+  `overrideFreeResponse` [course-ownership gated]; Attempt gains
+  `scoreOverride`/`reviewedAt` [migration], finalScore = override ?? AI;
+  /teacher/grading page + Grading nav. v1: overriding doesn't claw back
+  XP earned at submit.) (R24 v2) — answers + AI scores persisted but no
+  teacher surface read them.
 - **R34 · Live/cohort v2** (R25 v2) — calendar invite (.ics) on the
   schedule card, recurring sessions (not just one start), and attendance.
-- **R35 · Parent dashboard polish** (R26/perf) — `/parent` sums XP by
-  loading every `xpEvent` per child; switch to a Prisma aggregate. Plus
-  R26 v2: notify the child in-app when a parent links their code.
+- **R35 · Parent dashboard polish** · Status: DONE (cont.39 — `/parent`
+  XP sum is now a single `xPEvent.groupBy` aggregate keyed by child id
+  [was loading every XPEvent row per child]; parent.linkWithCode writes a
+  `parent.linked` notification to the child [R26 v2]. Test asserts the
+  notification.) (R26/perf)
 
 ---
 
