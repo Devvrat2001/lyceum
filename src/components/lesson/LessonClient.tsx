@@ -113,12 +113,14 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
   };
 
   const initialAi = lesson.intro ?? "Let's break this down step by step.";
+  // No fabricated citation on the opening message (R29) — real citations
+  // arrive on streamed tutor replies via findCitation. A fake "p. 142"
+  // undermines the cite-the-textbook trust story the whole tutor sells.
   const [messages, setMessages] = useState<Msg[]>([
     {
       from: "ai",
       step: "WELCOME",
       text: initialAi,
-      cite: `Cited: ${lesson.courseLabel}, p. 142`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -295,13 +297,6 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
   const isLastQuestion = qIdx >= lesson.questions.length - 1;
   const isCorrect = feedback?.correct === true;
 
-  const stepStateFor = (i: number): "done" | "current" | "locked" => {
-    // Until real progress tracking lands, mark first 3 done, 4 current, rest locked.
-    if (i < 3) return "done";
-    if (i === 3) return "current";
-    return "locked";
-  };
-
   return (
     <>
       <div
@@ -339,16 +334,11 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
           </div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>{lesson.title}</div>
         </div>
-        <XPChip value={120} sm />
-        <Btn sm variant="ghost" icon={<Icon name="bell" size={12} />}>
-          Pin
-        </Btn>
-        <Btn sm variant="ghost" icon={<Icon name="download" size={12} />}>
-          Offline
-        </Btn>
-        <Btn sm variant="ghost">
-          Notes
-        </Btn>
+        {/* Live earned XP this lesson — was a hardcoded 120 (R29 honesty
+            pass). The Pin/Notes/Offline buttons were dead (Offline now
+            lives as the real "Save offline" on the library card) and were
+            removed. */}
+        <XPChip value={xpEarned} sm />
       </div>
 
       <div
@@ -374,95 +364,61 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
               No steps defined for this lesson yet.
             </div>
           ) : (
-            lesson.steps.map((s, i) => {
-              const state = stepStateFor(i);
-              return (
+            // Neutral outline (R29): the old version fabricated
+            // done/current/locked states ("first 3 done") with no real
+            // per-step progress behind them. Until step-level progress is
+            // tracked, render the authored steps as a plain list — a
+            // hollow marker, the title, AI sparkle, and duration.
+            lesson.steps.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  padding: "10px 0",
+                  borderBottom: "1px solid var(--wf-hairline)",
+                }}
+              >
                 <div
-                  key={s.id}
                   style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    padding: "10px 0",
-                    borderBottom: "1px solid var(--wf-hairline)",
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    border: "1px solid var(--wf-hairline)",
+                    background: "var(--wf-fillsoft)",
+                    flexShrink: 0,
                   }}
-                >
+                />
+                <div style={{ flex: 1 }}>
                   <div
                     style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: "50%",
-                      border: `1px solid ${
-                        state === "current"
-                          ? "var(--wf-ink)"
-                          : "var(--wf-hairline)"
-                      }`,
-                      background:
-                        state === "done"
-                          ? "var(--wf-ink)"
-                          : state === "current"
-                          ? "white"
-                          : "var(--wf-fill)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "var(--wf-ink)",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
+                      gap: 6,
                     }}
                   >
-                    {state === "done" && (
-                      <Icon name="check" size={12} color="white" />
-                    )}
-                    {state === "locked" && (
-                      <Icon name="lock" size={10} color="var(--wf-mute)" />
-                    )}
-                    {state === "current" && (
-                      <span
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          background: "var(--wf-ink)",
-                        }}
-                      />
+                    {s.title}{" "}
+                    {s.isAi && (
+                      <Icon name="sparkles" size={10} color="var(--wf-ai)" />
                     )}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: state === "current" ? 600 : 500,
-                        color:
-                          state === "locked"
-                            ? "var(--wf-mute)"
-                            : "var(--wf-ink)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      {s.title}{" "}
-                      {s.isAi && (
-                        <Icon
-                          name="sparkles"
-                          size={10}
-                          color="var(--wf-ai)"
-                        />
-                      )}
-                    </div>
-                    <div
-                      className="wf-mono"
-                      style={{
-                        fontSize: 10,
-                        color: "var(--wf-mute)",
-                        marginTop: 2,
-                      }}
-                    >
-                      {s.durationLabel ?? ""}
-                    </div>
+                  <div
+                    className="wf-mono"
+                    style={{
+                      fontSize: 10,
+                      color: "var(--wf-mute)",
+                      marginTop: 2,
+                    }}
+                  >
+                    {s.durationLabel ?? ""}
                   </div>
                 </div>
-              );
-            })
+              </div>
+            ))
           )}
         </aside>
 
