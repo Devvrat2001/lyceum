@@ -551,6 +551,23 @@ button {
 .st-pulse-today {
   animation: st-pulse 2s ease-in-out infinite;
 }
+/* Lesson-complete celebration pop-in (R19/R20). */
+@keyframes st-celebrate {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.st-celebrate {
+  animation: st-celebrate 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+}
 @media (prefers-reduced-motion: reduce) {
   .st-card,
   .st-pop {
@@ -560,7 +577,8 @@ button {
     transform: none;
     box-shadow: none;
   }
-  .st-pulse-today {
+  .st-pulse-today,
+  .st-celebrate {
     animation: none;
   }
 }

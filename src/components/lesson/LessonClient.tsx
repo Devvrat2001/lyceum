@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Annot,
   Btn,
@@ -52,6 +53,7 @@ type Msg = {
 };
 
 export function LessonClient({ lesson }: { lesson: LessonProps }) {
+  const t = useTranslations("LessonReader");
   const [qIdx, setQIdx] = useState(0);
   const question = lesson.questions[qIdx];
 
@@ -505,14 +507,15 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
                 >
                   <Btn
                     variant="primary"
+                    className="st-pop"
                     onClick={() =>
                       markComplete.mutate({ lessonId: lesson.id })
                     }
                     disabled={markComplete.isPending}
                   >
                     {markComplete.isPending
-                      ? "Completing…"
-                      : "Mark lesson complete →"}
+                      ? t("completing")
+                      : t("markComplete")}
                   </Btn>
                 </div>
               )}
@@ -521,7 +524,7 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
           {!question ? (
             lesson.blocks.length === 0 && (
               <Card p={32} style={{ textAlign: "center" }}>
-                <Eyebrow>Lesson is empty</Eyebrow>
+                <Eyebrow>{t("emptyTitle")}</Eyebrow>
                 <div
                   style={{
                     marginTop: 8,
@@ -529,16 +532,14 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
                     color: "var(--wf-body)",
                   }}
                 >
-                  Your teacher hasn&apos;t added content to this lesson
-                  yet. Check back soon — or pick another lesson from
-                  the course outline.
+                  {t("emptyBody")}
                 </div>
                 <Link
                   href={`/course/${lesson.courseSlug}`}
                   style={{ textDecoration: "none" }}
                 >
                   <Btn variant="ghost" sm style={{ marginTop: 14 }}>
-                    Back to course
+                    {t("backToCourse")}
                   </Btn>
                 </Link>
               </Card>
@@ -722,14 +723,15 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
                   ) : (
                     <Btn
                       variant="primary"
+                      className={isLastQuestion ? "st-pop" : undefined}
                       onClick={next}
                       disabled={markComplete.isPending}
                     >
                       {isLastQuestion
                         ? markComplete.isPending
-                          ? "Completing…"
-                          : "Lesson complete →"
-                        : "Next question →"}
+                          ? t("completing")
+                          : t("lessonCompleteBtn")
+                        : t("nextQuestion")}
                     </Btn>
                   )}
                 </div>
@@ -974,20 +976,31 @@ function LessonComplete({
   xp: number;
   onContinue: () => void;
 }) {
+  const t = useTranslations("LessonReader");
   const pct = total > 0 ? Math.round((correct / total) * 100) : null;
   return (
     <Card
       p={32}
+      className="st-card"
       style={{ maxWidth: 480, margin: "24px auto 0", textAlign: "center" }}
     >
-      <div style={{ fontSize: 40, marginBottom: 4 }}>
-        {summary.completed ? "🎉" : "✓"}
+      {/* Celebration moment (R19): the emoji pops in, the streak-green XP
+          chip and Continue button get tactile feedback. */}
+      <div
+        className="st-celebrate"
+        style={{ fontSize: 52, marginBottom: 4, lineHeight: 1 }}
+      >
+        {summary.completed ? "🎉" : "✅"}
       </div>
       <Eyebrow style={{ marginBottom: 8 }}>
-        {summary.completed ? "Course complete" : "Lesson complete"}
+        {summary.completed
+          ? t("courseCompleteEyebrow")
+          : t("lessonCompleteEyebrow")}
       </Eyebrow>
-      <h1 className="wf-h1" style={{ fontSize: 24, marginBottom: 12 }}>
-        {summary.completed ? "You finished the course!" : "Nice work!"}
+      <h1 className="wf-h1" style={{ fontSize: 26, marginBottom: 12 }}>
+        {summary.completed
+          ? t("courseCompleteHeading")
+          : t("lessonCompleteHeading")}
       </h1>
       {total > 0 && (
         <div
@@ -997,19 +1010,19 @@ function LessonComplete({
             marginBottom: 6,
           }}
         >
-          You answered <b>{correct}</b> of <b>{total}</b> correctly
-          {pct !== null ? ` · ${pct}%` : ""}.
+          {t("score", { correct, total })}
+          {pct !== null ? ` · ${pct}%` : ""}
         </div>
       )}
       {xp > 0 && (
         <div
-          className="wf-mono"
+          className="st-celebrate wf-mono"
           style={{
             display: "inline-block",
             marginTop: 4,
             marginBottom: 18,
-            fontSize: 12,
-            padding: "3px 10px",
+            fontSize: 13,
+            padding: "4px 12px",
             borderRadius: 3,
             background: "var(--wf-good)",
             color: "white",
@@ -1017,7 +1030,7 @@ function LessonComplete({
             letterSpacing: "0.06em",
           }}
         >
-          +{xp} XP earned
+          {t("xpEarned", { xp })}
         </div>
       )}
       <div
@@ -1028,8 +1041,8 @@ function LessonComplete({
           marginTop: 8,
         }}
       >
-        <Btn variant="primary" onClick={onContinue}>
-          {summary.nextLessonSlug ? "Next lesson →" : "Back to course →"}
+        <Btn variant="primary" className="st-pop" onClick={onContinue}>
+          {summary.nextLessonSlug ? t("nextLesson") : t("backToCourseCta")}
         </Btn>
       </div>
     </Card>

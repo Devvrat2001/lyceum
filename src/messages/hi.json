@@ -49,5 +49,22 @@
     "done": "हो गया",
     "adaptsDifficulty": "कठिनाई के अनुसार ढलता है",
     "aiPartner": "AI बातचीत साथी"
+  },
+  "LessonReader": {
+    "markComplete": "पाठ पूरा करें →",
+    "completing": "पूरा हो रहा है…",
+    "lessonCompleteBtn": "पाठ पूरा →",
+    "nextQuestion": "अगला प्रश्न →",
+    "emptyTitle": "पाठ खाली है",
+    "emptyBody": "आपके शिक्षक ने अभी तक इस पाठ में सामग्री नहीं जोड़ी है। थोड़ी देर बाद देखें — या कोर्स की रूपरेखा से कोई दूसरा पाठ चुनें।",
+    "backToCourse": "कोर्स पर वापस जाएँ",
+    "courseCompleteEyebrow": "कोर्स पूरा",
+    "lessonCompleteEyebrow": "पाठ पूरा",
+    "courseCompleteHeading": "आपने कोर्स पूरा कर लिया!",
+    "lessonCompleteHeading": "बढ़िया काम!",
+    "score": "आपने {total} में से {correct} सही किए।",
+    "xpEarned": "+{xp} XP अर्जित",
+    "nextLesson": "अगला पाठ →",
+    "backToCourseCta": "कोर्स पर वापस →"
   }
 }

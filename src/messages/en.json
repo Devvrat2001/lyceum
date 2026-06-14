@@ -49,5 +49,22 @@
     "done": "Done",
     "adaptsDifficulty": "Adapts difficulty",
     "aiPartner": "AI conversation partner"
+  },
+  "LessonReader": {
+    "markComplete": "Mark lesson complete →",
+    "completing": "Completing…",
+    "lessonCompleteBtn": "Lesson complete →",
+    "nextQuestion": "Next question →",
+    "emptyTitle": "Lesson is empty",
+    "emptyBody": "Your teacher hasn't added content to this lesson yet. Check back soon — or pick another lesson from the course outline.",
+    "backToCourse": "Back to course",
+    "courseCompleteEyebrow": "Course complete",
+    "lessonCompleteEyebrow": "Lesson complete",
+    "courseCompleteHeading": "You finished the course!",
+    "lessonCompleteHeading": "Nice work!",
+    "score": "You answered {correct} of {total} correctly.",
+    "xpEarned": "+{xp} XP earned",
+    "nextLesson": "Next lesson →",
+    "backToCourseCta": "Back to course →"
   }
 }

@@ -49,5 +49,22 @@
     "done": "Hecho",
     "adaptsDifficulty": "Ajusta la dificultad",
     "aiPartner": "Compañero de conversación IA"
+  },
+  "LessonReader": {
+    "markComplete": "Marcar lección completa →",
+    "completing": "Completando…",
+    "lessonCompleteBtn": "Lección completa →",
+    "nextQuestion": "Siguiente pregunta →",
+    "emptyTitle": "La lección está vacía",
+    "emptyBody": "Tu profesor aún no ha añadido contenido a esta lección. Vuelve pronto — o elige otra lección del temario del curso.",
+    "backToCourse": "Volver al curso",
+    "courseCompleteEyebrow": "Curso completado",
+    "lessonCompleteEyebrow": "Lección completada",
+    "courseCompleteHeading": "¡Terminaste el curso!",
+    "lessonCompleteHeading": "¡Buen trabajo!",
+    "score": "Acertaste {correct} de {total}.",
+    "xpEarned": "+{xp} XP ganados",
+    "nextLesson": "Siguiente lección →",
+    "backToCourseCta": "Volver al curso →"
   }
 }
