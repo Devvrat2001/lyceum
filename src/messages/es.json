@@ -94,5 +94,33 @@
     "mastered": "{pct}% dominado",
     "upNext": "Lo siguiente",
     "upNextHint": "↑ Lo siguiente — las respuestas correctas avanzan esto hacia el dominio"
+  },
+  "Nav": {
+    "home": "Inicio",
+    "paths": "Mis rutas",
+    "library": "Biblioteca",
+    "browse": "Explorar",
+    "progress": "Progreso",
+    "community": "Comunidad"
+  },
+  "Browse": {
+    "catalog": "Catálogo",
+    "allCourses": "Todos los cursos",
+    "searchPlaceholder": "Buscar por título, materia o profesor…",
+    "searchAria": "Buscar cursos",
+    "count": "{count, plural, one {# curso} other {# cursos}}",
+    "filter": "Filtrar",
+    "noCourses": "No se encontraron cursos",
+    "nothingMatches": "Nada coincide con «{q}».",
+    "clearSearch": "Borrar búsqueda",
+    "loadMore": "Cargar más",
+    "loading": "Cargando…"
+  },
+  "CourseDetail": {
+    "browse": "Explorar",
+    "whatYoullMaster": "Lo que dominarás",
+    "curriculum": "Plan de estudios",
+    "reviewThisCourse": "Reseña este curso",
+    "whatStudentsSay": "Lo que dicen los estudiantes"
   }
 }

@@ -5,6 +5,7 @@ import { MarketChrome } from "@/components/layouts/MarketChrome";
 import { Annot, Avatar, Card, Icon } from "@/components/wf/primitives";
 import { boardLabel } from "@/lib/marketplace";
 import { courseGradient, subjectGlyph } from "@/lib/thumbnail";
+import { getTranslations } from "next-intl/server";
 import { getServerCaller } from "@/lib/trpc/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -73,6 +74,7 @@ export default async function CourseDetailPage({
     throw err;
   }
 
+  const t = await getTranslations("CourseDetail");
   const [reviews, myStatus, session] = await Promise.all([
     trpc.course.reviews({ courseId: course.id, limit: 4 }),
     trpc.course.myStatus({ courseId: course.id }),
@@ -145,7 +147,7 @@ export default async function CourseDetailPage({
             href="/"
             style={{ color: "inherit", textDecoration: "none" }}
           >
-            Browse
+            {t("browse")}
           </Link>{" "}
           · {course.subject.toUpperCase()} ·{" "}
           {boardLabel(course.board) ? `${boardLabel(course.board)} · ` : ""}
@@ -251,7 +253,7 @@ export default async function CourseDetailPage({
                   className="wf-h2"
                   style={{ fontSize: 18, marginBottom: 12 }}
                 >
-                  What you&apos;ll master
+                  {t("whatYoullMaster")}
                 </h2>
                 <div
                   className="wf-grid-cards-2"
@@ -302,7 +304,7 @@ export default async function CourseDetailPage({
               }}
             >
               <h2 className="wf-h2" style={{ fontSize: 18 }}>
-                Curriculum
+                {t("curriculum")}
               </h2>
               <span style={{ fontSize: 12, color: "var(--wf-mute)" }}>
                 {course.units.length} units · {totalLessons} lessons
@@ -332,7 +334,7 @@ export default async function CourseDetailPage({
                   className="wf-h2"
                   style={{ fontSize: 18, margin: "28px 0 12px" }}
                 >
-                  Review this course
+                  {t("reviewThisCourse")}
                 </h2>
                 <CourseReviewForm courseId={course.id} />
               </>
@@ -344,7 +346,7 @@ export default async function CourseDetailPage({
                   className="wf-h2"
                   style={{ fontSize: 18, margin: "28px 0 12px" }}
                 >
-                  What students say
+                  {t("whatStudentsSay")}
                 </h2>
                 <div className="wf-grid-cards-2">
                   {reviews.map((r) => (

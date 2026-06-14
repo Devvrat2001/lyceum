@@ -94,5 +94,33 @@
     "mastered": "{pct}% महारत",
     "upNext": "अगला",
     "upNextHint": "↑ अगला — सही उत्तर इसे महारत की ओर बढ़ाते हैं"
+  },
+  "Nav": {
+    "home": "होम",
+    "paths": "मेरे मार्ग",
+    "library": "लाइब्रेरी",
+    "browse": "ब्राउज़ करें",
+    "progress": "प्रगति",
+    "community": "समुदाय"
+  },
+  "Browse": {
+    "catalog": "कैटलॉग",
+    "allCourses": "सभी कोर्स",
+    "searchPlaceholder": "शीर्षक, विषय या शिक्षक से खोजें…",
+    "searchAria": "कोर्स खोजें",
+    "count": "{count, plural, one {# कोर्स} other {# कोर्स}}",
+    "filter": "फ़िल्टर",
+    "noCourses": "कोई कोर्स नहीं मिला",
+    "nothingMatches": "«{q}» से कुछ मेल नहीं खाता।",
+    "clearSearch": "खोज साफ़ करें",
+    "loadMore": "और दिखाएँ",
+    "loading": "लोड हो रहा है…"
+  },
+  "CourseDetail": {
+    "browse": "ब्राउज़ करें",
+    "whatYoullMaster": "आप क्या सीखेंगे",
+    "curriculum": "पाठ्यक्रम",
+    "reviewThisCourse": "इस कोर्स की समीक्षा करें",
+    "whatStudentsSay": "छात्र क्या कहते हैं"
   }
 }

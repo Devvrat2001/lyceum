@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { keepPreviousData } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc/react";
 import { Btn, Card, Eyebrow } from "@/components/wf/primitives";
@@ -19,6 +20,7 @@ import { useDebouncedValue } from "@/lib/useDebouncedValue";
  * flicker. "Load more" walks the cursor for big catalogs.
  */
 export function BrowseClient({ initialQ }: { initialQ: string }) {
+  const t = useTranslations("Browse");
   const [q, setQ] = useState(initialQ);
   const debouncedQ = useDebouncedValue(q.trim(), 250);
 
@@ -61,9 +63,9 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
         width: "100%",
       }}
     >
-      <Eyebrow>Catalog</Eyebrow>
+      <Eyebrow>{t("catalog")}</Eyebrow>
       <h1 className="wf-h1" style={{ fontSize: 28, margin: "6px 0 14px" }}>
-        All courses
+        {t("allCourses")}
       </h1>
 
       <div
@@ -78,9 +80,9 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by title, subject, or teacher…"
+          placeholder={t("searchPlaceholder")}
           autoFocus
-          aria-label="Search courses"
+          aria-label={t("searchAria")}
           style={{
             fontSize: 13,
             padding: "9px 12px",
@@ -98,7 +100,7 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
         >
           {browse.isLoading
             ? "…"
-            : `${total.toLocaleString()} course${total === 1 ? "" : "s"}`}
+            : t("count", { count: total })}
         </span>
       </div>
 
@@ -113,7 +115,7 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
           flexWrap: "wrap",
         }}
       >
-        <Eyebrow style={{ marginRight: 8 }}>Filter</Eyebrow>
+        <Eyebrow style={{ marginRight: 8 }}>{t("filter")}</Eyebrow>
         <MarketplaceFilters />
         <div style={{ flex: 1 }} />
         <MarketplaceSort />
@@ -121,7 +123,7 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
 
       {browse.isLoading ? null : courses.length === 0 ? (
         <Card p={28} style={{ textAlign: "center" }}>
-          <Eyebrow>No courses found</Eyebrow>
+          <Eyebrow>{t("noCourses")}</Eyebrow>
           <div
             style={{
               marginTop: 8,
@@ -129,7 +131,7 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
               color: "var(--wf-body)",
             }}
           >
-            Nothing matches &ldquo;{debouncedQ}&rdquo;.{" "}
+            {t("nothingMatches", { q: debouncedQ })}{" "}
             <button
               type="button"
               onClick={() => setQ("")}
@@ -143,7 +145,7 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
                 cursor: "pointer",
               }}
             >
-              Clear search
+              {t("clearSearch")}
             </button>
           </div>
         </Card>
@@ -169,7 +171,7 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
             disabled={browse.isFetchingNextPage}
             onClick={() => browse.fetchNextPage()}
           >
-            {browse.isFetchingNextPage ? "Loading…" : "Load more"}
+            {browse.isFetchingNextPage ? t("loading") : t("loadMore")}
           </Btn>
         </div>
       )}
