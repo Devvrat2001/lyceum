@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Btn } from "@/components/wf/primitives";
 import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombobox";
+import { NotificationBell } from "@/components/layouts/NotificationBell";
 import { useIsMobile } from "@/lib/useMediaQuery";
 
 /**
@@ -309,6 +310,9 @@ export function MarketChrome({
           {navLinks}
         </nav>
         <HeaderSearchCombobox />
+        {/* Bell for signed-in viewers only — the marketplace is public,
+            and notification.list is a protected query (R36). */}
+        {role && <NotificationBell />}
         <AuthArea navKey={navKey} />
       </header>
       {children}

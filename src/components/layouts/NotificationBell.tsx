@@ -22,7 +22,15 @@ function timeAgo(date: Date): string {
   return `${d}d`;
 }
 
-export function NotificationBell() {
+export function NotificationBell({
+  dropUp = false,
+  dark = false,
+}: {
+  /** Open the panel upward (for a sidebar-bottom placement). */
+  dropUp?: boolean;
+  /** Light bell icon for dark sidebars (admin). */
+  dark?: boolean;
+} = {}) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -61,7 +69,7 @@ export function NotificationBell() {
           padding: 4,
           cursor: "pointer",
           position: "relative",
-          color: "var(--wf-body)",
+          color: dark ? "rgba(255,255,255,0.7)" : "var(--wf-body)",
         }}
       >
         <Icon name="bell" size={18} color="currentColor" />
@@ -95,7 +103,9 @@ export function NotificationBell() {
         <div
           style={{
             position: "absolute",
-            top: "calc(100% + 8px)",
+            ...(dropUp
+              ? { bottom: "calc(100% + 8px)" }
+              : { top: "calc(100% + 8px)" }),
             right: 0,
             width: 360,
             maxHeight: 480,

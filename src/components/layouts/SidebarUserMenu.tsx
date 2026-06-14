@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { Icon } from "@/components/wf/primitives";
+import { NotificationBell } from "@/components/layouts/NotificationBell";
 
 /**
  * Bottom-of-sidebar identity strip:
@@ -82,6 +83,10 @@ export function SidebarUserMenu({ dark = false }: { dark?: boolean }) {
             {u.role}
           </div>
         </div>
+        {/* Notifications bell (R36) — lives in the shared sidebar identity
+            strip so it's on EVERY page of the Student/Teacher/Admin
+            chromes, not just the dashboard. Opens upward (sidebar bottom). */}
+        <NotificationBell dropUp dark={dark} />
       </div>
       <Link
         href="/settings"

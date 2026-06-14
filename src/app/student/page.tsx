@@ -15,7 +15,6 @@ import { getServerCaller } from "@/lib/trpc/server";
 import { TodaysPlan } from "@/components/student/TodaysPlan";
 import { TutorMiniCard } from "@/components/student/TutorMiniCard";
 import { ContinueLearningCard } from "@/components/student/ContinueLearningCard";
-import { NotificationBell } from "@/components/layouts/NotificationBell";
 
 const BADGE_ICON_FOR_SLUG: Record<string, string> = {
   "hot-streak": "flame",
@@ -67,7 +66,9 @@ export default async function StudentDashboard() {
         <LocaleToggle />
         <StreakChip days={dashboard.stats.streak} />
         <XPChip value={dashboard.stats.xp} />
-        <NotificationBell />
+        {/* Notifications bell now lives in the StudentChrome sidebar
+            (SidebarUserMenu), so it's on every page — removed the
+            dashboard-only duplicate here (R36). */}
         <Avatar initials={dashboard.me.avatarInitials || "ME"} />
       </header>
 
