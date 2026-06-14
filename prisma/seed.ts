@@ -326,6 +326,10 @@ async function main() {
     subject: string;
     grade: string;
     format?: string; // delivery format; defaults to "self_paced" when omitted
+    // Live/cohort scheduling (R25). sessionInDays seeds a start relative
+    // to seed time so the demo card always shows an upcoming session.
+    sessionInDays?: number;
+    sessionJoinUrl?: string;
     board?: string; // curriculum board tag ("cbse" | "icse" | "state" | …); omitted = untagged
     priceCents: number;
     tag: string;
@@ -562,6 +566,8 @@ async function main() {
       subject: "math",
       grade: "6",
       format: "cohort",
+      sessionInDays: 10,
+      sessionJoinUrl: "https://meet.google.com/lyceum-olympiad-demo",
       priceCents: 149900,
       tag: "CHALLENGE",
       aiHint:
@@ -659,6 +665,10 @@ async function main() {
 
   for (const c of COURSE_SEEDS) {
     const author = teachers.get(c.teacherName)!;
+    const sessionStartsAt =
+      c.sessionInDays != null
+        ? new Date(Date.now() + c.sessionInDays * 24 * 3600 * 1000)
+        : null;
     const course = await db.course.upsert({
       where: { slug: c.slug },
       update: {
@@ -670,6 +680,8 @@ async function main() {
         subject: c.subject,
         grade: c.grade,
         format: c.format ?? "self_paced",
+        sessionStartsAt,
+        sessionJoinUrl: c.sessionJoinUrl ?? null,
         board: c.board ?? null,
         status: "PUBLISHED",
         priceCents: c.priceCents,
@@ -689,6 +701,8 @@ async function main() {
         subject: c.subject,
         grade: c.grade,
         format: c.format ?? "self_paced",
+        sessionStartsAt,
+        sessionJoinUrl: c.sessionJoinUrl ?? null,
         board: c.board ?? null,
         status: "PUBLISHED",
         priceCents: c.priceCents,

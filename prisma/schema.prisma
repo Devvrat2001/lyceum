@@ -206,7 +206,12 @@ model Course {
   subject      String       // "math"
   grade        String       // "6"
   format       String       @default("self_paced") // delivery format: "self_paced" | "live" | "cohort"
-  board        String?      // curriculum board tag: "cbse" | "icse" | "state" | "ib" | "cambridge"; null = untagged
+  // Live/cohort scheduling (R25). NULL for self-paced. sessionStartsAt =
+  // when the live class / cohort kicks off; sessionJoinUrl = the meeting
+  // link, revealed only to enrolled students (+ author/admin).
+  sessionStartsAt DateTime?
+  sessionJoinUrl  String?
+  board       String?      // curriculum board tag: "cbse" | "icse" | "state" | "ib" | "cambridge"; null = untagged
   status       CourseStatus @default(DRAFT)
   priceCents   Int          @default(0)
   ratingAvg    Float        @default(0)

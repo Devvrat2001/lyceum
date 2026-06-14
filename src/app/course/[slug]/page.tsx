@@ -8,6 +8,7 @@ import { getServerCaller } from "@/lib/trpc/server";
 import { auth } from "@/lib/auth";
 import { TRPCError } from "@trpc/server";
 import { CurriculumAccordion } from "@/components/course/CurriculumAccordion";
+import { LiveScheduleCard } from "@/components/course/LiveScheduleCard";
 import { EnrollPanel } from "@/components/course/EnrollPanel";
 import { CourseReviewForm } from "@/components/course/CourseReviewForm";
 import { estimateCourseMinutes, formatDuration } from "@/lib/courseLength";
@@ -192,6 +193,24 @@ export default async function CourseDetailPage({
                 </div>
               </>
             )}
+
+            <LiveScheduleCard
+              format={course.format}
+              whenText={
+                course.sessionStartsAt
+                  ? course.sessionStartsAt.toLocaleString("en-IN", {
+                      timeZone: "Asia/Kolkata",
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    }) + " IST"
+                  : null
+              }
+              joinUrl={course.sessionJoinUrl}
+              isEnrolled={myStatus.isEnrolled}
+            />
 
             <div
               style={{

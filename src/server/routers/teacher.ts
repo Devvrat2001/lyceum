@@ -23,7 +23,7 @@ import {
 } from "@/lib/video/mux";
 import { slugify } from "@/lib/slugify";
 import { CURRENCY } from "@/lib/currency";
-import { isMarketplaceBoard } from "@/lib/marketplace";
+import { isMarketplaceBoard, isMarketplaceFormat } from "@/lib/marketplace";
 
 export const teacherRouter = router({
   /** Anyone can check follow state of a teacher (signed-in only). */
@@ -480,6 +480,12 @@ export const teacherRouter = router({
         grade: z.string().max(40).optional(),
         /** Curriculum board slug; empty string clears the tag. */
         board: z.string().max(20).optional(),
+        /** Delivery format: "self_paced" | "live" | "cohort". */
+        format: z.string().max(20).optional(),
+        /** Live/cohort start (ISO 8601); empty string clears it (R25). */
+        sessionStartsAt: z.string().max(40).optional(),
+        /** Live/cohort meeting link; empty string clears it (R25). */
+        sessionJoinUrl: z.string().max(600).optional(),
         priceCents: z.number().int().min(0).max(1_000_000).optional(),
         // Card/hero art. Empty string clears (falls back to the
         // deterministic gradient); http(s)-shape is enforced in the
@@ -543,6 +549,47 @@ export const teacherRouter = router({
           });
         }
         data.board = board.length > 0 ? board : null;
+      }
+      if (input.format !== undefined) {
+        const format = input.format.trim();
+        if (!isMarketplaceFormat(format)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Unknown format — use self-paced, live, or cohort.",
+          });
+        }
+        data.format = format;
+        // Switching back to self-paced clears any stale schedule so a
+        // converted course can't keep showing a dangling "live" card.
+        if (format === "self_paced") {
+          data.sessionStartsAt = null;
+          data.sessionJoinUrl = null;
+        }
+      }
+      if (input.sessionStartsAt !== undefined) {
+        const raw = input.sessionStartsAt.trim();
+        if (raw.length === 0) {
+          data.sessionStartsAt = null;
+        } else {
+          const when = new Date(raw);
+          if (Number.isNaN(when.getTime())) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Session start isn't a valid date/time.",
+            });
+          }
+          data.sessionStartsAt = when;
+        }
+      }
+      if (input.sessionJoinUrl !== undefined) {
+        const raw = input.sessionJoinUrl.trim();
+        if (raw.length > 0 && !/^https?:\/\//i.test(raw)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Meeting link must be an http(s) URL.",
+          });
+        }
+        data.sessionJoinUrl = raw.length > 0 ? raw : null;
       }
       if (input.priceCents !== undefined) {
         data.priceCents = input.priceCents;

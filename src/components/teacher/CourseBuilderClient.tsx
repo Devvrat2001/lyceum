@@ -34,7 +34,10 @@ import {
 } from "@/components/teacher/BlockInspector";
 import { LessonVideoPlayer } from "@/components/video/LessonVideoPlayer";
 import { BLOCK_GROUPS, findBlockMeta, type BlockType } from "@/lib/blocks";
-import { MARKETPLACE_BOARD_BUCKETS } from "@/lib/marketplace";
+import {
+  MARKETPLACE_BOARD_BUCKETS,
+  MARKETPLACE_FORMAT_BUCKETS,
+} from "@/lib/marketplace";
 
 /**
  * Course Builder v2 — a Gamma-style WYSIWYG authoring surface, rebuilt
@@ -119,6 +122,9 @@ type CourseProps = {
   subject: string;
   grade: string;
   board: string | null;
+  format: string;
+  sessionStartsAt: string | null;
+  sessionJoinUrl: string | null;
   priceCents: number;
   thumbnailUrl: string | null;
   updatedAt: string;
@@ -3715,6 +3721,23 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** ISO (UTC) → `datetime-local` input value in the browser's local tz. */
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  // Shift by the tz offset so toISOString's slice reads as LOCAL time.
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+/** `datetime-local` value (local tz) → ISO 8601 (UTC), or "" when empty. */
+function localInputToIso(local: string): string {
+  if (!local) return "";
+  const d = new Date(local); // datetime-local is parsed as local time
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+}
+
 function CourseDetailsEditor({ course }: { course: CourseProps }) {
   const router = useRouter();
   const [title, setTitle] = useState(course.title);
@@ -3722,9 +3745,17 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
   const [subject, setSubject] = useState(course.subject);
   const [grade, setGrade] = useState(course.grade);
   const [board, setBoard] = useState(course.board ?? "");
+  const [format, setFormat] = useState(course.format);
+  const [sessionStartsAt, setSessionStartsAt] = useState(
+    isoToLocalInput(course.sessionStartsAt)
+  );
+  const [sessionJoinUrl, setSessionJoinUrl] = useState(
+    course.sessionJoinUrl ?? ""
+  );
   const [price, setPrice] = useState((course.priceCents / 100).toString());
   const [thumbnailUrl, setThumbnailUrl] = useState(course.thumbnailUrl ?? "");
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const isScheduled = format === "live" || format === "cohort";
 
   const update = trpc.teacher.updateCourse.useMutation({
     onSuccess: () => {
@@ -3743,6 +3774,9 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
     subject !== course.subject ||
     grade !== course.grade ||
     board !== (course.board ?? "") ||
+    format !== course.format ||
+    sessionStartsAt !== isoToLocalInput(course.sessionStartsAt) ||
+    sessionJoinUrl !== (course.sessionJoinUrl ?? "") ||
     priceCents !== course.priceCents ||
     thumbnailUrl !== (course.thumbnailUrl ?? "");
 
@@ -3769,6 +3803,30 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
             ...MARKETPLACE_BOARD_BUCKETS,
           ]}
         />
+        <DetailSelect
+          label="Delivery format"
+          value={format}
+          onChange={setFormat}
+          options={MARKETPLACE_FORMAT_BUCKETS}
+        />
+        {isScheduled && (
+          <>
+            <DetailInput
+              label={
+                format === "live" ? "Live session start" : "Cohort start"
+              }
+              value={sessionStartsAt}
+              onChange={setSessionStartsAt}
+              type="datetime-local"
+            />
+            <DetailInput
+              label="Meeting link"
+              value={sessionJoinUrl}
+              onChange={setSessionJoinUrl}
+              placeholder="https://meet.… (shown to enrolled students)"
+            />
+          </>
+        )}
         <DetailInput
           label="Price · USD"
           value={price}
@@ -3792,6 +3850,13 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
               subject: subject.trim(),
               grade: grade.trim(),
               board,
+              format,
+              // When scheduled, send the local-input value as ISO; the
+              // server clears these anyway if format flips to self-paced.
+              sessionStartsAt: isScheduled
+                ? localInputToIso(sessionStartsAt)
+                : "",
+              sessionJoinUrl: isScheduled ? sessionJoinUrl.trim() : "",
               priceCents,
               thumbnailUrl: thumbnailUrl.trim(),
             })

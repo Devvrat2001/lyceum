@@ -37,6 +37,11 @@ export default async function CourseBuilderPage({
           subject: course.subject,
           grade: course.grade,
           board: course.board,
+          format: course.format,
+          sessionStartsAt: course.sessionStartsAt
+            ? course.sessionStartsAt.toISOString()
+            : null,
+          sessionJoinUrl: course.sessionJoinUrl,
           priceCents: course.priceCents,
           thumbnailUrl: course.thumbnailUrl,
           updatedAt: course.updatedAt.toISOString(),
