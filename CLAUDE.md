@@ -36,7 +36,7 @@ npm run db:reset      # Wipes DB — destructive
 - `AGENT_NOTES.md` — session-to-session scratchpad (phase status, last commit, new gotchas). **Update every session.**
 - `BACKEND_ROADMAP.md` — longer-horizon planning.
 - `KNOWN_ISSUES.md` — audited latent risks / tech debt (lint errors, unvalidated `Json` casts, structural debt) that compile today but fail later. Refresh after big sweeps; don't let S2/S3 rot into S1.
-- `REQUIREMENTS.md` — prioritized backlog (R1–R28) from the 2026-06-12 full review. Pick the highest OPEN item, work the normal cycle, update its Status inline. Its "Verified clean" section lists what NOT to re-audit.
+- `REQUIREMENTS.md` — prioritized backlog from the 2026-06-12 full review (R1–R28, all DONE except R1 user-owned TLS) + the **P4 post-marathon backlog R29–R35** from the 2026-06-14 review pass. Pick the highest OPEN item, work the normal cycle, update its Status inline. Its "Verified clean" section lists what NOT to re-audit.
 
 ## Key paths
 - `src/server/routers/` — tRPC routers (lesson, teacher, marketplace, payment)
