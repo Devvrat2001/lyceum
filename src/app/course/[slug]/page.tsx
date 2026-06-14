@@ -8,8 +8,8 @@ import { courseGradient, subjectGlyph } from "@/lib/thumbnail";
 import { getTranslations } from "next-intl/server";
 import { getServerCaller } from "@/lib/trpc/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { courseCanonicalMetadata } from "@/lib/seo";
 import { TRPCError } from "@trpc/server";
 import { CurriculumAccordion } from "@/components/course/CurriculumAccordion";
 import { LiveScheduleCard } from "@/components/course/LiveScheduleCard";
@@ -18,10 +18,9 @@ import { CourseReviewForm } from "@/components/course/CourseReviewForm";
 import { estimateCourseMinutes, formatDuration } from "@/lib/courseLength";
 
 /**
- * Per-course SEO metadata (R32). A direct, minimal DB read (Next dedupes
- * RSC data within a request, but a tRPC caller isn't auto-deduped, so a
- * lean query here is cheaper than re-running bySlug). Falls back to the
- * root metadata when the course doesn't exist.
+ * Per-course SEO metadata (R32). Delegates to `courseCanonicalMetadata`
+ * (a lean db-only lib) so the logic is unit-testable without the page's
+ * server-only import graph (R40).
  */
 export async function generateMetadata({
   params,
@@ -29,33 +28,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const course = await db.course.findUnique({
-    where: { slug },
-    select: {
-      title: true,
-      tagline: true,
-      description: true,
-      thumbnailUrl: true,
-      subject: true,
-      grade: true,
-      status: true,
-    },
-  });
-  if (!course || course.status !== "PUBLISHED") return {};
-  const desc = (course.tagline ?? course.description).slice(0, 200);
-  const url = `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/course/${slug}`;
-  return {
-    title: course.title,
-    description: desc,
-    alternates: { canonical: url },
-    openGraph: {
-      type: "website",
-      url,
-      title: course.title,
-      description: desc,
-      ...(course.thumbnailUrl ? { images: [course.thumbnailUrl] } : {}),
-    },
-  };
+  return courseCanonicalMetadata(slug);
 }
 
 export default async function CourseDetailPage({
