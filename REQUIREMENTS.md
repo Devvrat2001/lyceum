@@ -341,21 +341,29 @@ blocked on WhatsApp keys). New net-new findings from a fresh audit:
   `ParentHeader`, and `MarketChrome` top bar [anonymous-friendly — locale
   is cookie-based]; removed the 2 duplicate page-level toggles. The 12
   i18n surfaces are now reachable app-wide.)
-- **R38 · Accessibility pass** · Status: v1 DONE (cont.41 — `Icon` now
-  renders `aria-hidden` [decorative; accessible name comes from the
-  wrapping control], `Toggle` is a `role=switch` with `aria-checked` +
-  `aria-label` [both ToggleRow callsites pass their visible label].
-  Remaining: per-callsite aria-labels on icon-only buttons + non-color
-  status companions [StatusPill, plan rows, week strip].) — WCAG-AA
-  baseline schools ask for.
-- **R39 · Free-response XP reconciliation** (R33 v2) — a teacher score
-  override doesn't touch the XP awarded at submit. Decide the policy
-  (re-award the delta when the override crosses the 60 pass line, or
-  freeze) and reconcile the XPEvent ledger.
-- **R40 · Public-route integration tests** — sitemap / robots / .ics / OG
-  metadata are only smoke-checked via build artifacts. Add request-level
-  tests: .ics 404 on a self-paced course, sitemap excludes DRAFT courses,
-  robots disallows /api, course generateMetadata returns the canonical.
+- **R38 · Accessibility pass** · Status: v2 DONE (cont.41 Icon/Toggle
+  baseline; cont.42 labelled the remaining icon-only/placeholder-only
+  controls — tutor send button + tutor question input, command-palette
+  search, block-search. Audited the rest as already-covered: builder drag
+  handles [Reorder unit/lesson], browse search [aria], AI-outline
+  regenerate/settings, and reader correctness [✓/✗ glyphs + check icons +
+  "Correct"/"Not quite" text, not colour-only]. Long-tail full-surface
+  sweep stays under R38.) — WCAG-AA baseline schools ask for.
+- **R39 · Free-response XP reconciliation** (R33 v2) · Status: DONE
+  (cont.42 — `reconcileFreeResponseXp` service: teacher override is
+  authoritative, so crossing the 60 pass line either way writes a single
+  delta XPEvent keyed to the *attempt* [block.id isn't unique], idempotent
+  across re-overrides + clear-to-AI. Streaks/badges left as-earned. Submit
+  award now refId=attempt.id and shares FREE_RESPONSE_XP/PASS constants.
+  Student gets a grade_updated notification when XP moves. 3 reconcile
+  tests.)
+- **R40 · Public-route integration tests** · Status: DONE (cont.42 —
+  `test/publicRoutes.test.ts`: sitemap includes PUBLISHED / excludes DRAFT
+  / leaks no app routes; robots disallows /api + app + sitemap ref; .ics
+  404s on unknown/draft/session-less + valid recurring VEVENT on a live
+  course; course canonical metadata set for published, empty for
+  draft/unknown. generateMetadata logic extracted to `lib/seo.ts` so it's
+  testable without the page's server-only graph.)
 
 ---
 
