@@ -277,33 +277,30 @@ The original R1–R28 board is cleared (R1 = user-owned TLS, the only OPEN).
 This is the NET-NEW backlog surfaced by a fresh review after the marathon —
 pick the highest item and work the normal cycle. Ordered by trust/impact.
 
-- **R29 · Lesson-reader honesty pass** (P0-trust) — the reader still ships
-  fabricated elements to students on the highest-trust surface
-  (`LessonClient.tsx`): a fake citation `Cited: …, p. 142` on the opening
-  tutor message (line ~121); a hardcoded `<XPChip value={120}>` in the
-  header (line ~342); a fake TOC progress model `stepStateFor` that marks
-  "first 3 done, 4th current, rest locked" regardless of real progress
-  (line ~298); and three dead header buttons (Pin / Notes / Offline — the
-  last now duplicated by R22's real library save). Drive the XP chip + TOC
-  from real LessonProgress/Attempt data or remove them; kill the fake
-  citation (the tutor's real citations come from `findCitation`); cut or
-  wire the dead buttons. Same de-vanity discipline as R8.
-- **R30 · i18n breadth** (the big R20 continuation) — only 6 of ~113 tsx
-  surfaces are translated (dashboard, progress, today's plan, lesson
-  reader, library, skill-tree). The locale toggle is global but most of
-  the app stays English: chrome nav (all 5 `*Chrome`), /browse, course
-  detail, teacher/admin. Extend namespace-by-namespace; fix the v1 limit
-  too (tRPC-built strings — plan titles, assignment due labels — need
-  request-scoped getTranslations or tag-based client rendering).
+- **R29 · Lesson-reader honesty pass** · Status: DONE (cont.38 — killed
+  the fake `p. 142` citation [real ones come from findCitation on streamed
+  replies]; `<XPChip value={120}>` → live `xpEarned`; fake `stepStateFor`
+  TOC progress → neutral authored-steps list; removed dead Pin/Notes/Offline
+  header buttons. Reader header is now honest.) (P0-trust) — fabricated
+  elements on the highest-trust surface, same de-vanity discipline as R8.
+- **R30 · i18n breadth** · Status: IN PROGRESS (cont.38 — +Nav [Student
+  chrome], +Browse [/browse, ICU plural], +CourseDetail; 9 surfaces now
+  localized en/es/hi. Remaining: teacher/admin chromes + the other
+  `*Chrome` nav + tRPC-built strings [plan titles, assignment due labels —
+  need request-scoped getTranslations or tag-based client rendering].) —
+  the big R20 continuation; extend namespace-by-namespace.
 - **R31 · Wire the WhatsApp senders** (unblocks the day R23's keys land) —
   connect `lib/whatsapp.ts` to the streak-rollover cron (streak_reminder),
   the assignment post (assignment_due), and a new parent-digest cron
   (parent_weekly_digest); capture an opt-in + a phone column on User.
-- **R32 · SEO / discovery** — there is NO `sitemap.ts`, `robots.ts`,
-  `opengraph-image`, or per-course `generateMetadata` anywhere. Marketplace
-  courses aren't indexable and share as bare links. Add a course/teacher
-  sitemap, OG cards (reuse the gradient/glyph art), and JSON-LD Course
-  structured data. Pure growth lever for a marketplace.
+- **R32 · SEO / discovery** · Status: DONE (cont.38 — `app/sitemap.ts`
+  [static + PUBLISHED courses + non-hidden teacher storefronts, best-effort
+  on DB error], `app/robots.ts` [allow catalog, disallow authed app+API,
+  sitemap ref], root `metadataBase` + title template + default OG/Twitter,
+  course `generateMetadata` [canonical + OG image from thumbnailUrl] +
+  schema.org Course JSON-LD [rating/price/provider]. Build renders
+  sitemap.xml with all 6 courses + robots.txt. v2: dynamic OG images,
+  per-locale alternates.) — was zero SEO surface; pure growth lever.
 - **R33 · Free-response teacher review** (R24 v2) — answers + AI scores
   persist on Attempt but no teacher surface reads them. Build a review page
   (per assignment/lesson) listing submissions with the AI grade + an
