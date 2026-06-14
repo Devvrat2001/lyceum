@@ -287,8 +287,10 @@ pick the highest item and work the normal cycle. Ordered by trust/impact.
   CourseDetail; cont.39 +TeacherNav/AdminNav chrome navs — **11 surfaces
   localized** en/es/hi. Remaining: deeper teacher/admin page bodies +
   tRPC-built strings [plan titles, assignment due labels — need
-  request-scoped getTranslations or tag-based client rendering].) — the
-  big R20 continuation; extend namespace-by-namespace.
+  request-scoped getTranslations or tag-based client rendering].
+  cont.40: +TeacherCourses page body [first teacher page-body surface] —
+  **12 surfaces**.) — the big R20 continuation; extend
+  namespace-by-namespace.
 - **R31 · Wire the WhatsApp senders** (unblocks the day R23's keys land) —
   connect `lib/whatsapp.ts` to the streak-rollover cron (streak_reminder),
   the assignment post (assignment_due), and a new parent-digest cron
@@ -308,13 +310,51 @@ pick the highest item and work the normal cycle. Ordered by trust/impact.
   /teacher/grading page + Grading nav. v1: overriding doesn't claw back
   XP earned at submit.) (R24 v2) — answers + AI scores persisted but no
   teacher surface read them.
-- **R34 · Live/cohort v2** (R25 v2) — calendar invite (.ics) on the
-  schedule card, recurring sessions (not just one start), and attendance.
+- **R34 · Live/cohort v2** · Status: DONE-v1 (cont.40 — `Course.sessionRecurrence`
+  [weekly/biweekly/monthly] drives an iCalendar RRULE; `lib/calendar.ts`
+  builds the .ics served from `/api/course/[slug]/calendar`; schedule card
+  gains 'Add to calendar' + a 'Repeats weekly' label; builder Repeats
+  select. Pure-builder test. Remaining v2 leg: attendance tracking.) (R25
+  v2) — calendar invite + recurring sessions done; attendance is the
+  remaining piece.
 - **R35 · Parent dashboard polish** · Status: DONE (cont.39 — `/parent`
   XP sum is now a single `xPEvent.groupBy` aggregate keyed by child id
   [was loading every XPEvent row per child]; parent.linkWithCode writes a
   `parent.linked` notification to the child [R26 v2]. Test asserts the
   notification.) (R26/perf)
+
+---
+
+## P5 — post-P4 backlog (R36+), from the 2026-06-15 review pass
+
+P4 is essentially cleared (R29/R30[partial]/R32/R33/R34/R35 done; R31
+blocked on WhatsApp keys). New net-new findings from a fresh audit:
+
+- **R36 · Notification surfacing** (P0-trust) — `NotificationBell` is
+  mounted ONLY on `/student` dashboard, nowhere else. Every notification
+  the app creates (badge_earned, the new `parent.linked` from R35, future
+  WhatsApp-mirrors) is invisible on every other page and to non-students.
+  Mount the bell in all five `*Chrome` layouts. **Directly undercuts R35's
+  child-notify** — the child only sees it if they happen to land on the
+  dashboard.
+- **R37 · Global locale switcher** — `LocaleToggle` only renders on
+  `/student` + `/student/progress`. Teachers, admins, parents, and
+  signed-out marketing visitors have NO way to switch language, so the
+  en/es/hi work (12 surfaces) is unreachable for most of the app. Put the
+  toggle in the chrome user menu (all roles) + a marketing footer spot.
+- **R38 · Accessibility pass** — icon-only controls (`Btn` icon, header
+  back-arrows, `wf-toggle`) have no accessible names (0 aria-labels in
+  primitives); status is color-only (`StatusPill`, plan rows, week strip).
+  Add aria-labels, `aria-pressed`/`role` on toggles, and text/icon
+  companions to color. WCAG-AA baseline — school procurement asks for it.
+- **R39 · Free-response XP reconciliation** (R33 v2) — a teacher score
+  override doesn't touch the XP awarded at submit. Decide the policy
+  (re-award the delta when the override crosses the 60 pass line, or
+  freeze) and reconcile the XPEvent ledger.
+- **R40 · Public-route integration tests** — sitemap / robots / .ics / OG
+  metadata are only smoke-checked via build artifacts. Add request-level
+  tests: .ics 404 on a self-paced course, sitemap excludes DRAFT courses,
+  robots disallows /api, course generateMetadata returns the canonical.
 
 ---
 
