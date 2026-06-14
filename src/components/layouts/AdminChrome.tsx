@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Icon } from "@/components/wf/primitives";
 import { SidebarUserMenu } from "@/components/layouts/SidebarUserMenu";
 import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombobox";
@@ -131,6 +132,7 @@ export function AdminChrome({
 }) {
   const pathname = usePathname() ?? "";
   const isMobile = useIsMobile();
+  const t = useTranslations("AdminNav");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const computedActive =
     active ??
@@ -158,7 +160,7 @@ export function AdminChrome({
         }}
       >
         <Icon name={item.icon} size={16} color="currentColor" />
-        {item.label}
+        {t(item.id)}
       </Link>
     );
   });

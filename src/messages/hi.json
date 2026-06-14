@@ -122,5 +122,28 @@
     "curriculum": "पाठ्यक्रम",
     "reviewThisCourse": "इस कोर्स की समीक्षा करें",
     "whatStudentsSay": "छात्र क्या कहते हैं"
+  },
+  "TeacherNav": {
+    "courses": "मेरे कोर्स",
+    "students": "छात्र",
+    "assignments": "असाइनमेंट",
+    "grading": "ग्रेडिंग",
+    "analytics": "एनालिटिक्स",
+    "storefront": "स्टोरफ्रंट",
+    "paths": "बंडल",
+    "earnings": "आय",
+    "community": "चर्चाएँ"
+  },
+  "AdminNav": {
+    "overview": "अवलोकन",
+    "people": "लोग",
+    "teachers": "शिक्षक",
+    "curriculum": "पाठ्यक्रम",
+    "classes": "कक्षाएँ",
+    "analytics": "एनालिटिक्स",
+    "integrations": "इंटीग्रेशन",
+    "branding": "ब्रांडिंग",
+    "billing": "बिलिंग",
+    "audit": "ऑडिट लॉग"
   }
 }

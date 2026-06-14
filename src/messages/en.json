@@ -122,5 +122,28 @@
     "curriculum": "Curriculum",
     "reviewThisCourse": "Review this course",
     "whatStudentsSay": "What students say"
+  },
+  "TeacherNav": {
+    "courses": "My courses",
+    "students": "Students",
+    "assignments": "Assignments",
+    "grading": "Grading",
+    "analytics": "Analytics",
+    "storefront": "Storefront",
+    "paths": "Bundles",
+    "earnings": "Earnings",
+    "community": "Discussions"
+  },
+  "AdminNav": {
+    "overview": "Overview",
+    "people": "People",
+    "teachers": "Teachers",
+    "curriculum": "Curriculum",
+    "classes": "Classes",
+    "analytics": "Analytics",
+    "integrations": "Integrations",
+    "branding": "Branding",
+    "billing": "Billing",
+    "audit": "Audit log"
   }
 }

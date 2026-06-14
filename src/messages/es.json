@@ -122,5 +122,28 @@
     "curriculum": "Plan de estudios",
     "reviewThisCourse": "Reseña este curso",
     "whatStudentsSay": "Lo que dicen los estudiantes"
+  },
+  "TeacherNav": {
+    "courses": "Mis cursos",
+    "students": "Estudiantes",
+    "assignments": "Tareas",
+    "grading": "Calificación",
+    "analytics": "Analíticas",
+    "storefront": "Tienda",
+    "paths": "Paquetes",
+    "earnings": "Ingresos",
+    "community": "Debates"
+  },
+  "AdminNav": {
+    "overview": "Resumen",
+    "people": "Personas",
+    "teachers": "Profesores",
+    "curriculum": "Plan de estudios",
+    "classes": "Clases",
+    "analytics": "Analíticas",
+    "integrations": "Integraciones",
+    "branding": "Marca",
+    "billing": "Facturación",
+    "audit": "Registro de auditoría"
   }
 }
