@@ -31,6 +31,12 @@ const NAV = [
     href: "/teacher/assignments",
   },
   {
+    id: "grading",
+    icon: "sparkles" as const,
+    label: "Grading",
+    href: "/teacher/grading",
+  },
+  {
     id: "analytics",
     icon: "chart" as const,
     label: "Analytics",

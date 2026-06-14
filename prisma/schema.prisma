@@ -493,6 +493,11 @@ model Attempt {
   freeText   String?   @db.Text
   aiFeedback String?   @db.Text
   score      Int?
+  // Teacher's override of the AI free-response score (R33). NULL = no
+  // override; the displayed final score is `scoreOverride ?? score`.
+  // reviewedAt stamps when a teacher last touched it.
+  scoreOverride Int?
+  reviewedAt    DateTime?
   correct    Boolean
   hintsUsed  Int       @default(0)
   timeMs     Int

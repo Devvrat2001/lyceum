@@ -12,6 +12,7 @@ import { CLAUDE_MODEL, getClaude, isClaudeEnabled } from "@/lib/ai/claude";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
 import { findBlockTemplate } from "@/lib/blockTemplates";
+import { settingsFor } from "@/lib/blocks";
 import { ensureEnrollment } from "../services/enrollment";
 import { refreshCourseEmbedding } from "@/lib/jobs/refreshCourseEmbedding";
 import {
@@ -2218,5 +2219,114 @@ export const teacherRouter = router({
         )
       );
       return { ok: true as const, count: input.lessonIds.length };
+    }),
+
+  /**
+   * Free-response submissions across the teacher's courses (R33). Lists
+   * FREE_RESPONSE Attempts on blocks the teacher owns, newest first, with
+   * the student's answer + the AI grade so the teacher can review (and
+   * override). Scoped to authored courses — ADMIN sees everything.
+   */
+  freeResponseSubmissions: teacherProcedure
+    .input(
+      z.object({ limit: z.number().int().min(1).max(100).default(50) })
+    )
+    .query(async ({ ctx, input }) => {
+      const ownerFilter =
+        ctx.user.role === "ADMIN"
+          ? {}
+          : { block: { lesson: { unit: { course: { authorId: ctx.user.id } } } } };
+      const rows = await ctx.db.attempt.findMany({
+        where: {
+          block: { is: { type: "FREE_RESPONSE" } },
+          freeText: { not: null },
+          ...ownerFilter,
+        },
+        orderBy: { createdAt: "desc" },
+        take: input.limit,
+        select: {
+          id: true,
+          freeText: true,
+          aiFeedback: true,
+          score: true,
+          scoreOverride: true,
+          reviewedAt: true,
+          createdAt: true,
+          user: { select: { name: true, firstName: true, email: true } },
+          block: {
+            select: {
+              id: true,
+              settings: true,
+              lesson: {
+                select: {
+                  title: true,
+                  slug: true,
+                  unit: { select: { course: { select: { title: true } } } },
+                },
+              },
+            },
+          },
+        },
+      });
+      return rows.map((r) => {
+        const settings = settingsFor("FREE_RESPONSE", r.block?.settings);
+        return {
+          id: r.id,
+          answer: r.freeText ?? "",
+          aiFeedback: r.aiFeedback,
+          aiScore: r.score,
+          scoreOverride: r.scoreOverride,
+          finalScore: r.scoreOverride ?? r.score ?? 0,
+          reviewed: r.reviewedAt !== null,
+          createdAt: r.createdAt.toISOString(),
+          studentName: r.user.name ?? r.user.firstName ?? r.user.email,
+          lessonTitle: r.block?.lesson.title ?? "—",
+          courseTitle: r.block?.lesson.unit.course.title ?? "—",
+          prompt: (settings.prompt ?? "").slice(0, 300),
+        };
+      });
+    }),
+
+  /**
+   * Override the AI score on a free-response Attempt (R33). Teacher must
+   * own the block's course (ADMIN bypasses). Pass a 0-100 score to set
+   * the override, or null to clear it back to the AI grade. XP awarded at
+   * submit time isn't retroactively adjusted — overrides are a grading/
+   * feedback signal, not a re-scoring of the gamification ledger (v1).
+   */
+  overrideFreeResponse: teacherProcedure
+    .input(
+      z.object({
+        attemptId: z.string(),
+        score: z.number().int().min(0).max(100).nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const attempt = await ctx.db.attempt.findUnique({
+        where: { id: input.attemptId },
+        select: {
+          id: true,
+          block: {
+            select: {
+              type: true,
+              lesson: {
+                select: { unit: { select: { course: { select: { authorId: true } } } } },
+              },
+            },
+          },
+        },
+      });
+      if (!attempt || attempt.block?.type !== "FREE_RESPONSE") {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      const authorId = attempt.block.lesson.unit.course.authorId;
+      if (ctx.user.role !== "ADMIN" && authorId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      await ctx.db.attempt.update({
+        where: { id: attempt.id },
+        data: { scoreOverride: input.score, reviewedAt: new Date() },
+      });
+      return { ok: true as const };
     }),
 });
