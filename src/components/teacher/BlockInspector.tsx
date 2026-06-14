@@ -2340,7 +2340,7 @@ function ToggleRow({
       }}
     >
       <span style={{ fontSize: 12, color: "var(--wf-body)" }}>{label}</span>
-      <Toggle on={on} onChange={onChange} />
+      <Toggle on={on} onChange={onChange} label={label} />
     </div>
   );
 }

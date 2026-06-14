@@ -623,7 +623,7 @@ function ToggleRow({
           paddingTop: 2,
         }}
       >
-        <Toggle on={on} onChange={onChange} />
+        <Toggle on={on} onChange={onChange} label={label} />
       </div>
     </div>
   );

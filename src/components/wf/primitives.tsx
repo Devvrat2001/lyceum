@@ -184,6 +184,10 @@ export function Icon({
   return (
     <span
       className={`wf-icon ${className ?? ""}`}
+      // Icons are decorative by default (R38): the accessible name comes
+      // from the surrounding button/link's aria-label or visible text, so
+      // hiding the svg avoids a doubled / meaningless screen-reader read.
+      aria-hidden="true"
       style={{ width: size, height: size, color, ...style }}
     >
       <svg viewBox="0 0 20 20">{ICON_PATHS[name] ?? ICON_PATHS.dot}</svg>
@@ -439,9 +443,13 @@ export function Hatch({
 export function Toggle({
   on,
   onChange,
+  label,
 }: {
   on: boolean;
   onChange?: (on: boolean) => void;
+  /** Accessible name — what this switch controls (R38). Without it the
+   *  toggle announces as an unlabelled switch. */
+  label?: string;
 }) {
   return (
     <button
@@ -449,7 +457,9 @@ export function Toggle({
       className="wf-toggle"
       data-on={on}
       onClick={() => onChange?.(!on)}
-      aria-pressed={on}
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
     />
   );
 }
