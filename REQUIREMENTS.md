@@ -176,8 +176,10 @@ set, or AI-generated course art at publish time (cache to blob storage).
   st-pulse streak ritual; all off under prefers-reduced-motion] applied to
   the dashboard: 34px week circles with today pulsing until first activity,
   bigger streak figure, honest level-progress bar fed by stats.levelInto/
-  levelSpan. Next surfaces: lesson reader celebration moments, library,
-  skill tree.) — student surfaces go game-like
+  levelSpan. **cont.36: lesson-complete celebration moment done** — emoji
+  pops in via st-celebrate keyframe, XP chip + Continue button get
+  st-pop. Next surfaces: library, skill tree.) — student surfaces go
+  game-like
   (big, tactile, motion, streak ritual — Duolingo/Brilliant energy);
   teacher/admin stay information-dense. Sharpest available differentiation
   vs incumbents.
@@ -187,8 +189,10 @@ set, or AI-generated course art at publish time (cache to blob storage).
   + week letters localize; LocaleToggle in the dashboard header; catalogs
   parity- AND ICU-compile-tested. **v1 limit:** tRPC-built strings [plan
   item titles, assignment due labels] stay English — fix is tag-based
-  client rendering or request-scoped getTranslations in routers. Next
-  surfaces: chrome nav, lesson reader, /browse.) — string extraction first
+  client rendering or request-scoped getTranslations in routers.
+  **cont.36: lesson reader extracted** — LessonReader namespace [en/es/hi]
+  covers the completion + empty cards + primary action buttons. Next
+  surfaces: chrome nav, /browse.) — string extraction first
   (next-intl), Hindi pilot, then regional. Huge India differentiator.
 - **R21 · Board alignment** · Status: DONE (cont.34 — `Course.board`
   column [cbse/icse/state/ib/cambridge] with seed backfill in the
@@ -207,8 +211,14 @@ set, or AI-generated course art at publish time (cache to blob storage).
   existing service worker to
   pre-cache enrolled-course reader content; low-bandwidth mode (no video
   autoload).
-- **R23 · WhatsApp notification channel** — streak nudges, assignment due,
-  parent weekly digest. India table stakes; needs WhatsApp Business API.
+- **R23 · WhatsApp notification channel** · Status: SCAFFOLD DONE (cont.36 —
+  `lib/whatsapp.ts` mirrors the dormant-Resend pattern: env-gated on
+  WHATSAPP_API_TOKEN + WHATSAPP_PHONE_NUMBER_ID, Meta Graph Cloud API over
+  fetch [no SDK], fire-safe senders streak_reminder / assignment_due /
+  parent_weekly_digest + E.164 normalizer. Lights up when keys land. Still
+  TODO when live: wire the senders into the streak-rollover cron + the
+  assignment post + a parent-digest cron, and capture opt-in consent.) —
+  streak nudges, assignment due, parent weekly digest. India table stakes.
 - **R24 · AI moat expansions** · Status: syllabus-paste DONE-v1 (cont.33 —
   optional paste box on the AI builder [replaced the three dead chips];
   rides GenerationJob.input into the skeleton prompt as a source-of-truth
@@ -226,9 +236,13 @@ set, or AI-generated course art at publish time (cache to blob storage).
   syllabus-paste → full unit drafts;
   free-response auto-grading; adaptive difficulty on quiz decks; the
   citations-backed tutor as the schools-trust story.
-- **R25 · Cohort/live delivery mechanics** — `Course.format` ("live" |
-  "cohort") exists with zero scheduling/meeting machinery behind it. Either
-  build (schedule + meet links + calendar) or hide the formats until real.
+- **R25 · Cohort/live delivery mechanics** · Status: DONE-v1 (cont.36 —
+  sessionStartsAt + sessionJoinUrl columns; teacher.updateCourse format
+  select + schedule fields [self_paced clears them]; builder datetime +
+  link inputs shown only when scheduled; detail-page LiveScheduleCard
+  [server-formats in IST, join link enrolled-only]; seed cohort demo.
+  v2: calendar invites, recurring sessions, attendance.) — `Course.format`
+  ("live" | "cohort") exists with zero scheduling/meeting machinery.
 - **R26 · Parent self-service linking** · Status: DONE (cont.35 — family
   codes: student generates a 6-char single-use code in Settings → Family
   [VerificationToken `parentlink:` namespace, 7-day expiry,
