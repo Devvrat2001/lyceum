@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { StudentChrome } from "@/components/layouts/StudentChrome";
 import {
   Btn,
@@ -15,6 +16,7 @@ import { SaveCourseOffline } from "@/components/offline/SaveCourseOffline";
 export default async function StudentLibraryPage() {
   const session = await auth();
   const me = session!.user;
+  const t = await getTranslations("Library");
 
   const enrollments = await db.enrollment.findMany({
     where: { userId: me.id },
@@ -63,22 +65,18 @@ export default async function StudentLibraryPage() {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>My Library</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
         <div style={{ flex: 1 }} />
         <Link href="/" style={{ textDecoration: "none" }}>
           <Btn variant="primary" sm icon={<Icon name="plus" size={12} color="white" />}>
-            Add a course
+            {t("addCourse")}
           </Btn>
         </Link>
       </header>
 
       <div style={{ flex: 1, overflow: "auto", padding: "24px 28px 40px" }}>
         <Eyebrow style={{ marginBottom: 10 }}>
-          {inProgress.length === 0
-            ? "Nothing in progress yet"
-            : `${inProgress.length} ${
-                inProgress.length === 1 ? "course" : "courses"
-              } in progress`}
+          {t("inProgress", { count: inProgress.length })}
         </Eyebrow>
 
         {enrollments.length === 0 ? (
@@ -93,7 +91,7 @@ export default async function StudentLibraryPage() {
               className="wf-h2"
               style={{ fontSize: 20, marginBottom: 8 }}
             >
-              Your library is empty.
+              {t("emptyTitle")}
             </h2>
             <p
               style={{
@@ -103,11 +101,12 @@ export default async function StudentLibraryPage() {
                 marginBottom: 16,
               }}
             >
-              Enroll in a course from the marketplace and it&apos;ll appear
-              here, ready to pick up where you left off.
+              {t("emptyBody")}
             </p>
             <Link href="/" style={{ textDecoration: "none" }}>
-              <Btn variant="primary">Browse the marketplace</Btn>
+              <Btn variant="primary" className="st-pop">
+                {t("browse")}
+              </Btn>
             </Link>
           </Card>
         ) : (
@@ -133,7 +132,7 @@ export default async function StudentLibraryPage() {
                       href={href}
                       style={{ textDecoration: "none", color: "inherit" }}
                     >
-                      <Card p={0} className="hover:shadow-sm">
+                      <Card p={0} className="st-card">
                         <ImageBox h={110} kind="video" />
                         <div style={{ padding: 14 }}>
                           <div
@@ -199,7 +198,7 @@ export default async function StudentLibraryPage() {
                                 fontWeight: 600,
                               }}
                             >
-                              Continue →
+                              {t("continue")}
                             </span>
                           </div>
                         </div>
@@ -213,7 +212,7 @@ export default async function StudentLibraryPage() {
             {completed.length > 0 && (
               <section style={{ marginTop: 32 }}>
                 <Eyebrow style={{ marginBottom: 10 }}>
-                  Completed · {completed.length}
+                  {t("completedCount", { count: completed.length })}
                 </Eyebrow>
                 <div
                   style={{
@@ -245,7 +244,7 @@ export default async function StudentLibraryPage() {
                             letterSpacing: "0.06em",
                           }}
                         >
-                          COMPLETED
+                          {t("completedTag")}
                         </span>
                       </div>
                       <div
@@ -263,10 +262,11 @@ export default async function StudentLibraryPage() {
                           color: "var(--wf-mute)",
                         }}
                       >
-                        Finished{" "}
-                        {e.lastActivityAt
-                          ? new Date(e.lastActivityAt).toLocaleDateString()
-                          : "—"}
+                        {t("finished", {
+                          date: e.lastActivityAt
+                            ? new Date(e.lastActivityAt).toLocaleDateString()
+                            : "—",
+                        })}
                       </div>
                     </Card>
                   ))}

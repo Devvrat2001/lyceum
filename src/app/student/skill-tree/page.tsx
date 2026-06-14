@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { StudentChrome } from "@/components/layouts/StudentChrome";
 import { Annot, Btn, Eyebrow, Icon } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
@@ -8,7 +9,10 @@ type NodeState = "done" | "now" | "unlocked" | "locked";
 
 export default async function SkillTreePage() {
   const trpc = await getServerCaller();
-  const tree = await trpc.skill.tree();
+  const [tree, t] = await Promise.all([
+    trpc.skill.tree(),
+    getTranslations("SkillTree"),
+  ]);
 
   const W = 1080;
   const H = 540;
@@ -39,7 +43,7 @@ export default async function SkillTreePage() {
           borderBottom: "1px solid var(--wf-hairline)",
         }}
       >
-        <Eyebrow>Math 6 · Personalized Path</Eyebrow>
+        <Eyebrow>{t("eyebrow")}</Eyebrow>
         <div
           style={{
             display: "flex",
@@ -51,12 +55,14 @@ export default async function SkillTreePage() {
           }}
         >
           <h1 className="wf-h1" style={{ fontSize: 24 }}>
-            Your skill journey
+            {t("title")}
           </h1>
-          <Annot ai>Your next skill advances as you answer questions correctly</Annot>
+          <Annot ai>{t("aiNote")}</Annot>
           <div style={{ flex: 1 }} />
           <Link href="/student/library" style={{ textDecoration: "none" }}>
-            <Btn variant="ghost">Continue learning →</Btn>
+            <Btn variant="ghost" className="st-pop">
+              {t("continueLearning")}
+            </Btn>
           </Link>
           <WhyPathButton />
         </div>
@@ -71,20 +77,20 @@ export default async function SkillTreePage() {
           <Stat
             value={tree.stats.mastered.toString()}
             suffix={`/${tree.stats.total}`}
-            label="SKILLS MASTERED"
+            label={t("skillsMastered")}
           />
-          <Stat value={`L${tree.stats.level}`} label="LEVEL" />
+          <Stat value={`L${tree.stats.level}`} label={t("level")} />
           <Stat
             value={`${tree.stats.streak}d`}
-            label="STREAK"
+            label={t("streak")}
             accent
           />
           <Stat
             value={`~${tree.stats.progressToNextPct}%`}
-            label={`TO LEVEL ${tree.stats.level + 1}`}
+            label={t("toLevel", { level: tree.stats.level + 1 })}
           />
           <div style={{ flex: 1 }} />
-          <Annot>Branching scenarios · gated by mastery</Annot>
+          <Annot>{t("branchingNote")}</Annot>
         </div>
       </div>
 
@@ -141,6 +147,7 @@ export default async function SkillTreePage() {
             return (
               <div
                 key={n.id}
+                className="st-card"
                 title={`Mastery: ${n.masteryPct}%`}
                 style={{
                   position: "absolute",
@@ -187,9 +194,9 @@ export default async function SkillTreePage() {
                     }}
                   >
                     {n.isBoss
-                      ? "BOSS · UNIT TEST"
+                      ? t("boss")
                       : n.state === "now"
-                      ? "IN PROGRESS"
+                      ? t("inProgress")
                       : n.state.toUpperCase()}
                   </span>
                 </div>
@@ -207,7 +214,7 @@ export default async function SkillTreePage() {
                       opacity: 0.85,
                     }}
                   >
-                    {n.masteryPct}% mastered
+                    {t("mastered", { pct: n.masteryPct })}
                   </div>
                 )}
                 {n.current && (
@@ -219,7 +226,7 @@ export default async function SkillTreePage() {
                       opacity: 0.85,
                     }}
                   >
-                    Up next
+                    {t("upNext")}
                   </div>
                 )}
               </div>
@@ -243,7 +250,7 @@ export default async function SkillTreePage() {
                   letterSpacing: "0.04em",
                 }}
               >
-                ↑ Up next — correct answers move this toward mastery
+                {t("upNextHint")}
               </div>
             );
           })()}

@@ -66,5 +66,33 @@
     "xpEarned": "+{xp} XP earned",
     "nextLesson": "Next lesson →",
     "backToCourseCta": "Back to course →"
+  },
+  "Library": {
+    "title": "My Library",
+    "addCourse": "Add a course",
+    "inProgress": "{count, plural, =0 {Nothing in progress yet} one {# course in progress} other {# courses in progress}}",
+    "emptyTitle": "Your library is empty.",
+    "emptyBody": "Enroll in a course from the marketplace and it'll appear here, ready to pick up where you left off.",
+    "browse": "Browse the marketplace",
+    "continue": "Continue →",
+    "completedCount": "Completed · {count}",
+    "completedTag": "COMPLETED",
+    "finished": "Finished {date}"
+  },
+  "SkillTree": {
+    "eyebrow": "Personalized Path",
+    "title": "Your skill journey",
+    "aiNote": "Your next skill advances as you answer questions correctly",
+    "continueLearning": "Continue learning →",
+    "skillsMastered": "SKILLS MASTERED",
+    "level": "LEVEL",
+    "streak": "STREAK",
+    "toLevel": "TO LEVEL {level}",
+    "branchingNote": "Branching scenarios · gated by mastery",
+    "boss": "BOSS · UNIT TEST",
+    "inProgress": "IN PROGRESS",
+    "mastered": "{pct}% mastered",
+    "upNext": "Up next",
+    "upNextHint": "↑ Up next — correct answers move this toward mastery"
   }
 }

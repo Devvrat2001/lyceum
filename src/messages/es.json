@@ -66,5 +66,33 @@
     "xpEarned": "+{xp} XP ganados",
     "nextLesson": "Siguiente lección →",
     "backToCourseCta": "Volver al curso →"
+  },
+  "Library": {
+    "title": "Mi biblioteca",
+    "addCourse": "Añadir un curso",
+    "inProgress": "{count, plural, =0 {Nada en progreso aún} one {# curso en progreso} other {# cursos en progreso}}",
+    "emptyTitle": "Tu biblioteca está vacía.",
+    "emptyBody": "Inscríbete en un curso del mercado y aparecerá aquí, listo para retomarlo donde lo dejaste.",
+    "browse": "Explorar el mercado",
+    "continue": "Continuar →",
+    "completedCount": "Completados · {count}",
+    "completedTag": "COMPLETADO",
+    "finished": "Terminado {date}"
+  },
+  "SkillTree": {
+    "eyebrow": "Ruta personalizada",
+    "title": "Tu viaje de habilidades",
+    "aiNote": "Tu siguiente habilidad avanza al responder preguntas correctamente",
+    "continueLearning": "Seguir aprendiendo →",
+    "skillsMastered": "HABILIDADES DOMINADAS",
+    "level": "NIVEL",
+    "streak": "RACHA",
+    "toLevel": "AL NIVEL {level}",
+    "branchingNote": "Escenarios ramificados · según el dominio",
+    "boss": "JEFE · EXAMEN DE UNIDAD",
+    "inProgress": "EN PROGRESO",
+    "mastered": "{pct}% dominado",
+    "upNext": "Lo siguiente",
+    "upNextHint": "↑ Lo siguiente — las respuestas correctas avanzan esto hacia el dominio"
   }
 }
