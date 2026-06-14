@@ -330,23 +330,24 @@ pick the highest item and work the normal cycle. Ordered by trust/impact.
 P4 is essentially cleared (R29/R30[partial]/R32/R33/R34/R35 done; R31
 blocked on WhatsApp keys). New net-new findings from a fresh audit:
 
-- **R36 · Notification surfacing** (P0-trust) — `NotificationBell` is
-  mounted ONLY on `/student` dashboard, nowhere else. Every notification
-  the app creates (badge_earned, the new `parent.linked` from R35, future
-  WhatsApp-mirrors) is invisible on every other page and to non-students.
-  Mount the bell in all five `*Chrome` layouts. **Directly undercuts R35's
-  child-notify** — the child only sees it if they happen to land on the
-  dashboard.
-- **R37 · Global locale switcher** — `LocaleToggle` only renders on
-  `/student` + `/student/progress`. Teachers, admins, parents, and
-  signed-out marketing visitors have NO way to switch language, so the
-  en/es/hi work (12 surfaces) is unreachable for most of the app. Put the
-  toggle in the chrome user menu (all roles) + a marketing footer spot.
-- **R38 · Accessibility pass** — icon-only controls (`Btn` icon, header
-  back-arrows, `wf-toggle`) have no accessible names (0 aria-labels in
-  primitives); status is color-only (`StatusPill`, plan rows, week strip).
-  Add aria-labels, `aria-pressed`/`role` on toggles, and text/icon
-  companions to color. WCAG-AA baseline — school procurement asks for it.
+- **R36 · Notification surfacing** · Status: DONE (cont.41 — bell now in
+  the shared `SidebarUserMenu` [student/teacher/admin, every page;
+  `dropUp`/`dark` props for the sidebar-bottom + dark-admin placement],
+  `ParentHeader`, and `MarketChrome` top bar [signed-in only]; dashboard
+  duplicate removed. R35's child-notify is now visible everywhere.)
+  (P0-trust)
+- **R37 · Global locale switcher** · Status: DONE (cont.41 — LocaleToggle
+  in the shared `SidebarUserMenu` [all 3 sidebar roles, every page],
+  `ParentHeader`, and `MarketChrome` top bar [anonymous-friendly — locale
+  is cookie-based]; removed the 2 duplicate page-level toggles. The 12
+  i18n surfaces are now reachable app-wide.)
+- **R38 · Accessibility pass** · Status: v1 DONE (cont.41 — `Icon` now
+  renders `aria-hidden` [decorative; accessible name comes from the
+  wrapping control], `Toggle` is a `role=switch` with `aria-checked` +
+  `aria-label` [both ToggleRow callsites pass their visible label].
+  Remaining: per-callsite aria-labels on icon-only buttons + non-color
+  status companions [StatusPill, plan rows, week strip].) — WCAG-AA
+  baseline schools ask for.
 - **R39 · Free-response XP reconciliation** (R33 v2) — a teacher score
   override doesn't touch the XP awarded at submit. Decide the policy
   (re-award the delta when the override crosses the 60 pass line, or
