@@ -878,6 +878,7 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={streaming}
+                aria-label="Ask the tutor a question"
                 placeholder={streaming ? "Tutor is thinking…" : "Ask anything…"}
                 style={{
                   flex: 1,
@@ -891,6 +892,7 @@ export function LessonClient({ lesson }: { lesson: LessonProps }) {
               <button
                 type="submit"
                 disabled={streaming || !input.trim()}
+                aria-label="Send message to tutor"
                 style={{
                   border: "none",
                   background: "transparent",

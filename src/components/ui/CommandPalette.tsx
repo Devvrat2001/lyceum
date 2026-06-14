@@ -121,6 +121,7 @@ export function CommandPalette() {
       >
         <input
           ref={inputRef}
+          aria-label="Search courses or pages"
           value={q}
           onChange={(e) => {
             setQ(e.target.value);

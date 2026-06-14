@@ -2117,6 +2117,7 @@ function CommandMenu({
         <Icon name="search" size={13} color={tone.mute} />
         <input
           ref={inputRef}
+          aria-label="Search blocks"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
