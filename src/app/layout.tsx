@@ -6,6 +6,7 @@ import "./globals.css";
 import { TRPCProvider } from "@/lib/trpc/react";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { CommandPalette } from "@/components/ui/CommandPalette";
+import { env } from "@/lib/env";
 
 const interTight = Inter_Tight({
   variable: "--font-sans",
@@ -23,10 +24,25 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
+  // Resolves relative OG/canonical URLs on every page (R32). Without it,
+  // per-page openGraph images/urls don't get absolutized for crawlers.
+  metadataBase: new URL(env.PUBLIC_BASE_URL),
   applicationName: "Lyceum",
-  title: "Lyceum — Personalized learning, with an AI tutor on every page",
+  title: {
+    default: "Lyceum — Personalized learning, with an AI tutor on every page",
+    // Child pages set just their title; the template appends the brand.
+    template: "%s · Lyceum",
+  },
   description:
     "Lyceum is a personalized K-12 learning platform with adaptive paths, AI tutors that cite the textbook, gamified XP & streaks, and a creator marketplace for teachers.",
+  openGraph: {
+    siteName: "Lyceum",
+    type: "website",
+    title: "Lyceum — Personalized K-12 learning with an AI tutor",
+    description:
+      "Adaptive paths, AI tutors that cite the textbook, gamified XP & streaks, and a marketplace of teacher-built courses.",
+  },
+  twitter: { card: "summary_large_image" },
   // Lets iOS add Lyceum to the home screen as a standalone app. The web
   // manifest (app/manifest.ts) drives installability everywhere else.
   appleWebApp: {

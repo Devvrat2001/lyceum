@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketChrome } from "@/components/layouts/MarketChrome";
@@ -6,12 +7,55 @@ import { boardLabel } from "@/lib/marketplace";
 import { courseGradient, subjectGlyph } from "@/lib/thumbnail";
 import { getServerCaller } from "@/lib/trpc/server";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { TRPCError } from "@trpc/server";
 import { CurriculumAccordion } from "@/components/course/CurriculumAccordion";
 import { LiveScheduleCard } from "@/components/course/LiveScheduleCard";
 import { EnrollPanel } from "@/components/course/EnrollPanel";
 import { CourseReviewForm } from "@/components/course/CourseReviewForm";
 import { estimateCourseMinutes, formatDuration } from "@/lib/courseLength";
+
+/**
+ * Per-course SEO metadata (R32). A direct, minimal DB read (Next dedupes
+ * RSC data within a request, but a tRPC caller isn't auto-deduped, so a
+ * lean query here is cheaper than re-running bySlug). Falls back to the
+ * root metadata when the course doesn't exist.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const course = await db.course.findUnique({
+    where: { slug },
+    select: {
+      title: true,
+      tagline: true,
+      description: true,
+      thumbnailUrl: true,
+      subject: true,
+      grade: true,
+      status: true,
+    },
+  });
+  if (!course || course.status !== "PUBLISHED") return {};
+  const desc = (course.tagline ?? course.description).slice(0, 200);
+  const url = `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/course/${slug}`;
+  return {
+    title: course.title,
+    description: desc,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      url,
+      title: course.title,
+      description: desc,
+      ...(course.thumbnailUrl ? { images: [course.thumbnailUrl] } : {}),
+    },
+  };
+}
 
 export default async function CourseDetailPage({
   params,
@@ -43,8 +87,45 @@ export default async function CourseDetailPage({
     estimateCourseMinutes(course.units);
   const learn = (course.learnOutcomes as string[] | null) ?? [];
 
+  // schema.org Course structured data (R32) — lets Google show rich
+  // results (rating stars, price, provider) for marketplace courses.
+  const courseUrl = `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/course/${course.slug}`;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Course",
+    name: course.title,
+    description: (course.tagline ?? course.description).slice(0, 300),
+    url: courseUrl,
+    provider: {
+      "@type": "Organization",
+      name: course.authorLabel ?? "Lyceum",
+    },
+    ...(course.ratingCount > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: course.ratingAvg.toFixed(1),
+            reviewCount: course.ratingCount,
+          },
+        }
+      : {}),
+    offers: {
+      "@type": "Offer",
+      price: (course.priceCents / 100).toFixed(2),
+      priceCurrency: "INR",
+      availability: "https://schema.org/InStock",
+      url: courseUrl,
+    },
+  };
+
   return (
     <MarketChrome role={session?.user?.role ?? null}>
+      <script
+        type="application/ld+json"
+        // Server-rendered static JSON; no user input is interpolated
+        // unescaped beyond course fields, and JSON.stringify escapes them.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div
         style={{
           padding: "20px 28px 40px",
