@@ -13,6 +13,11 @@ const Schema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  // WhatsApp Cloud API (R23) — dormant until both are set, exactly like
+  // RESEND_API_KEY gates email. Token = a Business API access token;
+  // phone-number-id = the sending number's id from Meta.
+  WHATSAPP_API_TOKEN: z.string().optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   // Defaults to claude-sonnet-4-5 — broadly available across Anthropic
   // account tiers. Newer/better models (claude-opus-4-7, claude-sonnet-4-6)
