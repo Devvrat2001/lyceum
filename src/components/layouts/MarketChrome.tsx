@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Btn } from "@/components/wf/primitives";
 import { HeaderSearchCombobox } from "@/components/marketplace/HeaderSearchCombobox";
 import { NotificationBell } from "@/components/layouts/NotificationBell";
+import { LocaleToggle } from "@/components/i18n/LocaleToggle";
 import { useIsMobile } from "@/lib/useMediaQuery";
 
 /**
@@ -310,6 +311,9 @@ export function MarketChrome({
           {navLinks}
         </nav>
         <HeaderSearchCombobox />
+        {/* Language switcher works for anonymous visitors too (cookie-
+            based, no auth) — marketing pages are localizable (R37). */}
+        <LocaleToggle />
         {/* Bell for signed-in viewers only — the marketplace is public,
             and notification.list is a protected query (R36). */}
         {role && <NotificationBell />}

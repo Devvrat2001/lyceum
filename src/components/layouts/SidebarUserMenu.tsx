@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { Icon } from "@/components/wf/primitives";
 import { NotificationBell } from "@/components/layouts/NotificationBell";
+import { LocaleToggle } from "@/components/i18n/LocaleToggle";
 
 /**
  * Bottom-of-sidebar identity strip:
@@ -87,6 +88,11 @@ export function SidebarUserMenu({ dark = false }: { dark?: boolean }) {
             strip so it's on EVERY page of the Student/Teacher/Admin
             chromes, not just the dashboard. Opens upward (sidebar bottom). */}
         <NotificationBell dropUp dark={dark} />
+      </div>
+      {/* Language switcher (R37) — in the shared menu so teachers/admins
+          (not just the student dashboard) can switch locale. */}
+      <div style={{ padding: "2px 6px" }}>
+        <LocaleToggle />
       </div>
       <Link
         href="/settings"

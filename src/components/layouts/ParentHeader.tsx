@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Btn } from "@/components/wf/primitives";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { NotificationBell } from "@/components/layouts/NotificationBell";
+import { LocaleToggle } from "@/components/i18n/LocaleToggle";
 
 /**
  * Header bar for the (chrome-less) parent dashboard. A client component
@@ -41,6 +42,7 @@ export function ParentHeader({ email }: { email?: string | null }) {
       {!isMobile && email && (
         <span style={{ fontSize: 12, color: "var(--wf-mute)" }}>{email}</span>
       )}
+      {!isMobile && <LocaleToggle />}
       <NotificationBell />
       <Link href="/api/auth/signout" style={{ textDecoration: "none" }}>
         <Btn variant="ghost" sm>

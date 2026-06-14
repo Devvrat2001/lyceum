@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 import { StudentChrome } from "@/components/layouts/StudentChrome";
-import { LocaleToggle } from "@/components/i18n/LocaleToggle";
 import {
   Annot,
   Avatar,
@@ -63,7 +62,8 @@ export default async function StudentDashboard() {
             HeaderSearchCombobox) — this header used to render a dead
             look-alike search box here with no input behind it. */}
         <div className="flex-1" />
-        <LocaleToggle />
+        {/* Language switcher lives in the shared sidebar menu now (R37),
+            on every page — removed the dashboard-only duplicate. */}
         <StreakChip days={dashboard.stats.streak} />
         <XPChip value={dashboard.stats.xp} />
         {/* Notifications bell now lives in the StudentChrome sidebar

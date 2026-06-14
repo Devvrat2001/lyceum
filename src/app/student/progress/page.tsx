@@ -4,7 +4,6 @@ import { ComingSoon } from "@/components/ui/ComingSoon";
 import { getServerCaller } from "@/lib/trpc/server";
 import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { PdfDownloadButton } from "@/components/ui/PdfDownloadButton";
-import { LocaleToggle } from "@/components/i18n/LocaleToggle";
 
 export default async function StudentProgressPage() {
   const trpc = await getServerCaller();
@@ -33,7 +32,7 @@ export default async function StudentProgressPage() {
           <div
             style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}
           >
-            <LocaleToggle />
+            {/* Locale switcher now in the shared sidebar menu (R37). */}
             <PdfDownloadButton
               href="/api/student/report"
               downloadName="progress-report.pdf"
