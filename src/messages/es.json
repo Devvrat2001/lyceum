@@ -158,5 +158,42 @@
     "students": "{count, plural, one {# estudiante} other {# estudiantes}}",
     "noRatings": "Sin valoraciones aún",
     "edit": "Editar →"
+  },
+  "AdminDashboard": {
+    "overview": "Resumen de la institución",
+    "overviewNamed": "Resumen de la institución · {name}",
+    "boardReport": "Informe del consejo",
+    "inviteTeacher": "Invitar profesor",
+    "masteryTitle": "Dominio por clase · período actual",
+    "masteryAnnot": "Mapa de calor · haz clic para profundizar",
+    "masteryEmpty": "El mapa de calor de dominio por clase aparecerá aquí cuando las clases comiencen a registrar datos de dominio de habilidades.",
+    "aiBrief": "Información de IA · resumen para la dirección",
+    "teachersTitle": "Profesores · actividad",
+    "total": "{count} en total",
+    "noTeachers": "Aún no hay profesores.",
+    "curriculaTitle": "Currículos adoptados",
+    "add": "Añadir",
+    "noCurricula": "Aún no se han adoptado currículos.",
+    "complianceTitle": "Seguridad y cumplimiento",
+    "complianceAnnot": "Específico de K-12",
+    "complianceEmpty": "Aún no se han configurado comprobaciones de cumplimiento. El estado de SSO, los indicadores FERPA, el consentimiento de los padres y el filtro de contenido aparecerán aquí una vez que tu distrito esté configurado."
+  },
+  "TeacherAnalytics": {
+    "title": "Analíticas",
+    "allCourses": "Todos los cursos",
+    "last30": "Últimos 30 días",
+    "allCohorts": "Todas las cohortes",
+    "exportCsv": "Exportar CSV",
+    "engagement": "Participación a lo largo del tiempo",
+    "activeLearners": "Estudiantes activos",
+    "newEnrollments": "Nuevas inscripciones",
+    "aiTutorSessions": "Sesiones de tutor IA",
+    "dropOff": "Dónde abandonan los estudiantes",
+    "biggestDrop": "mayor caída",
+    "coursePerformance": "Rendimiento del curso",
+    "noCourses": "Aún no hay cursos.",
+    "students": "{count} estudiantes",
+    "completion": "{pct}% de finalización",
+    "aiTop3": "Información de IA · top 3"
   }
 }

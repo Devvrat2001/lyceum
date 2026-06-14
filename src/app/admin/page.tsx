@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { AdminChrome } from "@/components/layouts/AdminChrome";
 import {
   Annot,
@@ -13,7 +14,10 @@ import { PdfDownloadButton } from "@/components/ui/PdfDownloadButton";
 
 export default async function AdminDashboardPage() {
   const trpc = await getServerCaller();
-  const data = await trpc.admin.overview();
+  const [data, t] = await Promise.all([
+    trpc.admin.overview(),
+    getTranslations("AdminDashboard"),
+  ]);
 
   return (
     <AdminChrome active="overview">
@@ -30,14 +34,14 @@ export default async function AdminDashboardPage() {
       >
         <span style={{ fontSize: 16, fontWeight: 600 }}>
           {data.institution.name
-            ? `Institution overview · ${data.institution.name}`
-            : "Institution overview"}
+            ? t("overviewNamed", { name: data.institution.name })
+            : t("overview")}
         </span>
         <div style={{ flex: 1 }} />
         <PdfDownloadButton
           href="/api/admin/board-report"
           downloadName="board-report.pdf"
-          label="Board report"
+          label={t("boardReport")}
           icon={<Icon name="download" size={12} />}
         />
         <Btn
@@ -45,7 +49,7 @@ export default async function AdminDashboardPage() {
           sm
           icon={<Icon name="plus" size={12} color="white" />}
         >
-          Invite teacher
+          {t("inviteTeacher")}
         </Btn>
       </header>
 
@@ -116,9 +120,9 @@ export default async function AdminDashboardPage() {
               }}
             >
               <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
-                Mastery by class · current term
+                {t("masteryTitle")}
               </h3>
-              <Annot>Heatmap · click to drill in</Annot>
+              <Annot>{t("masteryAnnot")}</Annot>
             </div>
             <div
               style={{
@@ -129,8 +133,7 @@ export default async function AdminDashboardPage() {
                 lineHeight: 1.55,
               }}
             >
-              The per-class mastery heatmap appears here once classes
-              start logging skill-mastery data.
+              {t("masteryEmpty")}
             </div>
           </Card>
 
@@ -158,7 +161,7 @@ export default async function AdminDashboardPage() {
                   color: "var(--wf-ai)",
                 }}
               >
-                AI insights · principal brief
+                {t("aiBrief")}
               </h3>
             </div>
             <AdminInsights />
@@ -181,10 +184,10 @@ export default async function AdminDashboardPage() {
               }}
             >
               <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
-                Teachers · activity
+                {t("teachersTitle")}
               </h3>
               <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                {data.teachers.length} total
+                {t("total", { count: data.teachers.length })}
               </span>
             </div>
             {data.teachers.length === 0 ? (
@@ -195,7 +198,7 @@ export default async function AdminDashboardPage() {
                   padding: 8,
                 }}
               >
-                No teachers yet.
+                {t("noTeachers")}
               </div>
             ) : (
               data.teachers.map((t, i) => (
@@ -262,10 +265,10 @@ export default async function AdminDashboardPage() {
               }}
             >
               <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
-                Adopted curricula
+                {t("curriculaTitle")}
               </h3>
               <Btn sm variant="ghost" icon={<Icon name="plus" size={11} />}>
-                Add
+                {t("add")}
               </Btn>
             </div>
             {data.curricula.length === 0 ? (
@@ -276,7 +279,7 @@ export default async function AdminDashboardPage() {
                   padding: 8,
                 }}
               >
-                No curricula adopted yet.
+                {t("noCurricula")}
               </div>
             ) : (
               data.curricula.map((c, i) => (
@@ -337,9 +340,9 @@ export default async function AdminDashboardPage() {
               }}
             >
               <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
-                Safety & compliance
+                {t("complianceTitle")}
               </h3>
-              <Annot>K-12 specific</Annot>
+              <Annot>{t("complianceAnnot")}</Annot>
             </div>
             {data.compliance.length === 0 ? (
               <div
@@ -350,9 +353,7 @@ export default async function AdminDashboardPage() {
                   lineHeight: 1.5,
                 }}
               >
-                No compliance checks configured yet. SSO, FERPA flags,
-                parent consent, and content-filter status appear here
-                once your district is wired up.
+                {t("complianceEmpty")}
               </div>
             ) : (
               data.compliance.map(([k, v], i) => (

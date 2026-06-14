@@ -158,5 +158,42 @@
     "students": "{count, plural, one {# छात्र} other {# छात्र}}",
     "noRatings": "अभी कोई रेटिंग नहीं",
     "edit": "संपादित करें →"
+  },
+  "AdminDashboard": {
+    "overview": "संस्थान अवलोकन",
+    "overviewNamed": "संस्थान अवलोकन · {name}",
+    "boardReport": "बोर्ड रिपोर्ट",
+    "inviteTeacher": "शिक्षक को आमंत्रित करें",
+    "masteryTitle": "कक्षा अनुसार दक्षता · वर्तमान सत्र",
+    "masteryAnnot": "हीटमैप · विस्तार हेतु क्लिक करें",
+    "masteryEmpty": "कक्षाओं द्वारा कौशल-दक्षता डेटा दर्ज करना शुरू करते ही प्रति-कक्षा दक्षता हीटमैप यहाँ दिखाई देगा।",
+    "aiBrief": "AI अंतर्दृष्टि · प्रधानाचार्य सारांश",
+    "teachersTitle": "शिक्षक · गतिविधि",
+    "total": "कुल {count}",
+    "noTeachers": "अभी तक कोई शिक्षक नहीं।",
+    "curriculaTitle": "अपनाए गए पाठ्यक्रम",
+    "add": "जोड़ें",
+    "noCurricula": "अभी तक कोई पाठ्यक्रम नहीं अपनाया गया।",
+    "complianceTitle": "सुरक्षा और अनुपालन",
+    "complianceAnnot": "K-12 विशिष्ट",
+    "complianceEmpty": "अभी तक कोई अनुपालन जाँच कॉन्फ़िगर नहीं की गई। आपके ज़िले के सेटअप होते ही SSO, FERPA फ़्लैग, अभिभावक सहमति और कंटेंट-फ़िल्टर स्थिति यहाँ दिखाई देगी।"
+  },
+  "TeacherAnalytics": {
+    "title": "विश्लेषण",
+    "allCourses": "सभी कोर्स",
+    "last30": "पिछले 30 दिन",
+    "allCohorts": "सभी समूह",
+    "exportCsv": "CSV निर्यात करें",
+    "engagement": "समय के साथ सहभागिता",
+    "activeLearners": "सक्रिय शिक्षार्थी",
+    "newEnrollments": "नई नामांकन",
+    "aiTutorSessions": "AI ट्यूटर सत्र",
+    "dropOff": "छात्र कहाँ छोड़ते हैं",
+    "biggestDrop": "सबसे बड़ी गिरावट",
+    "coursePerformance": "कोर्स प्रदर्शन",
+    "noCourses": "अभी तक कोई कोर्स नहीं।",
+    "students": "{count} छात्र",
+    "completion": "{pct}% पूर्णता",
+    "aiTop3": "AI अंतर्दृष्टि · शीर्ष 3"
   }
 }

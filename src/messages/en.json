@@ -158,5 +158,42 @@
     "students": "{count, plural, one {# student} other {# students}}",
     "noRatings": "No ratings yet",
     "edit": "Edit →"
+  },
+  "AdminDashboard": {
+    "overview": "Institution overview",
+    "overviewNamed": "Institution overview · {name}",
+    "boardReport": "Board report",
+    "inviteTeacher": "Invite teacher",
+    "masteryTitle": "Mastery by class · current term",
+    "masteryAnnot": "Heatmap · click to drill in",
+    "masteryEmpty": "The per-class mastery heatmap appears here once classes start logging skill-mastery data.",
+    "aiBrief": "AI insights · principal brief",
+    "teachersTitle": "Teachers · activity",
+    "total": "{count} total",
+    "noTeachers": "No teachers yet.",
+    "curriculaTitle": "Adopted curricula",
+    "add": "Add",
+    "noCurricula": "No curricula adopted yet.",
+    "complianceTitle": "Safety & compliance",
+    "complianceAnnot": "K-12 specific",
+    "complianceEmpty": "No compliance checks configured yet. SSO, FERPA flags, parent consent, and content-filter status appear here once your district is wired up."
+  },
+  "TeacherAnalytics": {
+    "title": "Analytics",
+    "allCourses": "All courses",
+    "last30": "Last 30 days",
+    "allCohorts": "All cohorts",
+    "exportCsv": "Export CSV",
+    "engagement": "Engagement over time",
+    "activeLearners": "Active learners",
+    "newEnrollments": "New enrollments",
+    "aiTutorSessions": "AI tutor sessions",
+    "dropOff": "Where students drop off",
+    "biggestDrop": "biggest drop",
+    "coursePerformance": "Course performance",
+    "noCourses": "No courses yet.",
+    "students": "{count} students",
+    "completion": "{pct}% completion",
+    "aiTop3": "AI insights · top 3"
   }
 }

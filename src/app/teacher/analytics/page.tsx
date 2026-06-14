@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
 import {
   Btn,
@@ -12,7 +13,10 @@ import { AnalyticsInsights } from "@/components/teacher/AnalyticsInsights";
 
 export default async function TeacherAnalyticsPage() {
   const trpc = await getServerCaller();
-  const data = await trpc.teacher.analytics({ rangeDays: 30 });
+  const [data, t] = await Promise.all([
+    trpc.teacher.analytics({ rangeDays: 30 }),
+    getTranslations("TeacherAnalytics"),
+  ]);
 
   return (
     <TeacherChrome active="analytics">
@@ -27,15 +31,15 @@ export default async function TeacherAnalyticsPage() {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>Analytics</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
         <span className="wf-chip" style={{ marginLeft: 4 }}>
-          All courses ▾
+          {t("allCourses")} ▾
         </span>
-        <span className="wf-chip">Last 30 days ▾</span>
-        <span className="wf-chip">All cohorts ▾</span>
+        <span className="wf-chip">{t("last30")} ▾</span>
+        <span className="wf-chip">{t("allCohorts")} ▾</span>
         <div style={{ flex: 1 }} />
         <Btn variant="ghost" sm icon={<Icon name="download" size={12} />}>
-          Export CSV
+          {t("exportCsv")}
         </Btn>
       </header>
 
@@ -102,12 +106,15 @@ export default async function TeacherAnalyticsPage() {
               }}
             >
               <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
-                Engagement over time
+                {t("engagement")}
               </h3>
               <div style={{ display: "flex", gap: 8 }}>
-                <LegendDot color="var(--wf-ink)" label="Active learners" />
-                <LegendDot color="var(--wf-accent)" label="New enrollments" />
-                <LegendDot color="var(--wf-ai)" label="AI tutor sessions" />
+                <LegendDot color="var(--wf-ink)" label={t("activeLearners")} />
+                <LegendDot
+                  color="var(--wf-accent)"
+                  label={t("newEnrollments")}
+                />
+                <LegendDot color="var(--wf-ai)" label={t("aiTutorSessions")} />
               </div>
             </div>
             <ChartLine series={data.series} />
@@ -122,7 +129,7 @@ export default async function TeacherAnalyticsPage() {
               }}
             >
               <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600 }}>
-                Where students drop off
+                {t("dropOff")}
               </h3>
             </div>
             {data.funnel.map((s) => (
@@ -142,7 +149,7 @@ export default async function TeacherAnalyticsPage() {
                     }}
                   >
                     {s.label}
-                    {s.hot ? " · biggest drop" : ""}
+                    {s.hot ? ` · ${t("biggestDrop")}` : ""}
                   </span>
                   <span
                     className="wf-mono"
@@ -172,7 +179,7 @@ export default async function TeacherAnalyticsPage() {
                 fontWeight: 600,
               }}
             >
-              Course performance
+              {t("coursePerformance")}
             </h3>
             {data.coursePerformance.length === 0 ? (
               <div
@@ -183,7 +190,7 @@ export default async function TeacherAnalyticsPage() {
                   textAlign: "center",
                 }}
               >
-                No courses yet.
+                {t("noCourses")}
               </div>
             ) : (
               data.coursePerformance.map((c, i) => (
@@ -206,7 +213,8 @@ export default async function TeacherAnalyticsPage() {
                       {c.title}
                     </div>
                     <div style={{ fontSize: 10, color: "var(--wf-mute)" }}>
-                      {c.students} students · ★ {c.ratingAvg.toFixed(1)}
+                      {t("students", { count: c.students })} · ★{" "}
+                      {c.ratingAvg.toFixed(1)}
                     </div>
                   </div>
                   <div style={{ width: 100 }}>
@@ -219,7 +227,7 @@ export default async function TeacherAnalyticsPage() {
                         marginTop: 2,
                       }}
                     >
-                      {c.completionPct}% completion
+                      {t("completion", { pct: c.completionPct })}
                     </div>
                   </div>
                 </div>
@@ -251,7 +259,7 @@ export default async function TeacherAnalyticsPage() {
                   color: "var(--wf-ai)",
                 }}
               >
-                AI insights · top 3
+                {t("aiTop3")}
               </h3>
             </div>
             <AnalyticsInsights />
