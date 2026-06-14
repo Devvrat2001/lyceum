@@ -289,8 +289,11 @@ pick the highest item and work the normal cycle. Ordered by trust/impact.
   tRPC-built strings [plan titles, assignment due labels — need
   request-scoped getTranslations or tag-based client rendering].
   cont.40: +TeacherCourses page body [first teacher page-body surface] —
-  **12 surfaces**.) — the big R20 continuation; extend
-  namespace-by-namespace.
+  **12 surfaces**. cont.43: +AdminDashboard [first admin body] +
+  TeacherAnalytics — **14 surfaces**; the static JSX is localized but the
+  KPI/funnel labels these pages render still come from tRPC in English —
+  that ceiling is now tracked as **R41**.) — the big R20 continuation;
+  extend namespace-by-namespace.
 - **R31 · Wire the WhatsApp senders** (unblocks the day R23's keys land) —
   connect `lib/whatsapp.ts` to the streak-rollover cron (streak_reminder),
   the assignment post (assignment_due), and a new parent-digest cron
@@ -364,6 +367,45 @@ blocked on WhatsApp keys). New net-new findings from a fresh audit:
   course; course canonical metadata set for published, empty for
   draft/unknown. generateMetadata logic extracted to `lib/seo.ts` so it's
   testable without the page's server-only graph.)
+
+---
+
+## P6 — post-P5 backlog (R41+), from the 2026-06-15 review pass
+
+P5 cleared (R36–R40 all done). This pass scanned the mature tree for the
+next genuine gaps — not rehashed debt (KNOWN_ISSUES is clean: only S1-1 /
+R1 remains, user-owned). **Verified-absent before listing:** Sentry/error
+tracking already exists (`instrumentation.ts` + `sentry.*.config.ts`), so
+observability is **not** a gap.
+
+- **R41 · Locale-aware tRPC display strings** — the i18n ceiling. Routers
+  build UI labels in English (`admin.overview` KPI labels `k.l`,
+  `teacher.analytics` funnel `s.label` + KPI labels, status strings), so a
+  fully-translated page still shows English *data* labels. R30 can only
+  reach so far until routers return stable i18n keys (+ params) instead of
+  baked English and the components translate. Scope first to the dashboard
+  KPI/funnel labels localized in cont.43.
+- **R42 · Router test coverage: generator + skill** — both have ZERO
+  caller-level tests (only the worker `processOutlineJob` and the
+  `skillProgress` service are covered). Untested at the tRPC boundary:
+  generator job create/status/saveAsCourse (incl. authz) and
+  `skill.tree`/`nudge`. Add caller tests mirroring the lesson/teacher
+  suites.
+- **R43 · Account deletion + data export (DPDP/COPPA erasure &
+  portability)** — R11 shipped consent gating but there's no way to delete
+  an account or export a user's data (confirmed: `account.ts` has neither).
+  For a children's-data product under India DPDP + COPPA, right-to-erasure
+  and data portability are legal obligations. Needs a cascade-aware delete
+  (anonymise-vs-hard-delete decision) + a JSON export of the user's rows.
+- **R44 · Transactional email activation** — password reset, email
+  verification, weekly digest, and purchase receipts are all BUILT but
+  dormant (no `RESEND_API_KEY`; `email.ts` no-ops), so "forgot password"
+  silently does nothing for real users in prod. Needs the Resend key + a
+  verified sending domain (user-owned ops) then a smoke of each path.
+- **R45 · Mobile reflow stragglers** (R7 tail) — `/student/progress` KPI
+  row, the community grid, reader-internal 1fr-1fr blocks, and the
+  admin/teacher dashboards' fixed `repeat(6,1fr)`/`repeat(5,1fr)` KPI grids
+  + multi-column card rows overflow on phones. A focused responsive pass.
 
 ---
 
