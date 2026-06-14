@@ -487,6 +487,8 @@ export const teacherRouter = router({
         sessionStartsAt: z.string().max(40).optional(),
         /** Live/cohort meeting link; empty string clears it (R25). */
         sessionJoinUrl: z.string().max(600).optional(),
+        /** Recurrence: "weekly" | "biweekly" | "monthly"; empty clears (R34). */
+        sessionRecurrence: z.string().max(20).optional(),
         priceCents: z.number().int().min(0).max(1_000_000).optional(),
         // Card/hero art. Empty string clears (falls back to the
         // deterministic gradient); http(s)-shape is enforced in the
@@ -565,7 +567,18 @@ export const teacherRouter = router({
         if (format === "self_paced") {
           data.sessionStartsAt = null;
           data.sessionJoinUrl = null;
+          data.sessionRecurrence = null;
         }
+      }
+      if (input.sessionRecurrence !== undefined) {
+        const r = input.sessionRecurrence.trim();
+        if (r.length > 0 && !["weekly", "biweekly", "monthly"].includes(r)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Recurrence must be weekly, biweekly, or monthly.",
+          });
+        }
+        data.sessionRecurrence = r.length > 0 ? r : null;
       }
       if (input.sessionStartsAt !== undefined) {
         const raw = input.sessionStartsAt.trim();

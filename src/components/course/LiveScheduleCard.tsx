@@ -9,21 +9,36 @@
  */
 import { Card, Eyebrow } from "@/components/wf/primitives";
 
+const RECURRENCE_LABEL: Record<string, string> = {
+  weekly: "Repeats weekly",
+  biweekly: "Repeats every 2 weeks",
+  monthly: "Repeats monthly",
+};
+
 export function LiveScheduleCard({
   format,
   whenText,
   joinUrl,
   isEnrolled,
+  recurrence,
+  icsHref,
 }: {
   format: string;
   /** Pre-formatted start (e.g. "Sat, 21 Jun, 2:00 pm IST"), or null. */
   whenText: string | null;
   joinUrl: string | null;
   isEnrolled: boolean;
+  /** Recurrence slug ("weekly" | …) or null for a one-off. */
+  recurrence: string | null;
+  /** Download URL for the session .ics (only used when there's a start). */
+  icsHref: string;
 }) {
   if (format !== "live" && format !== "cohort") return null;
 
   const label = format === "live" ? "Live class" : "Cohort";
+  const recurrenceLabel = recurrence
+    ? (RECURRENCE_LABEL[recurrence] ?? null)
+    : null;
 
   return (
     <Card
@@ -48,6 +63,19 @@ export function LiveScheduleCard({
           </Eyebrow>
           <div style={{ fontSize: 15, fontWeight: 600 }}>
             {whenText ?? "Schedule to be announced"}
+            {recurrenceLabel && (
+              <span
+                className="wf-mono"
+                style={{
+                  fontSize: 10,
+                  color: "var(--wf-mute)",
+                  marginLeft: 8,
+                  fontWeight: 400,
+                }}
+              >
+                {recurrenceLabel}
+              </span>
+            )}
           </div>
           <div
             style={{ fontSize: 12, color: "var(--wf-mute)", marginTop: 2 }}
@@ -56,6 +84,21 @@ export function LiveScheduleCard({
               ? "Taught live — join at the scheduled time."
               : "A guided cohort that moves together from this start date."}
           </div>
+          {whenText && (
+            <a
+              href={icsHref}
+              style={{
+                display: "inline-block",
+                marginTop: 8,
+                fontSize: 11,
+                color: "var(--wf-accent)",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              + Add to calendar
+            </a>
+          )}
         </div>
         {joinUrl ? (
           isEnrolled ? (

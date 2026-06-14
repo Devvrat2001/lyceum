@@ -293,6 +293,8 @@ export default async function CourseDetailPage({
               }
               joinUrl={course.sessionJoinUrl}
               isEnrolled={myStatus.isEnrolled}
+              recurrence={course.sessionRecurrence}
+              icsHref={`/api/course/${course.slug}/calendar`}
             />
 
             <div

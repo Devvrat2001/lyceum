@@ -211,6 +211,10 @@ model Course {
   // link, revealed only to enrolled students (+ author/admin).
   sessionStartsAt DateTime?
   sessionJoinUrl  String?
+  // Recurrence for the live/cohort session (R34): "weekly" | "biweekly" |
+  // "monthly". NULL = a single one-off session. Drives the .ics RRULE and
+  // the schedule-card label.
+  sessionRecurrence String?
   board       String?      // curriculum board tag: "cbse" | "icse" | "state" | "ib" | "cambridge"; null = untagged
   status       CourseStatus @default(DRAFT)
   priceCents   Int          @default(0)

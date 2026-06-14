@@ -125,6 +125,7 @@ type CourseProps = {
   format: string;
   sessionStartsAt: string | null;
   sessionJoinUrl: string | null;
+  sessionRecurrence: string | null;
   priceCents: number;
   thumbnailUrl: string | null;
   updatedAt: string;
@@ -3752,6 +3753,9 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
   const [sessionJoinUrl, setSessionJoinUrl] = useState(
     course.sessionJoinUrl ?? ""
   );
+  const [sessionRecurrence, setSessionRecurrence] = useState(
+    course.sessionRecurrence ?? ""
+  );
   const [price, setPrice] = useState((course.priceCents / 100).toString());
   const [thumbnailUrl, setThumbnailUrl] = useState(course.thumbnailUrl ?? "");
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
@@ -3777,6 +3781,7 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
     format !== course.format ||
     sessionStartsAt !== isoToLocalInput(course.sessionStartsAt) ||
     sessionJoinUrl !== (course.sessionJoinUrl ?? "") ||
+    sessionRecurrence !== (course.sessionRecurrence ?? "") ||
     priceCents !== course.priceCents ||
     thumbnailUrl !== (course.thumbnailUrl ?? "");
 
@@ -3825,6 +3830,17 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
               onChange={setSessionJoinUrl}
               placeholder="https://meet.… (shown to enrolled students)"
             />
+            <DetailSelect
+              label="Repeats"
+              value={sessionRecurrence}
+              onChange={setSessionRecurrence}
+              options={[
+                { value: "", label: "One-off session" },
+                { value: "weekly", label: "Weekly" },
+                { value: "biweekly", label: "Every 2 weeks" },
+                { value: "monthly", label: "Monthly" },
+              ]}
+            />
           </>
         )}
         <DetailInput
@@ -3857,6 +3873,7 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
                 ? localInputToIso(sessionStartsAt)
                 : "",
               sessionJoinUrl: isScheduled ? sessionJoinUrl.trim() : "",
+              sessionRecurrence: isScheduled ? sessionRecurrence : "",
               priceCents,
               thumbnailUrl: thumbnailUrl.trim(),
             })
