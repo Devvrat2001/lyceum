@@ -68,6 +68,17 @@ export const parentRouter = router({
         where: { identifier: row.identifier },
       });
 
+      // Tell the child in-app that a parent linked (R26 v2) — a quiet
+      // safety signal so an unexpected link is visible to the student.
+      await ctx.db.notification.create({
+        data: {
+          userId: child.id,
+          kind: "parent.linked",
+          title: "A parent or guardian linked to your account",
+          body: "They can now see your course progress. Tell a teacher if this wasn't expected.",
+        },
+      });
+
       await audit({
         actorId: ctx.user.id,
         kind: "parent.self_link",

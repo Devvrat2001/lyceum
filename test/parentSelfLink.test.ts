@@ -35,6 +35,12 @@ describe("parent self-service linking", () => {
     });
     expect(link).not.toBeNull();
 
+    // The child is notified of the link (R26 v2).
+    const note = await db.notification.findFirst({
+      where: { userId: student.id, kind: "parent.linked" },
+    });
+    expect(note).not.toBeNull();
+
     // Single-use: the same code can't be redeemed again (even though
     // the link itself is idempotent).
     const parent2 = await createTestUser({ role: "PARENT" });

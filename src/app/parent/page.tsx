@@ -48,7 +48,6 @@ export default async function ParentDashboardPage() {
               },
             },
           },
-          xpEvents: { select: { points: true } },
           attempts: {
             take: 5,
             orderBy: { createdAt: "desc" },
@@ -64,9 +63,22 @@ export default async function ParentDashboardPage() {
     },
   });
 
+  // Total XP per child via a single grouped aggregate (R35) — the old
+  // version loaded EVERY XPEvent row for every child just to sum points.
+  const childIds = links.map((l) => l.child.id);
+  const xpByChild = new Map<string, number>();
+  if (childIds.length > 0) {
+    const sums = await db.xPEvent.groupBy({
+      by: ["userId"],
+      where: { userId: { in: childIds } },
+      _sum: { points: true },
+    });
+    for (const s of sums) xpByChild.set(s.userId, s._sum.points ?? 0);
+  }
+
   const children = links.map((l) => {
     const c = l.child;
-    const totalXp = c.xpEvents.reduce((a, e) => a + e.points, 0);
+    const totalXp = xpByChild.get(c.id) ?? 0;
     const inProgress = c.enrollments.filter((e) => !e.completed);
     const completed = c.enrollments.filter((e) => e.completed);
     const lastActivity =
