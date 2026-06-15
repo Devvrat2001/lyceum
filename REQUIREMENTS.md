@@ -385,18 +385,36 @@ observability is **not** a gap.
   reach so far until routers return stable i18n keys (+ params) instead of
   baked English and the components translate. Scope first to the dashboard
   KPI/funnel labels localized in cont.43.
+  · **Status: DONE-v1 (cont.44** — `admin.overview` + `teacher.analytics`
+  emit a stable `key` per KPI + funnel stage [English `l`/`label` kept as
+  fallback]; dashboards translate by key via a literal-`t()` record. KPI
+  titles + drop-off funnel labels now localize. Remaining tail: the
+  computed `meta`/delta unit-strings ["12 attempts", "+3 vs prev"] need ICU
+  composition.)
 - **R42 · Router test coverage: generator + skill** — both have ZERO
   caller-level tests (only the worker `processOutlineJob` and the
   `skillProgress` service are covered). Untested at the tRPC boundary:
   generator job create/status/saveAsCourse (incl. authz) and
   `skill.tree`/`nudge`. Add caller tests mirroring the lesson/teacher
   suites.
+  · **Status: DONE (cont.44** — `test/skill.test.ts` [pure
+  `computeSkillStates` all-states + `skill.tree` router with a seeded
+  A→B→C chain + user-scoped stats] and `test/generator.test.ts` [outline
+  demo, getJob/cancelJob ownership, generateQuestions authz, saveAsCourse
+  with `after()` stubbed]. 13 tests.)
 - **R43 · Account deletion + data export (DPDP/COPPA erasure &
   portability)** — R11 shipped consent gating but there's no way to delete
   an account or export a user's data (confirmed: `account.ts` has neither).
   For a children's-data product under India DPDP + COPPA, right-to-erasure
   and data portability are legal obligations. Needs a cascade-aware delete
   (anonymise-vs-hard-delete decision) + a JSON export of the user's rows.
+  · **Status: DONE (cont.44** — `account.exportData` [JSON bundle] +
+  `account.deleteAccount` [anonymise PII + tombstone email + `deletedAt` +
+  drop OAuth/sessions; refuse teachers with content/sales; type-DELETE
+  confirm]. Hard-delete was rejected because the Order buyer FK cascades
+  into the teacher's sale record. `auth.ts` refuses deleted users;
+  `User.deletedAt` migration; Settings "Your data" card; 3 tests. Active
+  JWTs aren't server-revocable [client signs out] — noted.)
 - **R44 · Transactional email activation** — password reset, email
   verification, weekly digest, and purchase receipts are all BUILT but
   dormant (no `RESEND_API_KEY`; `email.ts` no-ops), so "forgot password"
@@ -406,6 +424,11 @@ observability is **not** a gap.
   row, the community grid, reader-internal 1fr-1fr blocks, and the
   admin/teacher dashboards' fixed `repeat(6,1fr)`/`repeat(5,1fr)` KPI grids
   + multi-column card rows overflow on phones. A focused responsive pass.
+  · **Status: DONE-v1 (cont.44** — 9 fixed KPI/stat grids [admin + teacher
+  dashboards, admin analytics, teacher earnings, parent, /student/progress,
+  3 loading skeletons] switched to `repeat(auto-fit, minmax(140px, 1fr))`
+  so they wrap on phones, fill identically on desktop. Remaining tail: the
+  community grid + reader-internal 1fr-1fr blocks.)
 
 ---
 
