@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
 import { Card, Eyebrow } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
@@ -6,14 +7,17 @@ import { formatMoney as fmtPrice } from "@/lib/currency";
 
 export default async function TeacherEarningsPage() {
   const trpc = await getServerCaller();
-  const data = await trpc.payment.teacherEarnings({ limit: 30 });
+  const [data, t] = await Promise.all([
+    trpc.payment.teacherEarnings({ limit: 30 }),
+    getTranslations("TeacherEarnings"),
+  ]);
 
   return (
     <TeacherChrome active="earnings">
       <div style={{ overflow: "auto", padding: "24px 28px 40px" }}>
-        <Eyebrow>Earnings</Eyebrow>
+        <Eyebrow>{t("eyebrow")}</Eyebrow>
         <h1 className="wf-h1" style={{ fontSize: 28, margin: "6px 0 18px" }}>
-          Your creator payouts
+          {t("title")}
         </h1>
 
         <div
@@ -25,20 +29,24 @@ export default async function TeacherEarningsPage() {
             maxWidth: 1200,
           }}
         >
-          <KpiCard label="MTD NET" value={fmtPrice(data.mtdNetCents)} highlight />
           <KpiCard
-            label="LIFETIME NET"
+            label={t("kpiMtdNet")}
+            value={fmtPrice(data.mtdNetCents)}
+            highlight
+          />
+          <KpiCard
+            label={t("kpiLifetimeNet")}
             value={fmtPrice(data.lifetime.netCents)}
           />
           <KpiCard
-            label="ORDERS"
+            label={t("kpiOrders")}
             value={data.lifetime.count.toString()}
-            sub={`${fmtPrice(data.lifetime.grossCents)} gross`}
+            sub={t("subGross", { amount: fmtPrice(data.lifetime.grossCents) })}
           />
           <KpiCard
-            label="REV-SHARE"
+            label={t("kpiRevShare")}
             value="85%"
-            sub={`Lyceum fee ${fmtPrice(data.lifetime.feeCents)}`}
+            sub={t("subFee", { amount: fmtPrice(data.lifetime.feeCents) })}
           />
         </div>
 
@@ -55,7 +63,7 @@ export default async function TeacherEarningsPage() {
             background: "var(--wf-fillsoft)",
           }}
         >
-          <Eyebrow>What ships next</Eyebrow>
+          <Eyebrow>{t("payoutsEyebrow")}</Eyebrow>
           <div
             style={{
               fontSize: 12,
@@ -64,11 +72,7 @@ export default async function TeacherEarningsPage() {
               marginTop: 8,
             }}
           >
-            Stripe Connect is wired end-to-end above. Refunds work in demo
-            mode (real-Stripe refunds land with the Tier 2.2 smoke test).
-            Annual earnings CSV is ready in the export card above. Still
-            ahead: monthly automatic payouts to your bank and the
-            buyer-side invoice email.
+            {t("payoutsBody")}
           </div>
         </Card>
       </div>

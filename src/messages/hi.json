@@ -226,5 +226,17 @@
       "dFirstSales": "पहली बिक्री",
       "dNoSales": "अभी कोई बिक्री नहीं",
       "metaAfterFees": "शुल्क के बाद"
+  },
+  "TeacherEarnings": {
+    "eyebrow": "आय",
+    "title": "आपके क्रिएटर भुगतान",
+    "kpiMtdNet": "इस माह शुद्ध",
+    "kpiLifetimeNet": "कुल शुद्ध",
+    "kpiOrders": "ऑर्डर",
+    "kpiRevShare": "राजस्व हिस्सा",
+    "subGross": "{amount} सकल",
+    "subFee": "Lyceum शुल्क {amount}",
+    "payoutsEyebrow": "भुगतान",
+    "payoutsBody": "आपकी आय Stripe Connect के माध्यम से भुगतान की जाती है — ऊपर अपना भुगतान खाता कनेक्ट या प्रबंधित करें, और कभी भी अपनी वार्षिक आय CSV के रूप में निर्यात करें।"
   }
 }

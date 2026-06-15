@@ -226,5 +226,17 @@
       "dFirstSales": "first sales",
       "dNoSales": "no sales yet",
       "metaAfterFees": "after fees"
+  },
+  "TeacherEarnings": {
+    "eyebrow": "Earnings",
+    "title": "Your creator payouts",
+    "kpiMtdNet": "MTD NET",
+    "kpiLifetimeNet": "LIFETIME NET",
+    "kpiOrders": "ORDERS",
+    "kpiRevShare": "REV-SHARE",
+    "subGross": "{amount} gross",
+    "subFee": "Lyceum fee {amount}",
+    "payoutsEyebrow": "Payouts",
+    "payoutsBody": "Your earnings are paid out through Stripe Connect — connect or manage your payout account above, and export your annual earnings as CSV anytime."
   }
 }

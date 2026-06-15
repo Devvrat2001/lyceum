@@ -226,5 +226,17 @@
       "dFirstSales": "primeras ventas",
       "dNoSales": "sin ventas aún",
       "metaAfterFees": "tras comisiones"
+  },
+  "TeacherEarnings": {
+    "eyebrow": "Ingresos",
+    "title": "Tus pagos de creador",
+    "kpiMtdNet": "NETO DEL MES",
+    "kpiLifetimeNet": "NETO TOTAL",
+    "kpiOrders": "PEDIDOS",
+    "kpiRevShare": "REPARTO",
+    "subGross": "{amount} bruto",
+    "subFee": "Comisión Lyceum {amount}",
+    "payoutsEyebrow": "Pagos",
+    "payoutsBody": "Tus ingresos se pagan a través de Stripe Connect: conecta o gestiona tu cuenta de pagos arriba y exporta tus ingresos anuales en CSV cuando quieras."
   }
 }
