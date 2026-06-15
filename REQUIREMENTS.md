@@ -549,10 +549,13 @@ hunts net-new gaps, each grounded in the code.
   +`TeacherStudents`; cont.51 +`AdminPeople` [role chips/plurals + ICU
   counts] +`AdminClasses`). Remaining: ~11 page bodies — teacher
   grading/discussions/paths/storefront, admin curriculum/audit/billing/
-  teachers, student library/skill-tree. Note: teacher grading + discussions
-  bodies live in large CLIENT components [GradingClient 238L,
-  TeacherDiscussionsClient 381L] → `useTranslations`, a heavier focused
-  cycle; the rest are server pages.)
+  teachers, student library/skill-tree. cont.52 +`TeacherGrading` [first
+  CLIENT component, via `useTranslations` in GradingClient + SubmissionRow;
+  also fixed stale post-R39 copy that claimed overrides don't change XP].
+  Remaining: ~10 — teacher discussions[client]/paths/storefront, admin
+  teachers[client]/curriculum/audit/billing, student library/skill-tree.
+  The client-component i18n pattern is now proven [next-intl
+  `useTranslations`].)
 - **R53 · Test coverage for the thin routers + cron handlers** —
   `insight` + `parent` routers have ~1 caller test each, and the
   `/api/cron/*` route handlers (streak-rollover, weekly-digest, ai-insights,
