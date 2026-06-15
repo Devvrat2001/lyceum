@@ -6,6 +6,7 @@ import { router, publicProcedure } from "../trpc";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
+import { isSignupThrottled } from "@/lib/signupRateLimit";
 import {
   isEmailEnabled,
   sendParentalConsentEmail,
@@ -56,6 +57,16 @@ export const authRouter = router({
         });
       }
 
+      // Account-creation throttle (R51) — checked before the existing-user
+      // lookup so a flood can't probe which emails are taken either.
+      if (await isSignupThrottled(ctx.anonKey)) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message:
+            "Too many accounts have been created from your network recently. Please try again in a little while.",
+        });
+      }
+
       const existing = await ctx.db.user.findUnique({ where: { email } });
       if (existing) {
         throw new TRPCError({
@@ -78,6 +89,14 @@ export const authRouter = router({
           coppaConsentAt: input.consent ? new Date() : null,
         },
         select: { id: true, email: true, name: true, role: true },
+      });
+
+      // Feed the R51 throttle counter (+ an audit trail). Stamped with the
+      // hashed-IP anonKey; tied to the user so it cascades on deletion.
+      await audit({
+        actorId: user.id,
+        kind: "auth.signup",
+        payload: { anonKey: ctx.anonKey ?? null, role: input.role },
       });
 
       // Email verification (R10) — best-effort: signup must never fail
