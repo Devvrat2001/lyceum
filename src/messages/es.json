@@ -77,7 +77,8 @@
     "continue": "Continuar →",
     "completedCount": "Completados · {count}",
     "completedTag": "COMPLETADO",
-    "finished": "Terminado {date}"
+    "finished": "Terminado {date}",
+    "gradeLabel": "GRADO {grade}"
   },
   "SkillTree": {
     "eyebrow": "Ruta personalizada",
@@ -93,7 +94,11 @@
     "inProgress": "EN PROGRESO",
     "mastered": "{pct}% dominado",
     "upNext": "Lo siguiente",
-    "upNextHint": "↑ Lo siguiente — las respuestas correctas avanzan esto hacia el dominio"
+    "upNextHint": "↑ Lo siguiente — las respuestas correctas avanzan esto hacia el dominio",
+    "masteryTooltip": "Dominio: {pct}%",
+    "stateDone": "HECHO",
+    "stateUnlocked": "DESBLOQUEADO",
+    "stateLocked": "BLOQUEADO"
   },
   "Nav": {
     "home": "Inicio",
@@ -298,5 +303,29 @@
     "save": "Guardar",
     "saving": "Guardando…",
     "clear": "Borrar"
+  },
+  "TeacherDiscussions": {
+    "title": "Debates",
+    "intro": "Cada hilo de debate en tus cursos. Responde como instructor o elimina cualquier comentario que infrinja las normas de la clase: las eliminaciones moderadas quedan registradas en el registro de auditoría de la institución.",
+    "statThreads": "Hilos",
+    "statActive": "Con actividad",
+    "statComments": "Comentarios totales",
+    "loading": "Cargando debates…",
+    "emptyBody": "Aún no hay bloques de debate. Añade un bloque de <strong>Debate</strong> a cualquier lección en el creador de cursos y las conversaciones de los estudiantes aparecerán aquí.",
+    "commentCount": "{count, plural, one {# comentario} other {# comentarios}}",
+    "defaultPrompt": "Debate",
+    "removeTitle": "Eliminar este comentario",
+    "removing": "Eliminando…",
+    "remove": "Eliminar",
+    "earlierComments": "+ {count, plural, one {# comentario anterior} other {# comentarios anteriores}}",
+    "deleteError": "No se pudo eliminar ese comentario.",
+    "justNow": "ahora mismo",
+    "minutesAgo": "{n} min",
+    "hoursAgo": "{n} h",
+    "daysAgo": "{n} d",
+    "composerPlaceholder": "Responde como instructor…",
+    "posting": "Publicando…",
+    "reply": "Responder",
+    "postError": "No se pudo publicar tu respuesta. Inténtalo de nuevo."
   }
 }

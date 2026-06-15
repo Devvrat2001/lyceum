@@ -144,8 +144,8 @@ export default async function StudentLibraryPage() {
                               marginBottom: 4,
                             }}
                           >
-                            {e.course.subject.toUpperCase()} · GRADE{" "}
-                            {e.course.grade}
+                            {e.course.subject.toUpperCase()} ·{" "}
+                            {t("gradeLabel", { grade: e.course.grade })}
                           </div>
                           <div
                             style={{

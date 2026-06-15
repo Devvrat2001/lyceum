@@ -148,7 +148,7 @@ export default async function SkillTreePage() {
               <div
                 key={n.id}
                 className="st-card"
-                title={`Mastery: ${n.masteryPct}%`}
+                title={t("masteryTooltip", { pct: n.masteryPct })}
                 style={{
                   position: "absolute",
                   left: colX(n.col),
@@ -197,7 +197,11 @@ export default async function SkillTreePage() {
                       ? t("boss")
                       : n.state === "now"
                       ? t("inProgress")
-                      : n.state.toUpperCase()}
+                      : n.state === "done"
+                      ? t("stateDone")
+                      : n.state === "unlocked"
+                      ? t("stateUnlocked")
+                      : t("stateLocked")}
                   </span>
                 </div>
                 <div

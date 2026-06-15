@@ -77,7 +77,8 @@
     "continue": "जारी रखें →",
     "completedCount": "पूर्ण · {count}",
     "completedTag": "पूर्ण",
-    "finished": "{date} को समाप्त"
+    "finished": "{date} को समाप्त",
+    "gradeLabel": "ग्रेड {grade}"
   },
   "SkillTree": {
     "eyebrow": "व्यक्तिगत मार्ग",
@@ -93,7 +94,11 @@
     "inProgress": "प्रगति में",
     "mastered": "{pct}% महारत",
     "upNext": "अगला",
-    "upNextHint": "↑ अगला — सही उत्तर इसे महारत की ओर बढ़ाते हैं"
+    "upNextHint": "↑ अगला — सही उत्तर इसे महारत की ओर बढ़ाते हैं",
+    "masteryTooltip": "महारत: {pct}%",
+    "stateDone": "पूर्ण",
+    "stateUnlocked": "अनलॉक",
+    "stateLocked": "लॉक"
   },
   "Nav": {
     "home": "होम",
@@ -298,5 +303,29 @@
     "save": "सहेजें",
     "saving": "सहेजा जा रहा है…",
     "clear": "साफ़ करें"
+  },
+  "TeacherDiscussions": {
+    "title": "चर्चाएँ",
+    "intro": "आपके कोर्स में हर चर्चा सूत्र। प्रशिक्षक के रूप में उत्तर दें, या कक्षा के नियमों का उल्लंघन करने वाली किसी भी टिप्पणी को हटाएँ — नियंत्रित विलोपन संस्थान के ऑडिट लॉग में दर्ज होते हैं।",
+    "statThreads": "सूत्र",
+    "statActive": "गतिविधि वाले",
+    "statComments": "कुल टिप्पणियाँ",
+    "loading": "चर्चाएँ लोड हो रही हैं…",
+    "emptyBody": "अभी तक कोई चर्चा ब्लॉक नहीं। कोर्स बिल्डर में किसी भी पाठ में <strong>चर्चा</strong> ब्लॉक जोड़ें और छात्रों की बातचीत यहाँ दिखाई देगी।",
+    "commentCount": "{count, plural, one {# टिप्पणी} other {# टिप्पणियाँ}}",
+    "defaultPrompt": "चर्चा",
+    "removeTitle": "यह टिप्पणी हटाएँ",
+    "removing": "हटाया जा रहा है…",
+    "remove": "हटाएँ",
+    "earlierComments": "+ {count, plural, one {# पुरानी टिप्पणी} other {# पुरानी टिप्पणियाँ}}",
+    "deleteError": "वह टिप्पणी नहीं हटाई जा सकी।",
+    "justNow": "अभी",
+    "minutesAgo": "{n} मि",
+    "hoursAgo": "{n} घं",
+    "daysAgo": "{n} दि",
+    "composerPlaceholder": "प्रशिक्षक के रूप में उत्तर दें…",
+    "posting": "पोस्ट हो रहा है…",
+    "reply": "उत्तर दें",
+    "postError": "आपका उत्तर पोस्ट नहीं हो सका। पुनः प्रयास करें।"
   }
 }

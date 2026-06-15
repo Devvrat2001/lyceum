@@ -2,21 +2,29 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { Avatar, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
-/** Coarse relative time — wire value may arrive as a string. */
-function fmtTime(value: Date | string): string {
+/** Minimal translator shape — enough to format keyed ICU strings. */
+type TFn = (key: string, values?: Record<string, string | number>) => string;
+
+/**
+ * Coarse relative time. The wire value may arrive as a string; `t` localizes
+ * the "just now" / m / h / d buckets and `locale` drives the older-than-a-month
+ * date fallback.
+ */
+function fmtTime(value: Date | string, t: TFn, locale: string): string {
   const d = typeof value === "string" ? new Date(value) : value;
   const sec = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (sec < 45) return "just now";
+  if (sec < 45) return t("justNow");
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m`;
+  if (min < 60) return t("minutesAgo", { n: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h`;
+  if (hr < 24) return t("hoursAgo", { n: hr });
   const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (day < 30) return t("daysAgo", { n: day });
+  return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
 function initialsOf(name: string): string {
@@ -34,6 +42,8 @@ function initialsOf(name: string): string {
  * (audited server-side) and invalidate the feed.
  */
 export function TeacherDiscussionsClient() {
+  const t = useTranslations("TeacherDiscussions");
+  const locale = useLocale();
   const q = trpc.lesson.teacherDiscussions.useQuery();
   const utils = trpc.useUtils();
   const del = trpc.lesson.deleteComment.useMutation({
@@ -56,7 +66,7 @@ export function TeacherDiscussionsClient() {
         >
           <Icon name="chat" size={20} color="var(--wf-ink)" />
           <h1 className="wf-h1" style={{ fontSize: 24, margin: 0 }}>
-            Discussions
+            {t("title")}
           </h1>
         </div>
         <p
@@ -67,9 +77,7 @@ export function TeacherDiscussionsClient() {
             lineHeight: 1.5,
           }}
         >
-          Every discussion thread across your courses. Reply as the
-          instructor, or remove any comment that breaks class rules —
-          moderated deletes are recorded in the institution audit log.
+          {t("intro")}
         </p>
 
         {/* Stat strip */}
@@ -82,16 +90,16 @@ export function TeacherDiscussionsClient() {
               marginBottom: 20,
             }}
           >
-            <StatCard label="Threads" value={data.totals.threads} />
-            <StatCard label="With activity" value={data.totals.active} />
-            <StatCard label="Total comments" value={data.totals.comments} />
+            <StatCard label={t("statThreads")} value={data.totals.threads} />
+            <StatCard label={t("statActive")} value={data.totals.active} />
+            <StatCard label={t("statComments")} value={data.totals.comments} />
           </div>
         )}
 
         {q.isLoading ? (
           <Card p={28}>
             <div style={{ fontSize: 13, color: "var(--wf-mute)" }}>
-              Loading discussions…
+              {t("loading")}
             </div>
           </Card>
         ) : threads.length === 0 ? (
@@ -103,21 +111,21 @@ export function TeacherDiscussionsClient() {
                 lineHeight: 1.55,
               }}
             >
-              No discussion blocks yet. Add a{" "}
-              <strong>Discussion</strong> block to any lesson in the course
-              builder and student conversations will show up here.
+              {t.rich("emptyBody", {
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </div>
           </Card>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {threads.map((t) => (
-              <Card key={t.blockId} p={0}>
+            {threads.map((thread) => (
+              <Card key={thread.blockId} p={0}>
                 {/* Thread header */}
                 <div
                   style={{
                     padding: "14px 18px",
                     borderBottom:
-                      t.commentCount > 0
+                      thread.commentCount > 0
                         ? "1px solid var(--wf-hairline)"
                         : "none",
                   }}
@@ -131,7 +139,7 @@ export function TeacherDiscussionsClient() {
                     }}
                   >
                     <Link
-                      href={`/teacher/courses/${t.courseSlug}/edit`}
+                      href={`/teacher/courses/${thread.courseSlug}/edit`}
                       style={{
                         fontSize: 11,
                         color: "var(--wf-mute)",
@@ -141,10 +149,10 @@ export function TeacherDiscussionsClient() {
                         letterSpacing: "0.04em",
                       }}
                     >
-                      {t.courseTitle}
+                      {thread.courseTitle}
                     </Link>
                     <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                      · {t.lessonTitle}
+                      · {thread.lessonTitle}
                     </span>
                     <span
                       className="wf-mono"
@@ -154,9 +162,10 @@ export function TeacherDiscussionsClient() {
                         color: "var(--wf-mute)",
                       }}
                     >
-                      {t.commentCount}{" "}
-                      {t.commentCount === 1 ? "comment" : "comments"}
-                      {t.lastActivity ? ` · ${fmtTime(t.lastActivity)}` : ""}
+                      {t("commentCount", { count: thread.commentCount })}
+                      {thread.lastActivity
+                        ? ` · ${fmtTime(thread.lastActivity, t, locale)}`
+                        : ""}
                     </span>
                   </div>
                   <div
@@ -166,19 +175,19 @@ export function TeacherDiscussionsClient() {
                       color: "var(--wf-ink)",
                     }}
                   >
-                    {t.prompt ?? "Discussion"}
+                    {thread.prompt ?? t("defaultPrompt")}
                   </div>
                 </div>
 
                 {/* Recent comments + inline moderation */}
-                {t.recent.length > 0 && (
+                {thread.recent.length > 0 && (
                   <div
                     style={{
                       display: "flex",
                       flexDirection: "column",
                     }}
                   >
-                    {t.recent.map((c, i) => {
+                    {thread.recent.map((c, i) => {
                       const deleting =
                         del.isPending && del.variables?.commentId === c.id;
                       return (
@@ -209,7 +218,7 @@ export function TeacherDiscussionsClient() {
                               <span
                                 style={{ fontSize: 10, color: "var(--wf-mute)" }}
                               >
-                                {fmtTime(c.createdAt)}
+                                {fmtTime(c.createdAt, t, locale)}
                               </span>
                               <button
                                 type="button"
@@ -217,7 +226,7 @@ export function TeacherDiscussionsClient() {
                                   del.mutate({ commentId: c.id })
                                 }
                                 disabled={deleting}
-                                title="Remove this comment"
+                                title={t("removeTitle")}
                                 style={{
                                   marginLeft: "auto",
                                   border: "none",
@@ -229,7 +238,7 @@ export function TeacherDiscussionsClient() {
                                   cursor: deleting ? "default" : "pointer",
                                 }}
                               >
-                                {deleting ? "Removing…" : "Remove"}
+                                {deleting ? t("removing") : t("remove")}
                               </button>
                             </div>
                             <div
@@ -247,7 +256,7 @@ export function TeacherDiscussionsClient() {
                         </div>
                       );
                     })}
-                    {t.commentCount > t.recent.length && (
+                    {thread.commentCount > thread.recent.length && (
                       <div
                         style={{
                           padding: "8px 18px 12px",
@@ -255,15 +264,16 @@ export function TeacherDiscussionsClient() {
                           color: "var(--wf-mute)",
                         }}
                       >
-                        + {t.commentCount - t.recent.length} earlier comment
-                        {t.commentCount - t.recent.length === 1 ? "" : "s"}
+                        {t("earlierComments", {
+                          count: thread.commentCount - thread.recent.length,
+                        })}
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Instructor reply composer */}
-                <ThreadComposer blockId={t.blockId} />
+                <ThreadComposer blockId={thread.blockId} />
               </Card>
             ))}
           </div>
@@ -277,7 +287,7 @@ export function TeacherDiscussionsClient() {
               color: "var(--wf-accent)",
             }}
           >
-            {del.error.message ?? "Couldn't remove that comment."}
+            {del.error.message ?? t("deleteError")}
           </div>
         )}
       </div>
@@ -306,6 +316,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
  * hub feed so the new reply shows up in the thread's recent comments.
  */
 function ThreadComposer({ blockId }: { blockId: string }) {
+  const t = useTranslations("TeacherDiscussions");
   const utils = trpc.useUtils();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -315,8 +326,7 @@ function ThreadComposer({ blockId }: { blockId: string }) {
       setError(null);
       utils.lesson.teacherDiscussions.invalidate();
     },
-    onError: (err) =>
-      setError(err.message ?? "Couldn't post your reply. Try again."),
+    onError: (err) => setError(err.message ?? t("postError")),
   });
 
   const trimmed = draft.trim();
@@ -334,7 +344,7 @@ function ThreadComposer({ blockId }: { blockId: string }) {
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Reply as the instructor…"
+          placeholder={t("composerPlaceholder")}
           rows={1}
           maxLength={2000}
           disabled={post.isPending}
@@ -368,7 +378,7 @@ function ThreadComposer({ blockId }: { blockId: string }) {
             alignSelf: "stretch",
           }}
         >
-          {post.isPending ? "Posting…" : "Reply"}
+          {post.isPending ? t("posting") : t("reply")}
         </button>
       </div>
       {error && (

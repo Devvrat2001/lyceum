@@ -77,7 +77,8 @@
     "continue": "Continue →",
     "completedCount": "Completed · {count}",
     "completedTag": "COMPLETED",
-    "finished": "Finished {date}"
+    "finished": "Finished {date}",
+    "gradeLabel": "GRADE {grade}"
   },
   "SkillTree": {
     "eyebrow": "Personalized Path",
@@ -93,7 +94,11 @@
     "inProgress": "IN PROGRESS",
     "mastered": "{pct}% mastered",
     "upNext": "Up next",
-    "upNextHint": "↑ Up next — correct answers move this toward mastery"
+    "upNextHint": "↑ Up next — correct answers move this toward mastery",
+    "masteryTooltip": "Mastery: {pct}%",
+    "stateDone": "DONE",
+    "stateUnlocked": "UNLOCKED",
+    "stateLocked": "LOCKED"
   },
   "Nav": {
     "home": "Home",
@@ -298,5 +303,29 @@
     "save": "Save",
     "saving": "Saving…",
     "clear": "Clear"
+  },
+  "TeacherDiscussions": {
+    "title": "Discussions",
+    "intro": "Every discussion thread across your courses. Reply as the instructor, or remove any comment that breaks class rules — moderated deletes are recorded in the institution audit log.",
+    "statThreads": "Threads",
+    "statActive": "With activity",
+    "statComments": "Total comments",
+    "loading": "Loading discussions…",
+    "emptyBody": "No discussion blocks yet. Add a <strong>Discussion</strong> block to any lesson in the course builder and student conversations will show up here.",
+    "commentCount": "{count, plural, one {# comment} other {# comments}}",
+    "defaultPrompt": "Discussion",
+    "removeTitle": "Remove this comment",
+    "removing": "Removing…",
+    "remove": "Remove",
+    "earlierComments": "+ {count, plural, one {# earlier comment} other {# earlier comments}}",
+    "deleteError": "Couldn't remove that comment.",
+    "justNow": "just now",
+    "minutesAgo": "{n}m",
+    "hoursAgo": "{n}h",
+    "daysAgo": "{n}d",
+    "composerPlaceholder": "Reply as the instructor…",
+    "posting": "Posting…",
+    "reply": "Reply",
+    "postError": "Couldn't post your reply. Try again."
   }
 }
