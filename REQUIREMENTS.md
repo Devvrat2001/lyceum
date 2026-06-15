@@ -552,10 +552,15 @@ hunts net-new gaps, each grounded in the code.
   teachers, student library/skill-tree. cont.52 +`TeacherGrading` [first
   CLIENT component, via `useTranslations` in GradingClient + SubmissionRow;
   also fixed stale post-R39 copy that claimed overrides don't change XP].
-  Remaining: ~10 — teacher discussions[client]/paths/storefront, admin
-  teachers[client]/curriculum/audit/billing, student library/skill-tree.
-  The client-component i18n pattern is now proven [next-intl
-  `useTranslations`].)
+  cont.53 +`TeacherDiscussions` [second CLIENT component — the 381-line
+  moderation hub: rich-text empty state via `t.rich`, ICU-plural comment
+  counts, locale-aware relative-time formatter] + finished student
+  library/skill-tree [already localized bar a few hardcoded stragglers:
+  the `GRADE` card label, the `Mastery:` node tooltip, and the
+  done/unlocked/locked state chips]. Remaining: ~6 — teacher
+  paths/storefront, admin teachers[client]/curriculum/audit/billing. The
+  client-component i18n pattern is proven [next-intl `useTranslations`,
+  `t.rich` for inline emphasis].)
 - **R53 · Test coverage for the thin routers + cron handlers** —
   `insight` + `parent` routers have ~1 caller test each, and the
   `/api/cron/*` route handlers (streak-rollover, weekly-digest, ai-insights,
