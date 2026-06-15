@@ -176,7 +176,12 @@
     "noCurricula": "अभी तक कोई पाठ्यक्रम नहीं अपनाया गया।",
     "complianceTitle": "सुरक्षा और अनुपालन",
     "complianceAnnot": "K-12 विशिष्ट",
-    "complianceEmpty": "अभी तक कोई अनुपालन जाँच कॉन्फ़िगर नहीं की गई। आपके ज़िले के सेटअप होते ही SSO, FERPA फ़्लैग, अभिभावक सहमति और कंटेंट-फ़िल्टर स्थिति यहाँ दिखाई देगी।"
+    "complianceEmpty": "अभी तक कोई अनुपालन जाँच कॉन्फ़िगर नहीं की गई। आपके ज़िले के सेटअप होते ही SSO, FERPA फ़्लैग, अभिभावक सहमति और कंटेंट-फ़िल्टर स्थिति यहाँ दिखाई देगी।",
+      "kpiStudents": "छात्र",
+      "kpiTeachers": "शिक्षक",
+      "kpiClasses": "कक्षाएँ",
+      "kpiAvgQuizScore": "औसत क्विज़ स्कोर",
+      "kpiSeatUsage": "सीट उपयोग"
   },
   "TeacherAnalytics": {
     "title": "विश्लेषण",
@@ -194,6 +199,18 @@
     "noCourses": "अभी तक कोई कोर्स नहीं।",
     "students": "{count} छात्र",
     "completion": "{pct}% पूर्णता",
-    "aiTop3": "AI अंतर्दृष्टि · शीर्ष 3"
+    "aiTop3": "AI अंतर्दृष्टि · शीर्ष 3",
+      "kpiActiveStudents": "सक्रिय छात्र",
+      "kpiAvgCompletion": "औसत पूर्णता",
+      "kpiAvgQuizScore": "औसत क्विज़ स्कोर",
+      "kpiAiTutorSessions": "AI ट्यूटर सत्र",
+      "kpiEarningsMtd": "आय · इस माह",
+      "funnelEnrolled": "नामांकित",
+      "funnelStarted": "शुरू किया",
+      "funnelP25": "25% पूर्ण",
+      "funnelP50": "50% पूर्ण",
+      "funnelP75": "75% पूर्ण",
+      "funnelP90": "90% पूर्ण",
+      "funnelCompleted": "पूर्ण"
   }
 }

@@ -176,7 +176,12 @@
     "noCurricula": "Aún no se han adoptado currículos.",
     "complianceTitle": "Seguridad y cumplimiento",
     "complianceAnnot": "Específico de K-12",
-    "complianceEmpty": "Aún no se han configurado comprobaciones de cumplimiento. El estado de SSO, los indicadores FERPA, el consentimiento de los padres y el filtro de contenido aparecerán aquí una vez que tu distrito esté configurado."
+    "complianceEmpty": "Aún no se han configurado comprobaciones de cumplimiento. El estado de SSO, los indicadores FERPA, el consentimiento de los padres y el filtro de contenido aparecerán aquí una vez que tu distrito esté configurado.",
+      "kpiStudents": "Estudiantes",
+      "kpiTeachers": "Profesores",
+      "kpiClasses": "Clases",
+      "kpiAvgQuizScore": "Puntuación media de cuestionarios",
+      "kpiSeatUsage": "Uso de plazas"
   },
   "TeacherAnalytics": {
     "title": "Analíticas",
@@ -194,6 +199,18 @@
     "noCourses": "Aún no hay cursos.",
     "students": "{count} estudiantes",
     "completion": "{pct}% de finalización",
-    "aiTop3": "Información de IA · top 3"
+    "aiTop3": "Información de IA · top 3",
+      "kpiActiveStudents": "Estudiantes activos",
+      "kpiAvgCompletion": "Finalización media",
+      "kpiAvgQuizScore": "Puntuación media de cuestionarios",
+      "kpiAiTutorSessions": "Sesiones de tutor IA",
+      "kpiEarningsMtd": "Ingresos · mes en curso",
+      "funnelEnrolled": "Inscritos",
+      "funnelStarted": "Comenzaron",
+      "funnelP25": "25% completado",
+      "funnelP50": "50% completado",
+      "funnelP75": "75% completado",
+      "funnelP90": "90% completado",
+      "funnelCompleted": "Completado"
   }
 }

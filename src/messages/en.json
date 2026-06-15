@@ -176,7 +176,12 @@
     "noCurricula": "No curricula adopted yet.",
     "complianceTitle": "Safety & compliance",
     "complianceAnnot": "K-12 specific",
-    "complianceEmpty": "No compliance checks configured yet. SSO, FERPA flags, parent consent, and content-filter status appear here once your district is wired up."
+    "complianceEmpty": "No compliance checks configured yet. SSO, FERPA flags, parent consent, and content-filter status appear here once your district is wired up.",
+      "kpiStudents": "Students",
+      "kpiTeachers": "Teachers",
+      "kpiClasses": "Classes",
+      "kpiAvgQuizScore": "Avg quiz score",
+      "kpiSeatUsage": "Seat usage"
   },
   "TeacherAnalytics": {
     "title": "Analytics",
@@ -194,6 +199,18 @@
     "noCourses": "No courses yet.",
     "students": "{count} students",
     "completion": "{pct}% completion",
-    "aiTop3": "AI insights · top 3"
+    "aiTop3": "AI insights · top 3",
+      "kpiActiveStudents": "Active students",
+      "kpiAvgCompletion": "Avg. completion",
+      "kpiAvgQuizScore": "Avg. quiz score",
+      "kpiAiTutorSessions": "AI tutor sessions",
+      "kpiEarningsMtd": "Earnings · MTD",
+      "funnelEnrolled": "Enrolled",
+      "funnelStarted": "Started",
+      "funnelP25": "25% complete",
+      "funnelP50": "50% complete",
+      "funnelP75": "75% complete",
+      "funnelP90": "90% complete",
+      "funnelCompleted": "Completed"
   }
 }

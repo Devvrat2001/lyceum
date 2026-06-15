@@ -891,6 +891,17 @@ export const teacherRouter = router({
         "90% complete",
         "Completed",
       ];
+      // Stable i18n keys parallel to labelMap (R41); the page translates by
+      // `key` and falls back to the English `label`.
+      const keyMap = [
+        "enrolled",
+        "started",
+        "p25",
+        "p50",
+        "p75",
+        "p90",
+        "completed",
+      ];
       const totalE = totalEnrollments || 1;
       const stages = buckets.map((threshold, i) => {
         const count = courses.reduce(
@@ -899,6 +910,7 @@ export const teacherRouter = router({
           0
         );
         return {
+          key: keyMap[i],
           label: labelMap[i],
           pct: Math.round((count / totalE) * 100),
           count,
@@ -918,8 +930,10 @@ export const teacherRouter = router({
       if (dropAt > 0 && maxDrop > 0) stages[dropAt].hot = true;
 
       return {
+        // `key` is the stable i18n key (R41); `l` is the English fallback.
         kpis: [
           {
+            key: "activeStudents",
             l: "Active students",
             v: activeStudents.toLocaleString("en-US"),
             d: `${totalStudents} total`,
@@ -927,6 +941,7 @@ export const teacherRouter = router({
             neg: false,
           },
           {
+            key: "avgCompletion",
             l: "Avg. completion",
             v: `${avgProgress}%`,
             d: `${avgCompletion}% finished`,
@@ -934,6 +949,7 @@ export const teacherRouter = router({
             neg: false,
           },
           {
+            key: "avgQuizScore",
             l: "Avg. quiz score",
             v: avgQuiz.toString(),
             d: `${attempts.length} attempts`,
@@ -941,6 +957,7 @@ export const teacherRouter = router({
             neg: false,
           },
           {
+            key: "aiTutorSessions",
             l: "AI tutor sessions",
             v: tutorCurrent.toLocaleString("en-US"),
             d:
@@ -951,6 +968,7 @@ export const teacherRouter = router({
             neg: tutorDelta < 0,
           },
           {
+            key: "earningsMtd",
             l: "Earnings · MTD",
             v: `${CURRENCY.symbol}${Math.round(mtdNet / 100).toLocaleString(
               CURRENCY.locale

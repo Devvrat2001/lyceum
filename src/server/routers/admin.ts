@@ -382,17 +382,21 @@ export const adminRouter = router({
       // a hardcoded "Avg engagement: 47m / +6m" tile and arbitrary
       // deltas (`+spring`, `+4% 7-day` derived from multiplying counts)
       // — those are gone. Empty `d` / `meta` strings render nothing.
+      // `key` is the stable i18n key (R41); `l` is the English fallback the
+      // dashboard renders if a translation is missing.
       kpis: [
-        { l: "Students", v: students.toString(), d: "", meta: "" },
-        { l: "Teachers", v: teachers.toString(), d: "", meta: "" },
-        { l: "Classes", v: classes.toString(), d: "", meta: "" },
+        { key: "students", l: "Students", v: students.toString(), d: "", meta: "" },
+        { key: "teachers", l: "Teachers", v: teachers.toString(), d: "", meta: "" },
+        { key: "classes", l: "Classes", v: classes.toString(), d: "", meta: "" },
         {
+          key: "avgQuizScore",
           l: "Avg quiz score",
           v: avgQuizScore === null ? "—" : `${avgQuizScore}%`,
           d: "",
           meta: `${attempts.length} attempt${attempts.length === 1 ? "" : "s"}`,
         },
         {
+          key: "seatUsage",
           l: "Seat usage",
           v: `${seatPct}%`,
           d: "",

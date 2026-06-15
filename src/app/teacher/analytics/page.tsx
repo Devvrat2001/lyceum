@@ -17,6 +17,24 @@ export default async function TeacherAnalyticsPage() {
     trpc.teacher.analytics({ rangeDays: 30 }),
     getTranslations("TeacherAnalytics"),
   ]);
+  // Translate server-built KPI + funnel labels by stable key (R41); the
+  // English `l`/`label` the router still ships is the fallback.
+  const kpiLabel: Record<string, string> = {
+    activeStudents: t("kpiActiveStudents"),
+    avgCompletion: t("kpiAvgCompletion"),
+    avgQuizScore: t("kpiAvgQuizScore"),
+    aiTutorSessions: t("kpiAiTutorSessions"),
+    earningsMtd: t("kpiEarningsMtd"),
+  };
+  const funnelLabel: Record<string, string> = {
+    enrolled: t("funnelEnrolled"),
+    started: t("funnelStarted"),
+    p25: t("funnelP25"),
+    p50: t("funnelP50"),
+    p75: t("funnelP75"),
+    p90: t("funnelP90"),
+    completed: t("funnelCompleted"),
+  };
 
   return (
     <TeacherChrome active="analytics">
@@ -47,13 +65,13 @@ export default async function TeacherAnalyticsPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
             gap: 12,
             marginBottom: 24,
           }}
         >
           {data.kpis.map((k) => (
-            <Card key={k.l} p={14}>
+            <Card key={k.key} p={14}>
               <div
                 style={{
                   fontSize: 11,
@@ -61,7 +79,7 @@ export default async function TeacherAnalyticsPage() {
                   marginBottom: 6,
                 }}
               >
-                {k.l}
+                {kpiLabel[k.key] ?? k.l}
               </div>
               <div
                 className="wf-serif"
@@ -133,7 +151,7 @@ export default async function TeacherAnalyticsPage() {
               </h3>
             </div>
             {data.funnel.map((s) => (
-              <div key={s.label} style={{ marginBottom: 8 }}>
+              <div key={s.key} style={{ marginBottom: 8 }}>
                 <div
                   style={{
                     display: "flex",
@@ -148,7 +166,7 @@ export default async function TeacherAnalyticsPage() {
                       color: s.hot ? "var(--wf-accent)" : "var(--wf-ink)",
                     }}
                   >
-                    {s.label}
+                    {funnelLabel[s.key] ?? s.label}
                     {s.hot ? ` · ${t("biggestDrop")}` : ""}
                   </span>
                   <span

@@ -18,6 +18,15 @@ export default async function AdminDashboardPage() {
     trpc.admin.overview(),
     getTranslations("AdminDashboard"),
   ]);
+  // Translate the server-built KPI labels by their stable key (R41),
+  // falling back to the English label the router still ships.
+  const kpiLabel: Record<string, string> = {
+    students: t("kpiStudents"),
+    teachers: t("kpiTeachers"),
+    classes: t("kpiClasses"),
+    avgQuizScore: t("kpiAvgQuizScore"),
+    seatUsage: t("kpiSeatUsage"),
+  };
 
   return (
     <AdminChrome active="overview">
@@ -57,13 +66,13 @@ export default async function AdminDashboardPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(6, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
             gap: 12,
             marginBottom: 24,
           }}
         >
           {data.kpis.map((k) => (
-            <Card key={k.l} p={14}>
+            <Card key={k.key} p={14}>
               <div
                 style={{
                   fontSize: 11,
@@ -71,7 +80,7 @@ export default async function AdminDashboardPage() {
                   marginBottom: 6,
                 }}
               >
-                {k.l}
+                {kpiLabel[k.key] ?? k.l}
               </div>
               <div
                 className="wf-serif"
