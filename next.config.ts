@@ -3,7 +3,38 @@ import { withSentryConfig } from "@sentry/nextjs";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  /**
+   * Security response headers (REQUIREMENTS R50). Applied to every route.
+   * CSP is deliberately omitted for now — the app styles everything via
+   * inline `style={{}}` and emits JSON-LD via `dangerouslySetInnerHTML`, so
+   * a strict policy needs nonces/refactoring; that's the R50 tail (start
+   * report-only). These header-only hardenings are free and high-value.
+   */
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
+          },
+          // The SPEAK block uses the mic (SpeechRecognition); camera +
+          // geolocation are unused, so deny them outright.
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(self), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 // Phase 6.2 — Sentry. Only wrap the config when SENTRY_DSN is set, so a build
