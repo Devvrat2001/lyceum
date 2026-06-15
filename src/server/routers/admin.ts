@@ -260,7 +260,8 @@ export const adminRouter = router({
       classes,
       seatUsers,
       activeStudents,
-      attempts,
+      attemptTotal,
+      attemptCorrect,
       teachersList,
     ] = await Promise.all([
       ctx.db.user.count({
@@ -284,9 +285,11 @@ export const adminRouter = router({
           },
         },
       }),
-      ctx.db.attempt.findMany({
-        where: { user: { institutionId } },
-        select: { correct: true },
+      // Accuracy via two DB counts (R48) instead of pulling every
+      // institution Attempt into memory just to filter it in JS.
+      ctx.db.attempt.count({ where: { user: { institutionId } } }),
+      ctx.db.attempt.count({
+        where: { correct: true, user: { institutionId } },
       }),
       ctx.db.user.findMany({
         where: { role: "TEACHER", institutionId },
@@ -308,10 +311,8 @@ export const adminRouter = router({
     // Real average when we have any attempts; null lets the page
     // render "—" instead of the prototype's hardcoded 79.
     const avgQuizScore =
-      attempts.length > 0
-        ? Math.round(
-            (attempts.filter((a) => a.correct).length / attempts.length) * 100
-          )
+      attemptTotal > 0
+        ? Math.round((attemptCorrect / attemptTotal) * 100)
         : null;
 
     const seatTotal = institution?.seats ?? Math.max(seatUsers, 1);
@@ -400,7 +401,7 @@ export const adminRouter = router({
           l: "Avg quiz score",
           v: avgQuizScore === null ? "—" : `${avgQuizScore}%`,
           d: null,
-          meta: ann("metaAttempts", { count: attempts.length }),
+          meta: ann("metaAttempts", { count: attemptTotal }),
         },
         {
           key: "seatUsage",
