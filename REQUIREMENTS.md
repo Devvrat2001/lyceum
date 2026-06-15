@@ -546,10 +546,13 @@ hunts net-new gaps, each grounded in the code.
   infrastructure — just unfinished breadth.
   · **Status: IN PROGRESS (cont.49 +`TeacherEarnings` [+ rewrote its
   dev-jargon "What ships next" card into an honest payout note]; cont.50
-  +`TeacherStudents` [gradebook header/empty-states/row labels + View, ICU
-  plurals]). Remaining: ~13 page bodies — teacher grading/discussions/paths/
-  storefront, admin people/classes/curriculum/audit/billing/teachers,
-  student library/skill-tree.)
+  +`TeacherStudents`; cont.51 +`AdminPeople` [role chips/plurals + ICU
+  counts] +`AdminClasses`). Remaining: ~11 page bodies — teacher
+  grading/discussions/paths/storefront, admin curriculum/audit/billing/
+  teachers, student library/skill-tree. Note: teacher grading + discussions
+  bodies live in large CLIENT components [GradingClient 238L,
+  TeacherDiscussionsClient 381L] → `useTranslations`, a heavier focused
+  cycle; the rest are server pages.)
 - **R53 · Test coverage for the thin routers + cron handlers** —
   `insight` + `parent` routers have ~1 caller test each, and the
   `/api/cron/*` route handlers (streak-rollover, weekly-digest, ai-insights,
