@@ -388,9 +388,11 @@ observability is **not** a gap.
   · **Status: DONE-v1 (cont.44** — `admin.overview` + `teacher.analytics`
   emit a stable `key` per KPI + funnel stage [English `l`/`label` kept as
   fallback]; dashboards translate by key via a literal-`t()` record. KPI
-  titles + drop-off funnel labels now localize. Remaining tail: the
-  computed `meta`/delta unit-strings ["12 attempts", "+3 vs prev"] need ICU
-  composition.)
+  titles + drop-off funnel labels now localize. **Tail DONE (cont.45)** —
+  the `meta`/delta unit-strings now ship as structured `{key, params}` and
+  render via `t()` with ICU plurals; `teacher/students`' KPI strip (a third
+  consumer of `analytics.kpis`) localized too. No English left in the
+  dashboard KPI data.)
 - **R42 · Router test coverage: generator + skill** — both have ZERO
   caller-level tests (only the worker `processOutlineJob` and the
   `skillProgress` service are covered). Untested at the tRPC boundary:
@@ -427,8 +429,40 @@ observability is **not** a gap.
   · **Status: DONE-v1 (cont.44** — 9 fixed KPI/stat grids [admin + teacher
   dashboards, admin analytics, teacher earnings, parent, /student/progress,
   3 loading skeletons] switched to `repeat(auto-fit, minmax(140px, 1fr))`
-  so they wrap on phones, fill identically on desktop. Remaining tail: the
-  community grid + reader-internal 1fr-1fr blocks.)
+  so they wrap on phones, fill identically on desktop. **Tail DONE
+  (cont.45)** — community feed grid + teacher/students KPI strip reflowed;
+  the reader's drag-match `1fr auto 1fr` is an intentional paired layout
+  that fits, left as-is.)
+
+---
+
+## P7 — post-P6 backlog (R46+), from the 2026-06-15 review pass
+
+P6 effectively cleared (R41/R42/R43/R45 done in cont.44; **R44** transactional
+email is the only carry-over, user-owned). Net-new gaps, each grounded in the
+code. (Verified-absent: error tracking/Sentry already exists.)
+
+- **R46 · Login brute-force protection** — `lib/auth.ts` credentials
+  `authorize()` bcrypt-compares with **no attempt counter or lockout**. The
+  signup/password-reset router IS rate-limited, but the login path isn't, so
+  password-guessing against a known email is unthrottled. Add per-email + per-IP
+  attempt throttling on the credentials path (reuse the rate-limit infra).
+- **R47 · Verifiable parental consent (R11 v2, COPPA)** — under-13 signups
+  capture `parentEmail` but consent is self-attested; the actual VPC flow (email
+  the parent a confirm link before the child account activates) is unbuilt. A
+  real COPPA obligation; the token/gate/schema are buildable now, with the email
+  *send* riding on R44.
+- **R48 · Dashboard query performance** — `admin.overview` + `teacher.analytics`
+  each fan out 6–10 findMany/aggregate calls and pull full Attempt rows into
+  memory to compute accuracy (`attempts.findMany({select:{correct}})` then
+  filter in JS). At scale that's large row transfers + unindexed scans. Push the
+  accuracy/active-count math into DB aggregates + add covering indexes; consider
+  a short-TTL cache.
+- **R49 · E2E coverage for the paid checkout flow** — the Playwright suite
+  covers login + an MCQ + the marketplace shell, but NOT the business-critical
+  buy→enroll→gated-access path end-to-end (only unit-tested in
+  `payment.flow`/`pathCheckout`). Add a spec driving demo-checkout → enrollment
+  → gated lesson access.
 
 ---
 
