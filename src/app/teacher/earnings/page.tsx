@@ -19,7 +19,7 @@ export default async function TeacherEarningsPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
             gap: 12,
             marginBottom: 24,
             maxWidth: 1200,

@@ -19,7 +19,7 @@ export default function RootLoading() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
           gap: 12,
           marginTop: 24,
         }}
