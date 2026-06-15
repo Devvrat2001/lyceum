@@ -422,6 +422,24 @@ observability is **not** a gap.
   dormant (no `RESEND_API_KEY`; `email.ts` no-ops), so "forgot password"
   silently does nothing for real users in prod. Needs the Resend key + a
   verified sending domain (user-owned ops) then a smoke of each path.
+  · **Go-live checklist (yours to run; the code is ready — one env var is
+  the only gate):**
+  1. **Verify a sending domain** at resend.com (add the DKIM/SPF/DMARC DNS
+     records it gives you for `lyceum.app`). The senders use
+     `receipts@`/`account@`/`hello@lyceum.app` — the domain must be verified
+     or Resend rejects the send.
+  2. **Set `RESEND_API_KEY`** on Vercel (Production). `isEmailEnabled()`
+     flips true the moment it's present; no redeploy of code needed beyond
+     picking up the new env (redeploy to apply).
+  3. **Smoke all five senders** after deploy: receipt (`sendOrderReceipt`
+     via a demo checkout), reset (`requestPasswordReset`), verify
+     (signup), parental consent (`R47` under-13 signup → parent inbox),
+     weekly digest (`/api/cron/weekly-digest`). Each logs a skip line when
+     dormant — confirm those stop.
+  4. **If `from` addresses bounce**, point them at your verified domain in
+     `lib/email.ts` (`FROM_ADDRESS`/`ACCOUNT_FROM_ADDRESS`/
+     `DIGEST_FROM_ADDRESS`). That's the only code touch, and only if the
+     domain differs from `lyceum.app`.
 - **R45 · Mobile reflow stragglers** (R7 tail) — `/student/progress` KPI
   row, the community grid, reader-internal 1fr-1fr blocks, and the
   admin/teacher dashboards' fixed `repeat(6,1fr)`/`repeat(5,1fr)` KPI grids
@@ -494,6 +512,40 @@ code. (Verified-absent: error tracking/Sentry already exists.)
   `ensureEnrollment` gate — so reaching it IS the gated-access proof. An
   explicit "in your library" re-check was tried + reverted (the heavy
   course-page render flaked under full-suite load).
+
+---
+
+## P8 — post-P7 backlog (R50+), from the 2026-06-15 review pass
+
+P7 cleared (R46–R49). The feature backlog is genuinely exhausted — the only
+carry-overs are **R44** (email) and **R1** (TLS), both user-owned. This pass
+hunts net-new gaps, each grounded in the code.
+
+- **R50 · Security response headers** · **Status: DONE-v1 (cont.48** — none
+  were set [verified: no `headers()` in `next.config.ts`, none in
+  `proxy.ts`]. Added HSTS + `X-Content-Type-Options` + `X-Frame-Options:
+  SAMEORIGIN` + `Referrer-Policy` + `Permissions-Policy`
+  [`microphone=(self)` for the SPEAK block; camera/geo denied]; confirmed
+  served via `next start` + curl. **Tail:** a real CSP — deferred because
+  the app styles via inline `style={{}}` + emits JSON-LD via
+  `dangerouslySetInnerHTML`, so it needs nonces/refactor; start report-only.)
+- **R51 · Rate-limit account creation + public mutations** — `auth.signup`
+  and `auth.confirmParentalConsent` have NO throttle (only
+  `requestPasswordReset` does), so a bot can mass-create accounts. Extend
+  the AuditLog-counter pattern (R46 / `checkAIQuota`) to signup, keyed per
+  IP (the anon `ctx.anonKey` already exists for this).
+- **R52 · i18n breadth to 100%** (the long R30 tail) — chrome, dashboards,
+  and tRPC labels are localized, but ~15 page bodies are still English:
+  teacher students/earnings/grading/discussions/paths/storefront; admin
+  people/classes/curriculum/audit/billing/teachers; student
+  library/skill-tree. Mechanical, namespace-by-namespace, no new
+  infrastructure — just unfinished breadth.
+- **R53 · Test coverage for the thin routers + cron handlers** —
+  `insight` + `parent` routers have ~1 caller test each, and the
+  `/api/cron/*` route handlers (streak-rollover, weekly-digest, ai-insights,
+  backfill-embeddings) have no handler-level test of the auth gate +
+  happy/again path. Lock the cron `CRON_SECRET`/Bearer gate especially —
+  it's a public endpoint that spends money (OpenAI).
 
 ---
 
