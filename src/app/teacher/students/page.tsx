@@ -124,9 +124,10 @@ export default async function TeacherStudentsPage({
 
   const trpc = await getServerCaller();
   // Pull analytics to surface a small KPI row at the top
-  const [analytics, t] = await Promise.all([
+  const [analytics, t, ts] = await Promise.all([
     trpc.teacher.analytics({ rangeDays: 30 }),
     getTranslations("TeacherAnalytics"),
+    getTranslations("TeacherStudents"),
   ]);
   // Localize the server-built KPI labels by key (R41), English fallback.
   const kpiLabel: Record<string, string> = {
@@ -148,7 +149,7 @@ export default async function TeacherStudentsPage({
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>Students</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{ts("title")}</span>
         <StudentsToolbar
           courses={coursesOwned}
           classes={classOptions}
@@ -199,7 +200,7 @@ export default async function TeacherStudentsPage({
               alignItems: "center",
             }}
           >
-            <Eyebrow>Enrolled</Eyebrow>
+            <Eyebrow>{ts("enrolled")}</Eyebrow>
             <span
               style={{
                 marginLeft: "auto",
@@ -207,8 +208,8 @@ export default async function TeacherStudentsPage({
                 color: "var(--wf-mute)",
               }}
             >
-              {students.length} student{students.length === 1 ? "" : "s"}
-              {filterCourseSlug || filterClassId ? " · filtered" : ""}
+              {ts("studentCount", { count: students.length })}
+              {filterCourseSlug || filterClassId ? ts("filteredSuffix") : ""}
             </span>
           </div>
           {students.length === 0 ? (
@@ -221,8 +222,8 @@ export default async function TeacherStudentsPage({
               }}
             >
               {filterCourseSlug || filterClassId
-                ? "No students match the current filters."
-                : "No students have enrolled in your courses yet."}
+                ? ts("emptyFiltered")
+                : ts("emptyNone")}
             </div>
           ) : (
             students.map((s, i) => {
@@ -269,9 +270,10 @@ export default async function TeacherStudentsPage({
                         marginTop: 2,
                       }}
                     >
-                      {s.class?.name ? `Class ${s.class.name} · ` : ""}
-                      {s.enrollments.length} course
-                      {s.enrollments.length === 1 ? "" : "s"} ·{" "}
+                      {s.class?.name
+                        ? `${ts("rowClass", { name: s.class.name })} · `
+                        : ""}
+                      {ts("courseCount", { count: s.enrollments.length })} ·{" "}
                       {xp.toLocaleString()} XP
                     </div>
                   </div>
@@ -285,7 +287,7 @@ export default async function TeacherStudentsPage({
                         marginTop: 2,
                       }}
                     >
-                      {meanPct}% avg completion
+                      {ts("rowAvgCompletion", { pct: meanPct })}
                     </div>
                   </div>
                   <Link
@@ -293,7 +295,7 @@ export default async function TeacherStudentsPage({
                     style={{ textDecoration: "none" }}
                   >
                     <Btn sm variant="ghost">
-                      View →
+                      {ts("view")} →
                     </Btn>
                   </Link>
                 </div>

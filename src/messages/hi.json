@@ -238,5 +238,17 @@
     "subFee": "Lyceum शुल्क {amount}",
     "payoutsEyebrow": "भुगतान",
     "payoutsBody": "आपकी आय Stripe Connect के माध्यम से भुगतान की जाती है — ऊपर अपना भुगतान खाता कनेक्ट या प्रबंधित करें, और कभी भी अपनी वार्षिक आय CSV के रूप में निर्यात करें।"
+  },
+  "TeacherStudents": {
+    "title": "छात्र",
+    "enrolled": "नामांकित",
+    "studentCount": "{count, plural, one {# छात्र} other {# छात्र}}",
+    "filteredSuffix": " · फ़िल्टर किया गया",
+    "emptyFiltered": "वर्तमान फ़िल्टर से कोई छात्र मेल नहीं खाता।",
+    "emptyNone": "अभी तक किसी छात्र ने आपके कोर्स में नामांकन नहीं किया है।",
+    "rowClass": "कक्षा {name}",
+    "courseCount": "{count, plural, one {# कोर्स} other {# कोर्स}}",
+    "rowAvgCompletion": "{pct}% औसत पूर्णता",
+    "view": "देखें"
   }
 }

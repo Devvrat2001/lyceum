@@ -238,5 +238,17 @@
     "subFee": "Lyceum fee {amount}",
     "payoutsEyebrow": "Payouts",
     "payoutsBody": "Your earnings are paid out through Stripe Connect — connect or manage your payout account above, and export your annual earnings as CSV anytime."
+  },
+  "TeacherStudents": {
+    "title": "Students",
+    "enrolled": "Enrolled",
+    "studentCount": "{count, plural, one {# student} other {# students}}",
+    "filteredSuffix": " · filtered",
+    "emptyFiltered": "No students match the current filters.",
+    "emptyNone": "No students have enrolled in your courses yet.",
+    "rowClass": "Class {name}",
+    "courseCount": "{count, plural, one {# course} other {# courses}}",
+    "rowAvgCompletion": "{pct}% avg completion",
+    "view": "View"
   }
 }
