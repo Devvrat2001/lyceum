@@ -139,6 +139,11 @@ model User {
   assignments    Assignment[] @relation("AssignmentTeacher")
 
   @@index([role])
+  // Institution-scoped dashboard counts (R48): admin.overview filters
+  // users by (institutionId [+ role]); this composite also serves the
+  // institutionId-only count via its leftmost prefix and the Attempt→User
+  // join filter.
+  @@index([institutionId, role])
 }
 
 // Auth.js v5 standard tables
