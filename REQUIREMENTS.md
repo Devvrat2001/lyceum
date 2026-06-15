@@ -544,9 +544,12 @@ hunts net-new gaps, each grounded in the code.
   people/classes/curriculum/audit/billing/teachers; student
   library/skill-tree. Mechanical, namespace-by-namespace, no new
   infrastructure — just unfinished breadth.
-  · **Status: IN PROGRESS (cont.49** — +`TeacherEarnings` [teacher/earnings
-  page body; also rewrote its dev-jargon "What ships next" card into an
-  honest payout note]. Remaining: the ~14 other page bodies listed above.)
+  · **Status: IN PROGRESS (cont.49 +`TeacherEarnings` [+ rewrote its
+  dev-jargon "What ships next" card into an honest payout note]; cont.50
+  +`TeacherStudents` [gradebook header/empty-states/row labels + View, ICU
+  plurals]). Remaining: ~13 page bodies — teacher grading/discussions/paths/
+  storefront, admin people/classes/curriculum/audit/billing/teachers,
+  student library/skill-tree.)
 - **R53 · Test coverage for the thin routers + cron handlers** —
   `insight` + `parent` routers have ~1 caller test each, and the
   `/api/cron/*` route handlers (streak-rollover, weekly-digest, ai-insights,
@@ -556,8 +559,9 @@ hunts net-new gaps, each grounded in the code.
   · **Status: DONE-v1 (cont.49** — `test/cronAuth.test.ts` locks the cron
   gate via streak-rollover [the cheap DB-only cron]: 500 unset / 401
   wrong-or-missing Bearer / 200 only with the correct token; the other
-  crons share the identical check. Thin-router coverage [insight/parent]
-  remains the tail.)
+  crons share the identical check. cont.50: +`test/insight.test.ts`
+  [forTeacher cache read + teacher-only authz + health]; `parent` was
+  already covered by `parentSelfLink.test`. R53 fully done.)
 
 ---
 
