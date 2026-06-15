@@ -1,9 +1,11 @@
+import { getTranslations } from "next-intl/server";
 import { AdminChrome } from "@/components/layouts/AdminChrome";
 import { Btn, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 
 export default async function AdminClassesPage() {
+  const t = await getTranslations("AdminClasses");
   const session = await auth();
   const me = await db.user.findUnique({
     where: { id: session!.user.id },
@@ -35,16 +37,16 @@ export default async function AdminClassesPage() {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>Classes</span>
-        <span className="wf-chip">Spring 2026 ▾</span>
-        <span className="wf-chip">All grades ▾</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
+        <span className="wf-chip">{t("term")} ▾</span>
+        <span className="wf-chip">{t("allGrades")} ▾</span>
         <div style={{ flex: 1 }} />
         <Btn
           variant="primary"
           sm
           icon={<Icon name="plus" size={12} color="white" />}
         >
-          New class
+          {t("newClass")}
         </Btn>
       </header>
 
@@ -58,7 +60,7 @@ export default async function AdminClassesPage() {
               alignItems: "center",
             }}
           >
-            <Eyebrow>All classes</Eyebrow>
+            <Eyebrow>{t("allClasses")}</Eyebrow>
             <span
               style={{
                 marginLeft: "auto",
@@ -66,7 +68,7 @@ export default async function AdminClassesPage() {
                 color: "var(--wf-mute)",
               }}
             >
-              {classes.length} total
+              {t("total", { count: classes.length })}
             </span>
           </div>
           {classes.length === 0 ? (
@@ -78,7 +80,7 @@ export default async function AdminClassesPage() {
                 color: "var(--wf-mute)",
               }}
             >
-              No classes set up yet.
+              {t("empty")}
             </div>
           ) : (
             classes.map((c, i) => (
@@ -114,7 +116,7 @@ export default async function AdminClassesPage() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>
-                    Class {c.name}
+                    {t("rowClass", { name: c.name })}
                   </div>
                   <div
                     style={{
@@ -124,18 +126,18 @@ export default async function AdminClassesPage() {
                     }}
                   >
                     {c.teacher?.name
-                      ? `Taught by ${c.teacher.name}`
-                      : "Unassigned"}
+                      ? t("taughtBy", { name: c.teacher.name })
+                      : t("unassigned")}
                   </div>
                 </div>
                 <span
                   className="wf-mono"
                   style={{ fontSize: 11, color: "var(--wf-body)" }}
                 >
-                  {c._count.students} students
+                  {t("countStudents", { count: c._count.students })}
                 </span>
                 <Btn variant="ghost" sm>
-                  Manage →
+                  {t("manage")} →
                 </Btn>
               </div>
             ))

@@ -250,5 +250,38 @@
     "courseCount": "{count, plural, one {# course} other {# courses}}",
     "rowAvgCompletion": "{pct}% avg completion",
     "view": "View"
+  },
+  "AdminPeople": {
+    "title": "People",
+    "everyone": "Everyone",
+    "exportCsv": "Export CSV",
+    "invite": "Invite",
+    "empty": "No one here yet.",
+    "ofTotal": "{shown} of {total}",
+    "rowClass": "Class {name}",
+    "roleStudent": "Student",
+    "roleTeacher": "Teacher",
+    "roleAdmin": "Admin",
+    "roleParent": "Parent",
+    "groupStudent": "Students",
+    "groupTeacher": "Teachers",
+    "groupAdmin": "Admins",
+    "groupParent": "Parents",
+    "countCourses": "{count, plural, one {# course} other {# courses}}",
+    "countChildren": "{count, plural, one {# child} other {# children}}"
+  },
+  "AdminClasses": {
+    "title": "Classes",
+    "term": "Spring 2026",
+    "allGrades": "All grades",
+    "newClass": "New class",
+    "allClasses": "All classes",
+    "total": "{count} total",
+    "empty": "No classes set up yet.",
+    "rowClass": "Class {name}",
+    "taughtBy": "Taught by {name}",
+    "unassigned": "Unassigned",
+    "countStudents": "{count, plural, one {# student} other {# students}}",
+    "manage": "Manage"
   }
 }

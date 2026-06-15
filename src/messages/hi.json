@@ -250,5 +250,38 @@
     "courseCount": "{count, plural, one {# कोर्स} other {# कोर्स}}",
     "rowAvgCompletion": "{pct}% औसत पूर्णता",
     "view": "देखें"
+  },
+  "AdminPeople": {
+    "title": "लोग",
+    "everyone": "सभी",
+    "exportCsv": "CSV निर्यात करें",
+    "invite": "आमंत्रित करें",
+    "empty": "अभी यहाँ कोई नहीं है।",
+    "ofTotal": "{total} में से {shown}",
+    "rowClass": "कक्षा {name}",
+    "roleStudent": "छात्र",
+    "roleTeacher": "शिक्षक",
+    "roleAdmin": "प्रशासक",
+    "roleParent": "अभिभावक",
+    "groupStudent": "छात्र",
+    "groupTeacher": "शिक्षक",
+    "groupAdmin": "प्रशासक",
+    "groupParent": "अभिभावक",
+    "countCourses": "{count, plural, one {# कोर्स} other {# कोर्स}}",
+    "countChildren": "{count, plural, one {# बच्चा} other {# बच्चे}}"
+  },
+  "AdminClasses": {
+    "title": "कक्षाएँ",
+    "term": "वसंत 2026",
+    "allGrades": "सभी ग्रेड",
+    "newClass": "नई कक्षा",
+    "allClasses": "सभी कक्षाएँ",
+    "total": "कुल {count}",
+    "empty": "अभी तक कोई कक्षा सेट नहीं की गई।",
+    "rowClass": "कक्षा {name}",
+    "taughtBy": "{name} द्वारा पढ़ाई जाती है",
+    "unassigned": "अनिर्धारित",
+    "countStudents": "{count, plural, one {# छात्र} other {# छात्र}}",
+    "manage": "प्रबंधित करें"
   }
 }

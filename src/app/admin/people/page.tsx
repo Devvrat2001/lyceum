@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { AdminChrome } from "@/components/layouts/AdminChrome";
 import {
   Avatar,
@@ -10,13 +11,6 @@ import {
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ParentLinksManager } from "@/components/admin/ParentLinksManager";
-
-const ROLE_LABEL: Record<string, string> = {
-  STUDENT: "Student",
-  TEACHER: "Teacher",
-  ADMIN: "Admin",
-  PARENT: "Parent",
-};
 
 export default async function AdminPeoplePage({
   searchParams,
@@ -58,6 +52,21 @@ export default async function AdminPeoplePage({
     PARENT: users.filter((u) => u.role === "PARENT").length,
   };
 
+  const t = await getTranslations("AdminPeople");
+  // Role labels (singular for chips/rows, plural for the group eyebrow).
+  const roleLabel: Record<string, string> = {
+    STUDENT: t("roleStudent"),
+    TEACHER: t("roleTeacher"),
+    ADMIN: t("roleAdmin"),
+    PARENT: t("roleParent"),
+  };
+  const groupLabel: Record<string, string> = {
+    STUDENT: t("groupStudent"),
+    TEACHER: t("groupTeacher"),
+    ADMIN: t("groupAdmin"),
+    PARENT: t("groupParent"),
+  };
+
   return (
     <AdminChrome active="people">
       <header
@@ -71,7 +80,7 @@ export default async function AdminPeoplePage({
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>People</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
         <div style={{ display: "flex", gap: 6, marginLeft: 8 }}>
           {(["STUDENT", "TEACHER", "ADMIN", "PARENT"] as const).map(
             (r) => (
@@ -92,7 +101,7 @@ export default async function AdminPeoplePage({
                       r === roleFilter ? "var(--wf-ink)" : "var(--wf-hairline)",
                   }}
                 >
-                  {ROLE_LABEL[r]} · {counts[r]}
+                  {roleLabel[r]} · {counts[r]}
                 </span>
               </Link>
             )
@@ -100,14 +109,14 @@ export default async function AdminPeoplePage({
         </div>
         <div style={{ flex: 1 }} />
         <Btn variant="ghost" sm icon={<Icon name="download" size={12} />}>
-          Export CSV
+          {t("exportCsv")}
         </Btn>
         <Btn
           variant="primary"
           sm
           icon={<Icon name="plus" size={12} color="white" />}
         >
-          Invite
+          {t("invite")}
         </Btn>
       </header>
 
@@ -122,7 +131,7 @@ export default async function AdminPeoplePage({
             }}
           >
             <Eyebrow>
-              {roleFilter ? `${ROLE_LABEL[roleFilter]}s` : "Everyone"}
+              {roleFilter ? groupLabel[roleFilter] : t("everyone")}
             </Eyebrow>
             <span
               style={{
@@ -131,7 +140,10 @@ export default async function AdminPeoplePage({
                 color: "var(--wf-mute)",
               }}
             >
-              {users.length} of {Object.values(counts).reduce((a, b) => a + b, 0)}
+              {t("ofTotal", {
+                shown: users.length,
+                total: Object.values(counts).reduce((a, b) => a + b, 0),
+              })}
             </span>
           </div>
           {users.length === 0 ? (
@@ -143,7 +155,7 @@ export default async function AdminPeoplePage({
                 color: "var(--wf-mute)",
               }}
             >
-              No one here yet.
+              {t("empty")}
             </div>
           ) : (
             users.map((u, i) => (
@@ -181,14 +193,16 @@ export default async function AdminPeoplePage({
                     }}
                   >
                     {u.email}
-                    {u.class?.name ? ` · Class ${u.class.name}` : ""}
+                    {u.class?.name
+                      ? ` · ${t("rowClass", { name: u.class.name })}`
+                      : ""}
                   </div>
                 </div>
                 <span
                   className="wf-chip"
                   style={{ borderColor: "var(--wf-hairline)" }}
                 >
-                  {ROLE_LABEL[u.role]}
+                  {roleLabel[u.role]}
                 </span>
                 <span
                   className="wf-mono"
@@ -200,11 +214,11 @@ export default async function AdminPeoplePage({
                   }}
                 >
                   {u.role === "STUDENT"
-                    ? `${u._count.enrollments} courses`
+                    ? t("countCourses", { count: u._count.enrollments })
                     : u.role === "TEACHER"
-                    ? `${u._count.authoredCourses} courses`
+                    ? t("countCourses", { count: u._count.authoredCourses })
                     : u.role === "PARENT"
-                    ? `${u._count.childLinks} ${u._count.childLinks === 1 ? "child" : "children"}`
+                    ? t("countChildren", { count: u._count.childLinks })
                     : "—"}
                 </span>
                 {u.role === "PARENT" && (
