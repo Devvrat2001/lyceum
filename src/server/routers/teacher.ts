@@ -929,6 +929,14 @@ export const teacherRouter = router({
       }
       if (dropAt > 0 && maxDrop > 0) stages[dropAt].hot = true;
 
+      // Structured i18n annotation (R41 tail): KPIs ship {key, params} so the
+      // page renders meta/delta via t() and even computed labels localize.
+      const ann = (key: string, params?: Record<string, number | string>) => ({
+        key,
+        params,
+      });
+      const signed = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(n)}`;
+
       return {
         // `key` is the stable i18n key (R41); `l` is the English fallback.
         kpis: [
@@ -936,24 +944,24 @@ export const teacherRouter = router({
             key: "activeStudents",
             l: "Active students",
             v: activeStudents.toLocaleString("en-US"),
-            d: `${totalStudents} total`,
-            meta: `${rangeDays}-day`,
+            d: ann("dTotal", { count: totalStudents }),
+            meta: ann("metaRangeDay", { days: rangeDays }),
             neg: false,
           },
           {
             key: "avgCompletion",
             l: "Avg. completion",
             v: `${avgProgress}%`,
-            d: `${avgCompletion}% finished`,
-            meta: "all courses",
+            d: ann("dFinished", { pct: avgCompletion }),
+            meta: ann("metaAllCourses"),
             neg: false,
           },
           {
             key: "avgQuizScore",
             l: "Avg. quiz score",
             v: avgQuiz.toString(),
-            d: `${attempts.length} attempts`,
-            meta: "% correct",
+            d: ann("dAttempts", { count: attempts.length }),
+            meta: ann("metaPercentCorrect"),
             neg: false,
           },
           {
@@ -962,9 +970,9 @@ export const teacherRouter = router({
             v: tutorCurrent.toLocaleString("en-US"),
             d:
               tutorCurrent === 0 && tutorPrev === 0
-                ? "no activity yet"
-                : `${tutorDelta >= 0 ? "+" : "−"}${Math.abs(tutorDelta)} vs prev`,
-            meta: `${rangeDays}-day`,
+                ? ann("dNoActivity")
+                : ann("dVsPrev", { delta: signed(tutorDelta) }),
+            meta: ann("metaRangeDay", { days: rangeDays }),
             neg: tutorDelta < 0,
           },
           {
@@ -975,13 +983,11 @@ export const teacherRouter = router({
             )}`,
             d:
               earningsDeltaPct !== null
-                ? `${earningsDeltaPct >= 0 ? "+" : "−"}${Math.abs(
-                    earningsDeltaPct
-                  )}% vs last mo.`
+                ? ann("dVsLastMonth", { delta: `${signed(earningsDeltaPct)}%` })
                 : mtdNet > 0
-                ? "first sales"
-                : "no sales yet",
-            meta: "after fees",
+                ? ann("dFirstSales")
+                : ann("dNoSales"),
+            meta: ann("metaAfterFees"),
             neg: earningsDeltaPct !== null && earningsDeltaPct < 0,
           },
         ],

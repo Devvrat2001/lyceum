@@ -181,7 +181,9 @@
       "kpiTeachers": "शिक्षक",
       "kpiClasses": "कक्षाएँ",
       "kpiAvgQuizScore": "औसत क्विज़ स्कोर",
-      "kpiSeatUsage": "सीट उपयोग"
+      "kpiSeatUsage": "सीट उपयोग",
+      "metaAttempts": "{count, plural, one {# प्रयास} other {# प्रयास}}",
+      "metaSeatActive": "{active}/{total} · सक्रिय (30d)"
   },
   "TeacherAnalytics": {
     "title": "विश्लेषण",
@@ -211,6 +213,18 @@
       "funnelP50": "50% पूर्ण",
       "funnelP75": "75% पूर्ण",
       "funnelP90": "90% पूर्ण",
-      "funnelCompleted": "पूर्ण"
+      "funnelCompleted": "पूर्ण",
+      "dTotal": "कुल {count}",
+      "metaRangeDay": "{days} दिन",
+      "dFinished": "{pct}% पूर्ण",
+      "metaAllCourses": "सभी कोर्स",
+      "dAttempts": "{count, plural, one {# प्रयास} other {# प्रयास}}",
+      "metaPercentCorrect": "% सही",
+      "dNoActivity": "अभी कोई गतिविधि नहीं",
+      "dVsPrev": "{delta} पिछले से",
+      "dVsLastMonth": "{delta} पिछले माह से",
+      "dFirstSales": "पहली बिक्री",
+      "dNoSales": "अभी कोई बिक्री नहीं",
+      "metaAfterFees": "शुल्क के बाद"
   }
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { TeacherChrome } from "@/components/layouts/TeacherChrome";
 import {
   Avatar,
@@ -123,7 +124,16 @@ export default async function TeacherStudentsPage({
 
   const trpc = await getServerCaller();
   // Pull analytics to surface a small KPI row at the top
-  const analytics = await trpc.teacher.analytics({ rangeDays: 30 });
+  const [analytics, t] = await Promise.all([
+    trpc.teacher.analytics({ rangeDays: 30 }),
+    getTranslations("TeacherAnalytics"),
+  ]);
+  // Localize the server-built KPI labels by key (R41), English fallback.
+  const kpiLabel: Record<string, string> = {
+    activeStudents: t("kpiActiveStudents"),
+    avgCompletion: t("kpiAvgCompletion"),
+    avgQuizScore: t("kpiAvgQuizScore"),
+  };
 
   return (
     <TeacherChrome active="students">
@@ -151,13 +161,13 @@ export default async function TeacherStudentsPage({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
             gap: 12,
             marginBottom: 24,
           }}
         >
           {analytics.kpis.slice(0, 3).map((k) => (
-            <Card key={k.l} p={14}>
+            <Card key={k.key} p={14}>
               <div
                 style={{
                   fontSize: 11,
@@ -165,7 +175,7 @@ export default async function TeacherStudentsPage({
                   marginBottom: 6,
                 }}
               >
-                {k.l}
+                {kpiLabel[k.key] ?? k.l}
               </div>
               <div
                 className="wf-serif"
@@ -174,7 +184,7 @@ export default async function TeacherStudentsPage({
                 {k.v}
               </div>
               <div style={{ marginTop: 6, fontSize: 11, color: "var(--wf-mute)" }}>
-                {k.meta}
+                {t(k.meta.key, k.meta.params)}
               </div>
             </Card>
           ))}

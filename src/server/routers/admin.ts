@@ -369,6 +369,13 @@ export const adminRouter = router({
       p: number;
     }[];
 
+    // Structured i18n annotation (R41 tail): KPIs ship {key, params} so the
+    // page renders meta/delta via t() and even computed labels localize.
+    const ann = (key: string, params?: Record<string, number | string>) => ({
+      key,
+      params,
+    });
+
     return {
       institution: {
         // Real institution name when one exists; null lets the page
@@ -385,22 +392,25 @@ export const adminRouter = router({
       // `key` is the stable i18n key (R41); `l` is the English fallback the
       // dashboard renders if a translation is missing.
       kpis: [
-        { key: "students", l: "Students", v: students.toString(), d: "", meta: "" },
-        { key: "teachers", l: "Teachers", v: teachers.toString(), d: "", meta: "" },
-        { key: "classes", l: "Classes", v: classes.toString(), d: "", meta: "" },
+        { key: "students", l: "Students", v: students.toString(), d: null, meta: null },
+        { key: "teachers", l: "Teachers", v: teachers.toString(), d: null, meta: null },
+        { key: "classes", l: "Classes", v: classes.toString(), d: null, meta: null },
         {
           key: "avgQuizScore",
           l: "Avg quiz score",
           v: avgQuizScore === null ? "—" : `${avgQuizScore}%`,
-          d: "",
-          meta: `${attempts.length} attempt${attempts.length === 1 ? "" : "s"}`,
+          d: null,
+          meta: ann("metaAttempts", { count: attempts.length }),
         },
         {
           key: "seatUsage",
           l: "Seat usage",
           v: `${seatPct}%`,
-          d: "",
-          meta: `${activeStudents}/${seatTotal} · active 30d`,
+          d: null,
+          meta: ann("metaSeatActive", {
+            active: activeStudents,
+            total: seatTotal,
+          }),
         },
       ],
       teachers: teachersActivity,

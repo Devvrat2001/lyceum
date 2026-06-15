@@ -88,24 +88,11 @@ export default async function AdminDashboardPage() {
               >
                 {k.v}
               </div>
-              {(k.d || k.meta) && (
+              {k.meta && (
                 <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                  {k.d && (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: "var(--wf-good)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {k.d}
-                    </span>
-                  )}
-                  {k.meta && (
-                    <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                      {k.meta}
-                    </span>
-                  )}
+                  <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
+                    {t(k.meta.key, k.meta.params)}
+                  </span>
                 </div>
               )}
             </Card>

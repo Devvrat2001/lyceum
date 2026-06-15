@@ -181,7 +181,9 @@
       "kpiTeachers": "Profesores",
       "kpiClasses": "Clases",
       "kpiAvgQuizScore": "Puntuación media de cuestionarios",
-      "kpiSeatUsage": "Uso de plazas"
+      "kpiSeatUsage": "Uso de plazas",
+      "metaAttempts": "{count, plural, one {# intento} other {# intentos}}",
+      "metaSeatActive": "{active}/{total} · activos (30d)"
   },
   "TeacherAnalytics": {
     "title": "Analíticas",
@@ -211,6 +213,18 @@
       "funnelP50": "50% completado",
       "funnelP75": "75% completado",
       "funnelP90": "90% completado",
-      "funnelCompleted": "Completado"
+      "funnelCompleted": "Completado",
+      "dTotal": "{count} en total",
+      "metaRangeDay": "{days} días",
+      "dFinished": "{pct}% finalizado",
+      "metaAllCourses": "todos los cursos",
+      "dAttempts": "{count, plural, one {# intento} other {# intentos}}",
+      "metaPercentCorrect": "% correctas",
+      "dNoActivity": "sin actividad aún",
+      "dVsPrev": "{delta} vs ant.",
+      "dVsLastMonth": "{delta} vs mes ant.",
+      "dFirstSales": "primeras ventas",
+      "dNoSales": "sin ventas aún",
+      "metaAfterFees": "tras comisiones"
   }
 }

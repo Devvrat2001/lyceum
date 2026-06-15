@@ -95,10 +95,10 @@ export default async function TeacherAnalyticsPage() {
                     fontWeight: 600,
                   }}
                 >
-                  {k.d}
+                  {t(k.d.key, k.d.params)}
                 </span>
                 <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                  {k.meta}
+                  {t(k.meta.key, k.meta.params)}
                 </span>
               </div>
             </Card>
