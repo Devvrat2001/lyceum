@@ -534,18 +534,30 @@ hunts net-new gaps, each grounded in the code.
   `requestPasswordReset` does), so a bot can mass-create accounts. Extend
   the AuditLog-counter pattern (R46 / `checkAIQuota`) to signup, keyed per
   IP (the anon `ctx.anonKey` already exists for this).
+  · **Status: DONE (cont.49** — `lib/signupRateLimit.ts`: signup writes an
+  `auth.signup` row stamped with `anonKey`; `isSignupThrottled` caps 20/IP
+  per hour and skips when there's no IP scope (tests never throttle). 3
+  tests.)
 - **R52 · i18n breadth to 100%** (the long R30 tail) — chrome, dashboards,
   and tRPC labels are localized, but ~15 page bodies are still English:
   teacher students/earnings/grading/discussions/paths/storefront; admin
   people/classes/curriculum/audit/billing/teachers; student
   library/skill-tree. Mechanical, namespace-by-namespace, no new
   infrastructure — just unfinished breadth.
+  · **Status: IN PROGRESS (cont.49** — +`TeacherEarnings` [teacher/earnings
+  page body; also rewrote its dev-jargon "What ships next" card into an
+  honest payout note]. Remaining: the ~14 other page bodies listed above.)
 - **R53 · Test coverage for the thin routers + cron handlers** —
   `insight` + `parent` routers have ~1 caller test each, and the
   `/api/cron/*` route handlers (streak-rollover, weekly-digest, ai-insights,
   backfill-embeddings) have no handler-level test of the auth gate +
   happy/again path. Lock the cron `CRON_SECRET`/Bearer gate especially —
   it's a public endpoint that spends money (OpenAI).
+  · **Status: DONE-v1 (cont.49** — `test/cronAuth.test.ts` locks the cron
+  gate via streak-rollover [the cheap DB-only cron]: 500 unset / 401
+  wrong-or-missing Bearer / 200 only with the correct token; the other
+  crons share the identical check. Thin-router coverage [insight/parent]
+  remains the tail.)
 
 ---
 
