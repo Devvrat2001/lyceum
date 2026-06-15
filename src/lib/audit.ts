@@ -16,6 +16,8 @@ export type AuditKind =
   | "auth.password_reset_request"
   | "auth.password_reset"
   | "auth.email_verified"
+  | "auth.login_failed"
+  | "auth.parental_consent"
   | "course.publish"
   | "course.unpublish"
   | "course.update"

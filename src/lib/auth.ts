@@ -7,6 +7,11 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { authConfig } from "@/lib/auth.config";
+import {
+  ipFromRequest,
+  isLoginThrottled,
+  recordLoginFailure,
+} from "@/lib/loginRateLimit";
 
 /**
  * Full Auth.js v5 config — uses Prisma + Credentials.
@@ -33,24 +38,38 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const email = (credentials?.email as string | undefined)
           ?.trim()
           .toLowerCase();
         const password = credentials?.password as string | undefined;
         if (!email) return null;
+        const ip = ipFromRequest(request as unknown as Request | undefined);
+
+        // Brute-force throttle (R46) — bail before any DB/bcrypt work so a
+        // flood can't even probe whether an email exists.
+        if (await isLoginThrottled({ email, ip })) return null;
 
         const user = await db.user.findUnique({ where: { email } });
-        if (!user) return null;
+        if (!user) {
+          // Stamp a failure even for unknown emails so the per-IP bucket
+          // catches enumeration sweeps.
+          await recordLoginFailure({ email, ip });
+          return null;
+        }
         // Deleted accounts (R43) are anonymised + tombstoned; refuse
         // sign-in defensively even though the email was rewritten.
         if (user.deletedAt) return null;
 
         // Real users: require bcrypt password match.
         if (user.passwordHash) {
-          if (!password) return null;
-          const ok = await bcrypt.compare(password, user.passwordHash);
-          if (!ok) return null;
+          if (
+            !password ||
+            !(await bcrypt.compare(password, user.passwordHash))
+          ) {
+            await recordLoginFailure({ email, ip });
+            return null;
+          }
         } else {
           // Seeded demo users (no passwordHash). Only allow in dev,
           // and only when NO password was submitted — otherwise we'd
