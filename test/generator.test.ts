@@ -153,7 +153,17 @@ describe("generator.saveAsCourse (demo)", () => {
 
     const course = await db.course.findUniqueOrThrow({
       where: { id: saved.courseId },
-      include: { units: { include: { lessons: { include: { blocks: true } } } } },
+      include: {
+        // Order explicitly — without it row order is unspecified, so
+        // `units[0].lessons[0]` isn't reliably the order-1/order-1 lesson
+        // (passed locally on insertion order, flaked in CI).
+        units: {
+          orderBy: { order: "asc" },
+          include: {
+            lessons: { orderBy: { order: "asc" }, include: { blocks: true } },
+          },
+        },
+      },
     });
     expect(course.authorId).toBe(teacher.id);
     expect(course.status).toBe("DRAFT");
