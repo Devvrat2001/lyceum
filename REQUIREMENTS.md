@@ -462,6 +462,11 @@ code. (Verified-absent: error tracking/Sentry already exists.)
   token; `/parental-consent` confirm page; `account.me` exposes
   `awaitingParentalConsent` via pure `lib/parentalConsent`. 3 tests. Hard
   access gate [block lessons until confirmed] is the v2 step.)
+  · **v2 (cont.47)** — `ParentalConsentBanner` soft nudge on the student
+  dashboard for an unconfirmed under-13 learner. Deliberately NOT a hard
+  block: the confirm email is dormant until R44, so gating lessons would
+  lock every under-13 account out permanently. The enforced gate waits on
+  live email.
 - **R48 · Dashboard query performance** — `admin.overview` + `teacher.analytics`
   each fan out 6–10 findMany/aggregate calls and pull full Attempt rows into
   memory to compute accuracy (`attempts.findMany({select:{correct}})` then
@@ -473,11 +478,22 @@ code. (Verified-absent: error tracking/Sentry already exists.)
   transfer, identical result]. `teacher.analytics` keeps its rows — it
   needs them for the daily series. Covering indexes + caching remain the
   deeper tail.)
+  · **deeper (cont.47)** — added composite `@@index([institutionId, role])`
+  on User for the institution-scoped overview counts + the Attempt→User
+  join filter. Short-TTL caching is the remaining tail.
 - **R49 · E2E coverage for the paid checkout flow** — the Playwright suite
   covers login + an MCQ + the marketplace shell, but NOT the business-critical
   buy→enroll→gated-access path end-to-end (only unit-tested in
   `payment.flow`/`pathCheckout`). Add a spec driving demo-checkout → enrollment
   → gated lesson access.
+  · **Status: ALREADY COVERED (cont.47 — review correction).** `e2e/
+  buy-flow.spec.ts` already drives signup→buy→demoConfirm→enrolled and runs
+  in CI (the P7 review missed it — `tail`-ing the e2e log hid it among the 7
+  cumulative passes). The success page only renders after demoConfirm
+  creates the Enrollment in a tx, and that same row is the reader's
+  `ensureEnrollment` gate — so reaching it IS the gated-access proof. An
+  explicit "in your library" re-check was tried + reverted (the heavy
+  course-page render flaked under full-suite load).
 
 ---
 

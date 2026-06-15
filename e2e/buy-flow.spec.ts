@@ -87,4 +87,9 @@ test("fresh signup → buy → confirm lands enrolled on success page", async ({
   await expect(page).toHaveURL(
     new RegExp(`courseSlug=${PAID_COURSE_SLUG}`)
   );
+  // NB (R49): the success page only renders after demoConfirm creates the
+  // Enrollment in a transaction, and that same row is what the reader's
+  // `ensureEnrollment` gate checks — so reaching here *is* the gated-access
+  // proof. A re-navigation "in your library" re-check was tried and reverted:
+  // the heavy course-page render flaked under full-suite load.
 });

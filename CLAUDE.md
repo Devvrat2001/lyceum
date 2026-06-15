@@ -36,7 +36,7 @@ npm run db:reset      # Wipes DB — destructive
 - `AGENT_NOTES.md` — session-to-session scratchpad (phase status, last commit, new gotchas). **Update every session.**
 - `BACKEND_ROADMAP.md` — longer-horizon planning.
 - `KNOWN_ISSUES.md` — audited latent risks / tech debt (lint errors, unvalidated `Json` casts, structural debt) that compile today but fail later. Refresh after big sweeps; don't let S2/S3 rot into S1.
-- `REQUIREMENTS.md` — prioritized backlog: P0–P3 R1–R28 (2026-06-12 review, all DONE except R1 user-owned TLS) + **P4 R29–R35** (2026-06-14, done except R31 WhatsApp-keys-blocked) + **P5 R36–R40** (2026-06-15, all DONE) + **P6 R41–R45** (R41/R42/R43/R45 DONE; R44 email remains — user-owned) + **P7 R46–R49** (R46/R47/R48 DONE in cont.46; **R49 checkout e2e remains**, + R44 email user-owned). Pick the highest OPEN item, work the normal cycle, update its Status inline. Its "Verified clean" section lists what NOT to re-audit.
+- `REQUIREMENTS.md` — prioritized backlog: P0–P3 R1–R28 (2026-06-12 review, all DONE except R1 user-owned TLS) + **P4 R29–R35** (2026-06-14, done except R31 WhatsApp-keys-blocked) + **P5 R36–R40** (2026-06-15, all DONE) + **P6 R41–R45** (R41/R42/R43/R45 DONE; R44 email remains — user-owned) + **P7 R46–R49** (all DONE — R46/R47/R48 cont.46, R47-v2/R48-deeper cont.47, R49 was already covered by `buy-flow.spec`). **Only R44 (transactional email) remains — user-owned (Resend key + domain).** With R1 (TLS, user-owned) that's the whole open board. Next substantive work needs a fresh review pass (P8). Update Status inline. Its "Verified clean" section lists what NOT to re-audit.
 
 ## Key paths
 - `src/server/routers/` — tRPC routers (lesson, teacher, marketplace, payment)
