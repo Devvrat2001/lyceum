@@ -89,6 +89,11 @@ model User {
   // verify against later.
   ageBand        String?
   parentEmail    String?
+  // Soft-delete tombstone (R43 — DPDP/COPPA right-to-erasure). When set,
+  // the row's PII has been anonymised and sign-in is refused; de-identified
+  // domain rows (attempts, orders) are retained for analytics + financial
+  // integrity. NULL for live accounts.
+  deletedAt      DateTime?
 
   // Auth.js relations
   accounts       Account[]

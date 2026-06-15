@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Btn, Card, Eyebrow, Icon, Toggle } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
@@ -142,6 +143,7 @@ export function SettingsClient({
             initialTutorOptOut={user.tutorLogOptOut}
             initialConsentAt={user.coppaConsentAt}
           />
+          <DangerZone userId={user.id} />
         </div>
       </div>
     </div>
@@ -587,6 +589,108 @@ function PrivacySection({
       <div style={{ ...saveRow, marginTop: 8 }}>
         <SavedFlag state={flag} />
       </div>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------- Danger */
+
+/**
+ * Data portability + account erasure (R43, DPDP/COPPA). "Download my
+ * data" fetches the export bundle on demand and saves it as JSON;
+ * "Delete account" requires typing DELETE, anonymises the account
+ * server-side, then signs out. Teachers with content/sales are refused
+ * server-side — the error surfaces inline.
+ */
+function DangerZone({ userId }: { userId: string }) {
+  const utils = trpc.useUtils();
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState("");
+  const [delErr, setDelErr] = useState<string | null>(null);
+
+  const del = trpc.account.deleteAccount.useMutation({
+    onSuccess: () => signOut({ callbackUrl: "/" }),
+    onError: (e) => setDelErr(e.message),
+  });
+
+  async function download() {
+    setExporting(true);
+    setExportErr(null);
+    try {
+      const data = await utils.account.exportData.fetch();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lyceum-data-${userId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportErr(e instanceof Error ? e.message : "Export failed.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <Card
+      p={20}
+      style={{ marginBottom: 16, borderColor: "var(--wf-accent)" }}
+    >
+      <Eyebrow>Your data</Eyebrow>
+      <p style={helpText}>
+        Download everything we hold about your account, or permanently
+        delete it. Deletion anonymises your profile and signs you out — it
+        can&apos;t be undone.
+      </p>
+
+      <div style={{ ...saveRow, marginBottom: 16 }}>
+        <Btn sm variant="ghost" disabled={exporting} onClick={download}>
+          {exporting ? "Preparing…" : "Download my data"}
+        </Btn>
+        {exportErr && (
+          <span style={{ fontSize: 11, color: "var(--wf-accent)" }}>
+            {exportErr}
+          </span>
+        )}
+      </div>
+
+      <div
+        style={{ height: 1, background: "var(--wf-hairline)", margin: "4px 0 16px" }}
+      />
+
+      <FieldLabel>DELETE ACCOUNT</FieldLabel>
+      <p style={{ ...helpText, marginTop: 6 }}>
+        Type <strong>DELETE</strong> to confirm.
+      </p>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <input
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          placeholder="DELETE"
+          aria-label="Type DELETE to confirm account deletion"
+          style={{ ...inputStyle, marginTop: 0, maxWidth: 160 }}
+        />
+        <Btn
+          sm
+          variant="accent"
+          disabled={confirm !== "DELETE" || del.isPending}
+          onClick={() => {
+            setDelErr(null);
+            del.mutate({ confirm: "DELETE" });
+          }}
+        >
+          {del.isPending ? "Deleting…" : "Delete my account"}
+        </Btn>
+      </div>
+      {delErr && (
+        <div style={{ marginTop: 10, fontSize: 11, color: "var(--wf-accent)", lineHeight: 1.5 }}>
+          {delErr}
+        </div>
+      )}
     </Card>
   );
 }

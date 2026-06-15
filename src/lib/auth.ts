@@ -42,6 +42,9 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 
         const user = await db.user.findUnique({ where: { email } });
         if (!user) return null;
+        // Deleted accounts (R43) are anonymised + tombstoned; refuse
+        // sign-in defensively even though the email was rewritten.
+        if (user.deletedAt) return null;
 
         // Real users: require bcrypt password match.
         if (user.passwordHash) {
