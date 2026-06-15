@@ -89,6 +89,11 @@ model User {
   // verify against later.
   ageBand        String?
   parentEmail    String?
+  // Verifiable parental consent (R47, COPPA — R11 v2). `coppaConsentAt` is
+  // the child's self-attested checkbox; `parentConsentAt` is stamped only
+  // when the parent confirms via the emailed link. NULL for an under-13
+  // account still awaiting that confirmation (or for 13+ accounts).
+  parentConsentAt DateTime?
   // Soft-delete tombstone (R43 — DPDP/COPPA right-to-erasure). When set,
   // the row's PII has been anonymised and sign-in is refused; de-identified
   // domain rows (attempts, orders) are retained for analytics + financial

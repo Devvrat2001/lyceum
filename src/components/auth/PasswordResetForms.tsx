@@ -255,3 +255,58 @@ export function VerifyEmailClient({
     </Shell>
   );
 }
+
+/**
+ * Parental-consent confirmation (R47, COPPA). The parent lands here from
+ * the emailed link; fires the confirm mutation once on mount and shows the
+ * outcome. Mirrors VerifyEmailClient.
+ */
+export function ParentalConsentClient({
+  token,
+  email,
+}: {
+  token: string;
+  email: string;
+}) {
+  const missingLink = !token || !email;
+  const firedRef = useRef(false);
+  const [state, setState] = useState<"working" | "ok" | "error">(
+    missingLink ? "error" : "working"
+  );
+  const [message, setMessage] = useState(
+    missingLink ? "Open the link from the consent email." : ""
+  );
+  const confirm = trpc.auth.confirmParentalConsent.useMutation({
+    onSuccess: () => setState("ok"),
+    onError: (e) => {
+      setState("error");
+      setMessage(e.message);
+    },
+  });
+
+  useEffect(() => {
+    if (firedRef.current || missingLink) return;
+    firedRef.current = true;
+    confirm.mutate({ token, email });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <Shell eyebrow="Parental consent" title="Confirming consent…">
+      {state === "working" && (
+        <p style={{ fontSize: 13, color: "var(--wf-mute)" }}>One moment…</p>
+      )}
+      {state === "ok" && (
+        <p style={{ fontSize: 13, color: "var(--wf-good)", lineHeight: 1.5 }}>
+          Thank you ✓ — you&apos;ve approved this Lyceum account. Your child can
+          now use it fully.
+        </p>
+      )}
+      {state === "error" && (
+        <p style={{ fontSize: 13, color: "var(--wf-bad)", lineHeight: 1.5 }}>
+          {message}
+        </p>
+      )}
+    </Shell>
+  );
+}

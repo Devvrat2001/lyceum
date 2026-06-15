@@ -8,20 +8,23 @@ import { audit } from "@/lib/audit";
 import { checkAIQuota } from "@/lib/rateLimit";
 import {
   isEmailEnabled,
+  sendParentalConsentEmail,
   sendPasswordResetEmail,
   sendVerificationEmail,
 } from "@/lib/email";
 
 const PASSWORD_MIN = 8;
-/** Reset links work for 1 hour; verification links for 24. */
+/** Reset links work for 1 hour; verification links for 24; consent for 7d. */
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const PARENT_CONSENT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Namespaced VerificationToken identifiers — the Auth.js table is a
- *  generic (identifier, token) store, so the prefix keeps our two flows
+ *  generic (identifier, token) store, so the prefix keeps our flows
  *  from ever colliding with each other or an adapter's own rows. */
 const resetIdentifier = (email: string) => `pwreset:${email}`;
 const verifyIdentifier = (email: string) => `verify:${email}`;
+const pconsentIdentifier = (email: string) => `pconsent:${email}`;
 
 export const authRouter = router({
   signup: publicProcedure
@@ -99,7 +102,85 @@ export const authRouter = router({
         }
       }
 
+      // Verifiable parental consent (R47, COPPA). For under-13 signups we
+      // ALWAYS mint a consent token (so the record exists + the flow works
+      // the moment email is enabled) and best-effort email the parent.
+      // `parentConsentAt` stays NULL until they confirm via the link.
+      if (input.ageBand === "under13" && input.parentEmail) {
+        try {
+          const ptoken = randomBytes(32).toString("hex");
+          await ctx.db.verificationToken.create({
+            data: {
+              identifier: pconsentIdentifier(email),
+              token: ptoken,
+              expires: new Date(Date.now() + PARENT_CONSENT_TTL_MS),
+            },
+          });
+          await sendParentalConsentEmail({
+            to: input.parentEmail.trim().toLowerCase(),
+            childName: user.name ?? "Your child",
+            confirmUrl: `${env.PUBLIC_BASE_URL}/parental-consent?token=${ptoken}&email=${encodeURIComponent(email)}`,
+          });
+        } catch (err) {
+          console.error("[auth.signup] parental consent setup failed", err);
+        }
+      }
+
       return user;
+    }),
+
+  /**
+   * Confirm verifiable parental consent (R47, COPPA). The parent follows
+   * the emailed link; a valid, unexpired token stamps `parentConsentAt` on
+   * the child account and burns the token. Public — the parent isn't a
+   * Lyceum user.
+   */
+  confirmParentalConsent: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email().max(160),
+        token: z.string().min(16).max(128),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.trim().toLowerCase();
+      const identifier = pconsentIdentifier(email);
+      const row = await ctx.db.verificationToken.findUnique({
+        where: { identifier_token: { identifier, token: input.token } },
+      });
+      if (!row || row.expires.getTime() < Date.now()) {
+        if (row) {
+          await ctx.db.verificationToken.deleteMany({ where: { identifier } });
+        }
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "That consent link is invalid or has expired. Ask your child to sign in to resend it.",
+        });
+      }
+      const user = await ctx.db.user.findUnique({
+        where: { email },
+        select: { id: true, name: true, firstName: true, parentConsentAt: true },
+      });
+      if (!user) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown account." });
+      }
+      await ctx.db.$transaction([
+        ctx.db.user.update({
+          where: { id: user.id },
+          data: { parentConsentAt: user.parentConsentAt ?? new Date() },
+        }),
+        ctx.db.verificationToken.deleteMany({ where: { identifier } }),
+      ]);
+      await audit({
+        actorId: user.id,
+        kind: "auth.parental_consent",
+        payload: {},
+      });
+      return {
+        ok: true as const,
+        childName: user.firstName ?? user.name ?? "your child",
+      };
     }),
 
   /**

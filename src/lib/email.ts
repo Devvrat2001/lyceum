@@ -270,6 +270,40 @@ export async function sendVerificationEmail(o: {
   }
 }
 
+/**
+ * Verifiable parental-consent link (R47, COPPA), sent to the parent/
+ * guardian address an under-13 signup listed. Fire-safe + dormant until a
+ * Resend key lands.
+ */
+export async function sendParentalConsentEmail(o: {
+  to: string;
+  childName: string;
+  confirmUrl: string;
+}): Promise<boolean> {
+  try {
+    const resend = await getResend();
+    if (!resend) return false;
+    await resend.emails.send({
+      from: ACCOUNT_FROM_ADDRESS,
+      to: o.to,
+      subject: "Confirm your child's Lyceum account",
+      html: actionEmailHtml({
+        eyebrow: "Parental consent",
+        heading: "Confirm your child's Lyceum account",
+        body: `${o.childName} created a Lyceum learning account and listed you as their parent or guardian. Children's privacy law (COPPA) requires your verifiable consent before the account is fully active. The link below confirms you approve — it works for 7 days.`,
+        ctaLabel: "I approve this account",
+        ctaUrl: o.confirmUrl,
+        footer:
+          "If you weren't expecting this, you can ignore this email — the account stays unconfirmed.",
+      }),
+    });
+    return true;
+  } catch (err) {
+    console.error("[email] sendParentalConsentEmail failed", err);
+    return false;
+  }
+}
+
 /** Sender identity for engagement (non-transactional) mail. */
 const DIGEST_FROM_ADDRESS = "Lyceum <hello@lyceum.app>";
 

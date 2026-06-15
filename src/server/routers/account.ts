@@ -2,6 +2,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import type { Prisma } from "@prisma/client";
 import { router, protectedProcedure, TRPCError } from "../trpc";
+import { isAwaitingParentalConsent } from "@/lib/parentalConsent";
 
 const PASSWORD_MIN = 8;
 
@@ -36,11 +37,19 @@ export const accountRouter = router({
         emailOptOut: true,
         tutorLogOptOut: true,
         coppaConsentAt: true,
+        ageBand: true,
+        parentConsentAt: true,
       },
     });
     if (!u) throw new TRPCError({ code: "NOT_FOUND" });
     const { passwordHash, ...rest } = u;
-    return { ...rest, hasPassword: !!passwordHash };
+    return {
+      ...rest,
+      hasPassword: !!passwordHash,
+      // R47: surface the verifiable-parental-consent pending state so the
+      // UI can nudge an under-13 learner whose parent hasn't confirmed yet.
+      awaitingParentalConsent: isAwaitingParentalConsent(u),
+    };
   }),
 
   /**
