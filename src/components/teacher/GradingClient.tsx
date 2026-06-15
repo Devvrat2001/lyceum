@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/routers/_app";
 import { Annot, Btn, Card, Eyebrow } from "@/components/wf/primitives";
@@ -13,14 +14,15 @@ import { trpc } from "@/lib/trpc/react";
  * each override is a single optimistic mutation that refetches the list.
  */
 export function GradingClient() {
+  const t = useTranslations("TeacherGrading");
   const list = trpc.teacher.freeResponseSubmissions.useQuery({ limit: 50 });
   const rows = list.data ?? [];
 
   return (
     <div style={{ padding: "24px 28px 40px", maxWidth: 900, margin: "0 auto" }}>
-      <Eyebrow>AI-graded writing</Eyebrow>
+      <Eyebrow>{t("eyebrow")}</Eyebrow>
       <h1 className="wf-h1" style={{ fontSize: 26, margin: "6px 0 6px" }}>
-        Free-response review
+        {t("title")}
       </h1>
       <div
         style={{
@@ -30,23 +32,20 @@ export function GradingClient() {
           lineHeight: 1.5,
         }}
       >
-        Every short answer your students submitted, with the AI&apos;s grade.
-        Override any score you disagree with — overrides don&apos;t change XP
-        already earned; they record your final grade.
+        {t("intro")}
       </div>
 
       {list.isLoading ? (
         <Card p={20}>
-          <Annot>Loading submissions…</Annot>
+          <Annot>{t("loading")}</Annot>
         </Card>
       ) : rows.length === 0 ? (
         <Card p={28} style={{ textAlign: "center" }}>
-          <Eyebrow>No submissions yet</Eyebrow>
+          <Eyebrow>{t("emptyTitle")}</Eyebrow>
           <div
             style={{ marginTop: 8, fontSize: 13, color: "var(--wf-body)" }}
           >
-            When students answer a free-response block in one of your
-            courses, their writing shows up here for review.
+            {t("emptyBody")}
           </div>
         </Card>
       ) : (
@@ -75,6 +74,7 @@ function SubmissionRow({
   row: Row;
   onSaved: () => void;
 }) {
+  const t = useTranslations("TeacherGrading");
   const [score, setScore] = useState<string>(
     row.scoreOverride != null ? String(row.scoreOverride) : ""
   );
@@ -113,7 +113,7 @@ function SubmissionRow({
             style={{ fontSize: 10, color: "var(--wf-mute)", marginTop: 2 }}
           >
             {row.courseTitle} · {row.lessonTitle}
-            {row.reviewed ? " · REVIEWED" : ""}
+            {row.reviewed ? ` · ${t("reviewed")}` : ""}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -129,7 +129,7 @@ function SubmissionRow({
               className="wf-mono"
               style={{ fontSize: 9, color: "var(--wf-mute)" }}
             >
-              AI said {row.aiScore ?? "—"}
+              {t("aiSaid", { score: row.aiScore ?? "—" })}
             </div>
           )}
         </div>
@@ -171,7 +171,7 @@ function SubmissionRow({
           }}
         >
           <span className="wf-mono" style={{ color: "var(--wf-ai)" }}>
-            AI ·{" "}
+            {t("aiPrefix")} ·{" "}
           </span>
           {row.aiFeedback}
         </div>
@@ -186,7 +186,7 @@ function SubmissionRow({
         }}
       >
         <label style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-          Override score
+          {t("overrideLabel")}
         </label>
         <input
           type="number"
@@ -212,7 +212,7 @@ function SubmissionRow({
             override.mutate({ attemptId: row.id, score: parsed })
           }
         >
-          {override.isPending ? "Saving…" : "Save"}
+          {override.isPending ? t("saving") : t("save")}
         </Btn>
         {row.scoreOverride != null && (
           <Btn
@@ -224,7 +224,7 @@ function SubmissionRow({
               override.mutate({ attemptId: row.id, score: null });
             }}
           >
-            Clear
+            {t("clear")}
           </Btn>
         )}
         {override.error && (

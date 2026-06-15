@@ -283,5 +283,20 @@
     "unassigned": "Unassigned",
     "countStudents": "{count, plural, one {# student} other {# students}}",
     "manage": "Manage"
+  },
+  "TeacherGrading": {
+    "eyebrow": "AI-graded writing",
+    "title": "Free-response review",
+    "intro": "Every short answer your students submitted, with the AI's grade. Override any score you disagree with — your grade is final, and the student's XP adjusts to match.",
+    "loading": "Loading submissions…",
+    "emptyTitle": "No submissions yet",
+    "emptyBody": "When students answer a free-response block in one of your courses, their writing shows up here for review.",
+    "reviewed": "REVIEWED",
+    "aiSaid": "AI said {score}",
+    "aiPrefix": "AI",
+    "overrideLabel": "Override score",
+    "save": "Save",
+    "saving": "Saving…",
+    "clear": "Clear"
   }
 }

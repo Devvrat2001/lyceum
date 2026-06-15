@@ -283,5 +283,20 @@
     "unassigned": "Sin asignar",
     "countStudents": "{count, plural, one {# estudiante} other {# estudiantes}}",
     "manage": "Gestionar"
+  },
+  "TeacherGrading": {
+    "eyebrow": "Escritura calificada por IA",
+    "title": "Revisión de respuestas abiertas",
+    "intro": "Cada respuesta corta que enviaron tus estudiantes, con la nota de la IA. Anula cualquier puntuación con la que no estés de acuerdo: tu nota es definitiva y los XP del estudiante se ajustan en consecuencia.",
+    "loading": "Cargando entregas…",
+    "emptyTitle": "Aún no hay entregas",
+    "emptyBody": "Cuando los estudiantes respondan a un bloque de respuesta abierta en uno de tus cursos, su escritura aparecerá aquí para revisión.",
+    "reviewed": "REVISADO",
+    "aiSaid": "La IA dijo {score}",
+    "aiPrefix": "IA",
+    "overrideLabel": "Anular puntuación",
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "clear": "Borrar"
   }
 }
