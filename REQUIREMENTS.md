@@ -447,17 +447,32 @@ code. (Verified-absent: error tracking/Sentry already exists.)
   signup/password-reset router IS rate-limited, but the login path isn't, so
   password-guessing against a known email is unthrottled. Add per-email + per-IP
   attempt throttling on the credentials path (reuse the rate-limit infra).
+  · **Status: DONE (cont.46** — `lib/loginRateLimit.ts` counts
+  `auth.login_failed` AuditLog rows [8/email, 30/IP over 15 min, no
+  migration]; `authorize()` bails before DB/bcrypt when throttled + records
+  failures incl. for unknown emails. 3 tests.)
 - **R47 · Verifiable parental consent (R11 v2, COPPA)** — under-13 signups
   capture `parentEmail` but consent is self-attested; the actual VPC flow (email
   the parent a confirm link before the child account activates) is unbuilt. A
   real COPPA obligation; the token/gate/schema are buildable now, with the email
   *send* riding on R44.
+  · **Status: DONE-v1 (cont.46** — `User.parentConsentAt` migration;
+  under-13 signup always mints a 7-day `pconsent:` token + dormant-emails
+  the parent; `auth.confirmParentalConsent` stamps consent + burns the
+  token; `/parental-consent` confirm page; `account.me` exposes
+  `awaitingParentalConsent` via pure `lib/parentalConsent`. 3 tests. Hard
+  access gate [block lessons until confirmed] is the v2 step.)
 - **R48 · Dashboard query performance** — `admin.overview` + `teacher.analytics`
   each fan out 6–10 findMany/aggregate calls and pull full Attempt rows into
   memory to compute accuracy (`attempts.findMany({select:{correct}})` then
   filter in JS). At scale that's large row transfers + unindexed scans. Push the
   accuracy/active-count math into DB aggregates + add covering indexes; consider
   a short-TTL cache.
+  · **Status: DONE-v1 (cont.46** — `admin.overview` accuracy now two
+  `attempt.count` queries instead of `findMany`+JS-filter [no N-row
+  transfer, identical result]. `teacher.analytics` keeps its rows — it
+  needs them for the daily series. Covering indexes + caching remain the
+  deeper tail.)
 - **R49 · E2E coverage for the paid checkout flow** — the Playwright suite
   covers login + an MCQ + the marketplace shell, but NOT the business-critical
   buy→enroll→gated-access path end-to-end (only unit-tested in
