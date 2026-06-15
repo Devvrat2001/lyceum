@@ -14,6 +14,7 @@ import { getServerCaller } from "@/lib/trpc/server";
 import { TodaysPlan } from "@/components/student/TodaysPlan";
 import { TutorMiniCard } from "@/components/student/TutorMiniCard";
 import { ContinueLearningCard } from "@/components/student/ContinueLearningCard";
+import { ParentalConsentBanner } from "@/components/student/ParentalConsentBanner";
 
 const BADGE_ICON_FOR_SLUG: Record<string, string> = {
   "hot-streak": "flame",
@@ -71,6 +72,10 @@ export default async function StudentDashboard() {
             dashboard-only duplicate here (R36). */}
         <Avatar initials={dashboard.me.avatarInitials || "ME"} />
       </header>
+
+      {/* R47 v2: soft consent nudge for an unconfirmed under-13 learner
+          (a hard gate would lock them out while the email is dormant). */}
+      <ParentalConsentBanner />
 
       <div className="wf-two-col content-start overflow-auto px-7 pb-7 pt-6">
         {/* LEFT */}
