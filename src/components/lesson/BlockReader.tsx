@@ -17,6 +17,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import { useTranslations } from "next-intl";
 import { Avatar, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import {
   findBlockMeta,
@@ -204,23 +205,26 @@ function renderBody(block: BlockReaderProps) {
         />
       );
     default:
-      return (
-        <div
-          style={{
-            padding: 12,
-            border: "1px dashed var(--wf-hairline)",
-            borderRadius: 3,
-            fontSize: 12,
-            color: "var(--wf-mute)",
-            lineHeight: 1.5,
-          }}
-        >
-          Reader for <b>{block.type}</b> blocks is on the way. Your
-          teacher has added this to the lesson; the student-side
-          rendering ships next.
-        </div>
-      );
+      return <ComingSoonBlock type={block.type} />;
   }
+}
+
+function ComingSoonBlock({ type }: { type: string }) {
+  const t = useTranslations("LessonReader");
+  return (
+    <div
+      style={{
+        padding: 12,
+        border: "1px dashed var(--wf-hairline)",
+        borderRadius: 3,
+        fontSize: 12,
+        color: "var(--wf-mute)",
+        lineHeight: 1.5,
+      }}
+    >
+      {t.rich("comingSoon", { type, b: (c) => <b>{c}</b> })}
+    </div>
+  );
 }
 
 /* ── VIDEO ───────────────────────────────────────────────── */
@@ -242,6 +246,7 @@ function VideoBody({
 /* ── READING ─────────────────────────────────────────────── */
 
 function ReadingBody({ settings }: { settings: Record<string, unknown> }) {
+  const t = useTranslations("LessonReader");
   const body = typeof settings.body === "string" ? settings.body : "";
   // Minimal markdown: just paragraphs + bold/italic + headings.
   // Anything fancier ships when we add a real markdown lib; this
@@ -252,7 +257,7 @@ function ReadingBody({ settings }: { settings: Record<string, unknown> }) {
   const nodes = useMemo(() => renderMiniMarkdown(body), [body]);
   if (!body.trim()) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't added the reading content yet." />
+      <EmptyBlockHint message={t("readingEmpty")} />
     );
   }
   return (
@@ -416,6 +421,7 @@ function McqBody({
   blockId: string;
   settings: SettingsFor<"MCQ">;
 }) {
+  const t = useTranslations("LessonReader");
   const stem = settings.stem ?? "";
   // settings.options is McqOption[] | undefined at the type level; the
   // .filter is still a runtime guard against teacher-edited JSON
@@ -453,7 +459,7 @@ function McqBody({
 
   if (!stem.trim() || opts.length < 2) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't finished setting up this question yet." />
+      <EmptyBlockHint message={t("mcqEmpty")} />
     );
   }
 
@@ -588,7 +594,7 @@ function McqBody({
             fontWeight: 600,
           }}
         >
-          {pending ? "Checking…" : "Check answer"}
+          {pending ? t("mcqChecking") : t("mcqCheck")}
         </button>
         {checked && (
           <button
@@ -615,7 +621,7 @@ function McqBody({
               fontWeight: 600,
             }}
           >
-            {feedback.correct ? "✓ Correct" : "Not quite — try again"}
+            {feedback.correct ? t("mcqCorrect") : t("mcqNotQuite")}
           </span>
         )}
         {feedback?.correct && feedback.points > 0 && (
@@ -696,6 +702,7 @@ function McqBody({
 /* ── SLIDES ───────────────────────────────────────────────── */
 
 function SlidesBody({ settings }: { settings: Record<string, unknown> }) {
+  const t = useTranslations("LessonReader");
   const rawUrl =
     typeof settings.url === "string" ? settings.url.trim() : "";
   const caption =
@@ -703,7 +710,7 @@ function SlidesBody({ settings }: { settings: Record<string, unknown> }) {
 
   if (!rawUrl) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't added a slides URL yet." />
+      <EmptyBlockHint message={t("slidesEmpty")} />
     );
   }
 
@@ -758,7 +765,7 @@ function SlidesBody({ settings }: { settings: Record<string, unknown> }) {
             fontSize: 13,
           }}
         >
-          Open slides ↗
+          {t("slidesOpen")}
         </a>
       )}
       {caption && (
@@ -813,6 +820,7 @@ function toSlidesEmbed(raw: string): string | null {
 /* ── PDF ──────────────────────────────────────────────────── */
 
 function PdfBody({ settings }: { settings: Record<string, unknown> }) {
+  const t = useTranslations("LessonReader");
   const rawUrl =
     typeof settings.url === "string" ? settings.url.trim() : "";
   const caption =
@@ -820,7 +828,7 @@ function PdfBody({ settings }: { settings: Record<string, unknown> }) {
 
   if (!rawUrl) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't added a PDF URL yet." />
+      <EmptyBlockHint message={t("pdfEmpty")} />
     );
   }
 
@@ -888,7 +896,7 @@ function PdfBody({ settings }: { settings: Record<string, unknown> }) {
             textDecoration: "underline",
           }}
         >
-          Open PDF in new tab ↗
+          {t("pdfOpen")}
         </a>
         {caption && (
           <span style={{ color: "var(--wf-body)" }}>· {caption}</span>
@@ -907,6 +915,7 @@ function PollBody({
   blockId: string;
   settings: SettingsFor<"POLL">;
 }) {
+  const t = useTranslations("LessonReader");
   // POLL's `stem` historically lived on the same JSON column as MCQ's
   // — preserved for back-compat. Newer polls use `prompt`.
   const stem =
@@ -940,8 +949,8 @@ function PollBody({
     onError: (err) => {
       setLocalError(
         err.data?.code === "UNAUTHORIZED"
-          ? "Sign in to vote."
-          : err.message ?? "Couldn't record your vote. Try again."
+          ? t("pollSignIn")
+          : err.message ?? t("pollError")
       );
     },
   });
@@ -951,7 +960,7 @@ function PollBody({
 
   if (!stem.trim() || opts.length < 2) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't finished setting up this poll yet." />
+      <EmptyBlockHint message={t("pollEmpty")} />
     );
   }
 
@@ -1072,7 +1081,7 @@ function PollBody({
             marginBottom: 8,
           }}
         >
-          ✓ Vote saved offline — syncs when you reconnect
+          {t("pollOffline")}
         </div>
       )}
       <div
@@ -1087,12 +1096,12 @@ function PollBody({
       >
         <span>
           {hasVoted
-            ? `${data.totalVotes} ${data.totalVotes === 1 ? "vote" : "votes"} · click another option to change yours`
-            : `${data.totalVotes} ${data.totalVotes === 1 ? "vote" : "votes"} so far — pick one to see the results`}
+            ? t("pollVoted", { count: data.totalVotes })
+            : t("pollUnvoted", { count: data.totalVotes })}
         </span>
         {pending && (
           <span className="wf-mono" style={{ fontSize: 10 }}>
-            saving…
+            {t("pollSaving")}
           </span>
         )}
       </div>
@@ -1712,6 +1721,7 @@ function FreeResponseBody({
   blockId: string;
   settings: SettingsFor<"FREE_RESPONSE">;
 }) {
+  const t = useTranslations("LessonReader");
   const [answer, setAnswer] = useState("");
   const grade = trpc.lesson.gradeFreeResponse.useMutation();
   const result = grade.data ?? null;
@@ -1735,8 +1745,7 @@ function FreeResponseBody({
           lineHeight: 1.5,
         }}
       >
-        This free-response block isn&apos;t configured yet — the teacher
-        needs to add a writing prompt.
+        {t("frEmpty")}
       </div>
     );
   }
@@ -1761,7 +1770,7 @@ function FreeResponseBody({
         rows={6}
         maxLength={5_000}
         disabled={grade.isPending}
-        placeholder="Write your answer in your own words…"
+        placeholder={t("frPlaceholder")}
         style={{
           width: "100%",
           fontSize: 13,
@@ -1800,17 +1809,17 @@ function FreeResponseBody({
           }}
         >
           {grade.isPending
-            ? "Grading…"
+            ? t("frGrading")
             : result
-              ? "Resubmit for a fresh grade"
-              : "Submit for feedback"}
+              ? t("frResubmit")
+              : t("frSubmit")}
         </button>
         <span
           className="wf-mono"
           style={{ fontSize: 10, color: "var(--wf-mute)" }}
         >
-          {words} {words === 1 ? "word" : "words"}
-          {tooShort && answer.length > 0 ? " · write a bit more" : ""}
+          {t("frWords", { count: words })}
+          {tooShort && answer.length > 0 ? t("frWriteMore") : ""}
         </span>
       </div>
 
@@ -1868,7 +1877,7 @@ function FreeResponseBody({
                 className="wf-mono"
                 style={{ fontSize: 9, color: "var(--wf-mute)" }}
               >
-                DEMO GRADER
+                {t("frDemoGrader")}
               </span>
             )}
           </div>
