@@ -1125,6 +1125,8 @@ function PollBody({
 type LivePhase = "scheduled" | "live" | "ended";
 
 function LiveBody({ settings }: { settings: Record<string, unknown> }) {
+  const t = useTranslations("LessonReader");
+  const locale = useLocale();
   const title =
     typeof settings.title === "string" ? settings.title.trim() : "";
   const startsAtRaw =
@@ -1161,7 +1163,7 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
 
   if (!startsAt) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't scheduled this live session yet." />
+      <EmptyBlockHint message={t("liveEmpty")} />
     );
   }
 
@@ -1170,7 +1172,7 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
   if (now === null) {
     return (
       <div className="wf-mono" style={{ fontSize: 12, color: "var(--wf-mute)" }}>
-        ● Live session · {durationMin} min
+        {t("livePlaceholder", { min: durationMin })}
       </div>
     );
   }
@@ -1191,35 +1193,35 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
         : "var(--wf-mute)";
   const phaseLabel =
     phase === "live"
-      ? "● LIVE NOW"
+      ? t("liveNow")
       : phase === "scheduled"
-        ? "● UPCOMING"
-        : "● ENDED";
+        ? t("liveUpcoming")
+        : t("liveEnded");
 
   const relative = (() => {
     if (phase === "scheduled") {
       const diffMin = Math.round((startsAt.getTime() - now) / 60_000);
-      if (diffMin < 1) return "starting now";
-      if (diffMin < 60) return `starts in ${diffMin}m`;
+      if (diffMin < 1) return t("liveStartingNow");
+      if (diffMin < 60) return t("liveStartsMin", { m: diffMin });
       const diffHr = Math.round(diffMin / 60);
-      if (diffHr < 24) return `starts in ${diffHr}h`;
+      if (diffHr < 24) return t("liveStartsHr", { h: diffHr });
       const diffDay = Math.round(diffHr / 24);
-      return `starts in ${diffDay}d`;
+      return t("liveStartsDay", { d: diffDay });
     }
     if (phase === "live") {
       const diffMin = Math.round((endsAt.getTime() - now) / 60_000);
-      return diffMin > 0 ? `ends in ${diffMin}m` : "wrapping up";
+      return diffMin > 0 ? t("liveEndsMin", { m: diffMin }) : t("liveWrapping");
     }
     // ended
     const diffMin = Math.round((now - endsAt.getTime()) / 60_000);
-    if (diffMin < 60) return `ended ${diffMin}m ago`;
+    if (diffMin < 60) return t("liveEndedMin", { m: diffMin });
     const diffHr = Math.round(diffMin / 60);
-    if (diffHr < 24) return `ended ${diffHr}h ago`;
+    if (diffHr < 24) return t("liveEndedHr", { h: diffHr });
     const diffDay = Math.round(diffHr / 24);
-    return `ended ${diffDay}d ago`;
+    return t("liveEndedDay", { d: diffDay });
   })();
 
-  const formattedWhen = startsAt.toLocaleString(undefined, {
+  const formattedWhen = startsAt.toLocaleString(locale, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -1273,7 +1275,7 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
           marginBottom: 12,
         }}
       >
-        {formattedWhen} · {durationMin} min
+        {t("liveWhen", { when: formattedWhen, min: durationMin })}
       </div>
       {joinUrl ? (
         <a
@@ -1313,10 +1315,10 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
           }}
         >
           {phase === "live"
-            ? "Join now →"
+            ? t("liveJoinNow")
             : phase === "scheduled"
-              ? "Join opens at start time"
-              : "Session ended"}
+              ? t("liveJoinOpens")
+              : t("liveSessionEnded")}
         </a>
       ) : (
         <div
@@ -1326,7 +1328,7 @@ function LiveBody({ settings }: { settings: Record<string, unknown> }) {
             fontStyle: "italic",
           }}
         >
-          Join link hasn&apos;t been added yet.
+          {t("liveNoLink")}
         </div>
       )}
     </div>
