@@ -647,7 +647,9 @@ Ordered by learner/public impact:
    **quiz family** — QUIZ/AI_QUIZ + MCQ's feedback strings (Sign in / streak
    / offline) which are shared *verbatim* across all three (do them together
    so the keys wire once), + LIVE (locale-aware relative times) + BRANCHING +
-   SPEAK + DRAG_MATCH/SIMULATION/SECTION/DISCUSSION.
+   DRAG_MATCH (shares streak/offline w/ the quiz family) + SECTION +
+   DISCUSSION. **Part 2a DONE (cont.61):** SPEAK + SIMULATION (+20 keys;
+   both self-contained).
 3. **Learner/public pages**: `/settings`, the `/` home, `t/[teacherId]`
    public storefront, `student/community`, `parent`/`parental-consent`,
    `checkout/success` + `demo-checkout`.
