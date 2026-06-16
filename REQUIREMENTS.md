@@ -621,19 +621,26 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58 — auth core: login + signup, pages + forms)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–59 — auth flow fully done; next: lesson reader blocks)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
 Ordered by learner/public impact:
-1. **Auth flow** (HIGH — public, every user): `login` + `signup` (pages +
-   `LoginForm`/`SignupForm`) **DONE cont.58** (LoginPage/SignupPage ns; dev
-   demo panel left English). Remaining: `forgot-password`, `reset-password`,
-   `verify-email` — the recovery flow.
+1. **Auth flow** (HIGH — public, every user): **DONE.** `login` + `signup`
+   (cont.58, LoginPage/SignupPage ns; dev demo panel left English) + the
+   recovery flow `forgot`/`reset`/`verify` + parental-consent confirm
+   (cont.59, AuthRecovery ns in `PasswordResetForms.tsx`, 5 components). The
+   whole auth surface is localized.
 2. **Lesson reader blocks** (HIGH — learner-facing): `BlockReader.tsx` imports
    zero next-intl; the block affordances (check/submit/next/feedback across
    READING/QUIZ/POLL/SPEAK/DRAG_MATCH/BRANCHING/AI_QUIZ/FREE_RESPONSE) are
    English. Authored *content* stays as-authored — only UI chrome is in scope.
+   **NOTE: ~3,654 lines / ~16 block types / 100+ strings — this is a
+   multi-part job, NOT one cycle. Split by block type (core interactive
+   blocks — READING/MCQ/POLL/FREE_RESPONSE/QUIZ — first; locale-aware times
+   in LIVE). Each body component is its own fn → its own `useTranslations`.
+   The block-type *labels* (`meta.label` from `@/lib/blocks` BLOCK_GROUPS)
+   are a separate sub-item, shared with the builder.**
 3. **Learner/public pages**: `/settings`, the `/` home, `t/[teacherId]`
    public storefront, `student/community`, `parent`/`parental-consent`,
    `checkout/success` + `demo-checkout`.
