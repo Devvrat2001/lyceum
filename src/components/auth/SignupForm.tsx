@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Btn, Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 import { safeRedirect } from "@/lib/roles";
@@ -11,6 +12,7 @@ type Role = "STUDENT" | "TEACHER";
 type AgeBand = "under13" | "13to17" | "18plus";
 
 export function SignupForm({ next }: { next?: string }) {
+  const t = useTranslations("SignupPage");
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
@@ -38,7 +40,7 @@ export function SignupForm({ next }: { next?: string }) {
         router.replace(safeRedirect(role, next));
         router.refresh();
       } else {
-        setError("Account created. Please sign in.");
+        setError(t("createdSignIn"));
         router.push("/login");
       }
     },
@@ -54,23 +56,23 @@ export function SignupForm({ next }: { next?: string }) {
         e.preventDefault();
         setError(null);
         if (passwordMismatch) {
-          setError("Passwords don't match.");
+          setError(t("mismatch"));
           return;
         }
         if (password.length < 8) {
-          setError("Password must be at least 8 characters.");
+          setError(t("errPasswordLength"));
           return;
         }
         if (needsAge && !ageBand) {
-          setError("Pick your age range.");
+          setError(t("errAge"));
           return;
         }
         if (isUnder13 && !parentEmail.includes("@")) {
-          setError("Under-13 signups need a parent or guardian email.");
+          setError(t("errParent"));
           return;
         }
         if (!consent) {
-          setError("Please accept the terms to continue.");
+          setError(t("errConsent"));
           return;
         }
         signup.mutate({
@@ -85,31 +87,31 @@ export function SignupForm({ next }: { next?: string }) {
       }}
       style={{ display: "flex", flexDirection: "column", gap: 12 }}
     >
-      <Field label="FIRST NAME">
+      <Field label={t("firstNameLabel")}>
         <input
           type="text"
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
           autoComplete="given-name"
-          placeholder="Jordan"
+          placeholder={t("firstNamePlaceholder")}
           required
           style={inputStyle}
         />
       </Field>
 
-      <Field label="EMAIL">
+      <Field label={t("emailLabel")}>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
-          placeholder="you@school.edu"
+          placeholder={t("emailPlaceholder")}
           required
           style={inputStyle}
         />
       </Field>
 
-      <Field label="PASSWORD · 8+ CHARACTERS">
+      <Field label={t("passwordLabel")}>
         <input
           type="password"
           value={password}
@@ -122,7 +124,7 @@ export function SignupForm({ next }: { next?: string }) {
         />
       </Field>
 
-      <Field label="CONFIRM PASSWORD">
+      <Field label={t("confirmLabel")}>
         <input
           type="password"
           value={confirm}
@@ -135,12 +137,12 @@ export function SignupForm({ next }: { next?: string }) {
         />
         {passwordMismatch && (
           <span style={{ fontSize: 11, color: "var(--wf-accent)" }}>
-            Passwords don&apos;t match.
+            {t("mismatch")}
           </span>
         )}
       </Field>
 
-      <Field label="I'M A">
+      <Field label={t("roleLabel")}>
         <div style={{ display: "flex", gap: 8 }}>
           {(["STUDENT", "TEACHER"] as const).map((r) => (
             <button
@@ -170,14 +172,14 @@ export function SignupForm({ next }: { next?: string }) {
                 size={13}
                 color="currentColor"
               />
-              {r === "STUDENT" ? "Student" : "Teacher"}
+              {r === "STUDENT" ? t("roleStudent") : t("roleTeacher")}
             </button>
           ))}
         </div>
       </Field>
 
       {needsAge && (
-        <Field label="AGE">
+        <Field label={t("ageLabel")}>
           <select
             value={ageBand}
             onChange={(e) => setAgeBand(e.target.value as AgeBand | "")}
@@ -185,22 +187,22 @@ export function SignupForm({ next }: { next?: string }) {
             style={{ ...inputStyle, appearance: "auto" }}
           >
             <option value="" disabled>
-              Select your age range
+              {t("ageSelect")}
             </option>
-            <option value="under13">Under 13</option>
-            <option value="13to17">13–17</option>
-            <option value="18plus">18 or older</option>
+            <option value="under13">{t("ageUnder13")}</option>
+            <option value="13to17">{t("age13to17")}</option>
+            <option value="18plus">{t("age18plus")}</option>
           </select>
         </Field>
       )}
 
       {isUnder13 && (
-        <Field label="PARENT / GUARDIAN EMAIL">
+        <Field label={t("parentLabel")}>
           <input
             type="email"
             value={parentEmail}
             onChange={(e) => setParentEmail(e.target.value)}
-            placeholder="parent@example.com"
+            placeholder={t("parentPlaceholder")}
             required
             style={inputStyle}
           />
@@ -225,11 +227,7 @@ export function SignupForm({ next }: { next?: string }) {
           required
           style={{ marginTop: 2 }}
         />
-        <span>
-          {isUnder13
-            ? "My parent or guardian has reviewed and agrees to Lyceum's terms of service and privacy policy on my behalf."
-            : "I agree to Lyceum's terms of service and privacy policy (with my parent or guardian's consent where required)."}
-        </span>
+        <span>{isUnder13 ? t("consentUnder13") : t("consentRegular")}</span>
       </label>
 
       {error && (
@@ -253,7 +251,7 @@ export function SignupForm({ next }: { next?: string }) {
         disabled={signup.isPending || passwordMismatch}
         full
       >
-        {signup.isPending ? "Creating account…" : "Create account →"}
+        {signup.isPending ? t("submitting") : t("submit")}
       </Btn>
 
     </form>

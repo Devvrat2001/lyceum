@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Btn, Icon } from "@/components/wf/primitives";
 import { safeRedirect } from "@/lib/roles";
 
@@ -14,6 +15,7 @@ export function LoginForm({
   next?: string;
   googleEnabled?: boolean;
 }) {
+  const t = useTranslations("LoginPage");
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,7 +58,7 @@ export function LoginForm({
             }}
           >
             <GoogleG />
-            Continue with Google
+            {t("google")}
           </button>
           <div
             style={{
@@ -70,7 +72,7 @@ export function LoginForm({
             <span
               style={{ flex: 1, height: 1, background: "var(--wf-hairline)" }}
             />
-            OR
+            {t("or")}
             <span
               style={{ flex: 1, height: 1, background: "var(--wf-hairline)" }}
             />
@@ -98,9 +100,7 @@ export function LoginForm({
           router.refresh();
         } else {
           setPending(false);
-          setError(
-            "Couldn't sign you in. Check your email and password, or sign up below."
-          );
+          setError(t("signinError"));
         }
       }}
       style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -114,7 +114,7 @@ export function LoginForm({
             letterSpacing: "0.08em",
           }}
         >
-          EMAIL
+          {t("emailLabel")}
         </span>
         <div
           style={{
@@ -134,7 +134,7 @@ export function LoginForm({
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            placeholder="you@school.edu"
+            placeholder={t("emailPlaceholder")}
             style={{
               flex: 1,
               fontSize: 14,
@@ -155,7 +155,7 @@ export function LoginForm({
             letterSpacing: "0.08em",
           }}
         >
-          PASSWORD
+          {t("passwordLabel")}
         </span>
         <div
           style={{
@@ -203,7 +203,7 @@ export function LoginForm({
       )}
 
       <Btn type="submit" variant="primary" disabled={pending} full>
-        {pending ? "Signing in…" : "Sign in →"}
+        {pending ? t("submitting") : t("submit")}
       </Btn>
 
       <div
@@ -214,12 +214,12 @@ export function LoginForm({
           marginTop: 4,
         }}
       >
-        New here?{" "}
+        {t("newHere")}{" "}
         <Link
           href={`/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`}
           style={{ color: "var(--wf-ink)", fontWeight: 600 }}
         >
-          Create an account
+          {t("createAccount")}
         </Link>
       </div>
     </form>

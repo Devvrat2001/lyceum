@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/lib/auth";
 import { Eyebrow, Icon } from "@/components/wf/primitives";
 import { SignupForm } from "@/components/auth/SignupForm";
@@ -17,6 +18,8 @@ export default async function SignupPage({
   // hardcoded /student looped non-students (teacher → /student → proxy
   // rejects → /login?next=/student → … ).
   if (session?.user) redirect(safeRedirect(session.user.role, sp.next));
+
+  const t = await getTranslations("SignupPage");
 
   return (
     <div
@@ -77,9 +80,9 @@ export default async function SignupPage({
           </span>
         </Link>
 
-        <Eyebrow>Create account</Eyebrow>
+        <Eyebrow>{t("eyebrow")}</Eyebrow>
         <h1 className="wf-h1" style={{ fontSize: 32, margin: "8px 0 12px" }}>
-          Start learning.
+          {t("heading")}
         </h1>
         <p
           style={{
@@ -89,8 +92,7 @@ export default async function SignupPage({
             lineHeight: 1.5,
           }}
         >
-          Free to sign up — no credit card. Pick Student to learn or Teacher
-          to publish courses.
+          {t("intro")}
         </p>
 
         <SignupForm next={sp.next} />
@@ -102,12 +104,12 @@ export default async function SignupPage({
             color: "var(--wf-mute)",
           }}
         >
-          Already have an account?{" "}
+          {t("alreadyHave")}{" "}
           <Link
             href={`/login${sp.next ? `?next=${encodeURIComponent(sp.next)}` : ""}`}
             style={{ color: "var(--wf-ink)", fontWeight: 600 }}
           >
-            Sign in
+            {t("signIn")}
           </Link>
         </div>
       </div>
@@ -131,10 +133,10 @@ export default async function SignupPage({
           }}
         >
           <Icon name="sparkles" size={16} color="var(--wf-ai)" />
-          <Eyebrow>What you get</Eyebrow>
+          <Eyebrow>{t("getEyebrow")}</Eyebrow>
         </div>
         <h2 className="wf-h2" style={{ fontSize: 22, marginTop: -4 }}>
-          Personal AI tutor, gamified progress.
+          {t("getHeading")}
         </h2>
         <ul
           style={{
@@ -150,14 +152,14 @@ export default async function SignupPage({
           }}
         >
           {[
-            ["sparkles", "Always-available AI tutor that cites the textbook"],
-            ["star", "Adaptive practice that adjusts to your level"],
-            ["flame", "Daily streak + XP that unlocks new content"],
-            ["branch", "A skill tree that AI re-routes nightly"],
-            ["book", "1,200+ free lessons across math, ELA, science"],
-          ].map(([ic, t]) => (
+            ["sparkles", "feat1"],
+            ["star", "feat2"],
+            ["flame", "feat3"],
+            ["branch", "feat4"],
+            ["book", "feat5"],
+          ].map(([ic, featKey]) => (
             <li
-              key={t}
+              key={featKey}
               style={{ display: "flex", gap: 10, alignItems: "flex-start" }}
             >
               <Icon
@@ -166,7 +168,7 @@ export default async function SignupPage({
                 color={ic === "sparkles" ? "var(--wf-ai)" : "var(--wf-accent)"}
                 style={{ marginTop: 2, flexShrink: 0 }}
               />
-              <span>{t}</span>
+              <span>{t(featKey)}</span>
             </li>
           ))}
         </ul>

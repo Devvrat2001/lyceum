@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { auth, isGoogleAuthEnabled } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
@@ -22,6 +23,8 @@ export default async function LoginPage({
   // to `next` bounced non-students back here via proxy.ts forever.
   if (session?.user)
     redirect(safeRedirect(session.user.role, sp.next));
+
+  const t = await getTranslations("LoginPage");
 
   // Dev-only demo accounts panel. Production builds never see this.
   const isDev = env.NODE_ENV === "development";
@@ -96,9 +99,9 @@ export default async function LoginPage({
           </span>
         </div>
 
-        <Eyebrow>Sign in</Eyebrow>
+        <Eyebrow>{t("eyebrow")}</Eyebrow>
         <h1 className="wf-h1" style={{ fontSize: 32, margin: "8px 0 12px" }}>
-          Welcome back.
+          {t("heading")}
         </h1>
         <p
           style={{
@@ -108,7 +111,7 @@ export default async function LoginPage({
             lineHeight: 1.5,
           }}
         >
-          Sign in with your email and password.
+          {t("intro")}
         </p>
 
         {sp.error && (
@@ -124,10 +127,10 @@ export default async function LoginPage({
             }}
           >
             {sp.error === "CredentialsSignin"
-              ? "Couldn't sign you in. Check your email and password, or create an account below."
+              ? t("errorCredentials")
               : sp.error === "ForbiddenForRole"
-              ? "Your role doesn't have access to that page."
-              : `Sign-in failed: ${sp.error}`}
+              ? t("errorForbidden")
+              : t("errorGeneric", { error: sp.error })}
           </div>
         )}
 
@@ -144,7 +147,7 @@ export default async function LoginPage({
                 textDecoration: "none",
               }}
             >
-              Forgot your password?
+              {t("forgotPassword")}
             </Link>
           </div>
         )}
@@ -163,9 +166,9 @@ export default async function LoginPage({
             gap: 14,
           }}
         >
-          <Eyebrow>New to Lyceum?</Eyebrow>
+          <Eyebrow>{t("newEyebrow")}</Eyebrow>
           <h2 className="wf-h2" style={{ fontSize: 22, marginTop: -4 }}>
-            Browse without an account.
+            {t("newHeading")}
           </h2>
           <p
             style={{
@@ -175,9 +178,7 @@ export default async function LoginPage({
               marginBottom: 4,
             }}
           >
-            Explore the course marketplace, see what students learn, and check
-            out our teacher tools. Create a free account to track progress and
-            earn XP.
+            {t("newBody")}
           </p>
         </div>
       ) : (
