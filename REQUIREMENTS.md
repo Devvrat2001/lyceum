@@ -586,7 +586,17 @@ hunts net-new gaps, each grounded in the code.
   the entire teacher surface]. **Remaining: 1 — admin audit only** [its 21
   `KIND_LABELS` audit event-type labels + chrome (`timeAgo`, filters,
   `[deleted user]`/`system`); a focused finale, after which R52 is done and
-  a fresh P9 review is due].)
+  a fresh P9 review is due]. **cont.57 +`AdminAudit` — every page R52 ever
+  enumerated is now localized.** ⚠️ **The P9 review then found R52's scope
+  was too narrow:** whole surfaces were never listed and are still English —
+  the auth flow (login/signup/forgot/reset/verify), the entire course builder
+  (`CourseBuilderClient`/`BlockInspector`/`BlockLibrary`/`AddBlockPopover`),
+  the lesson **reader blocks** (`BlockReader` — learner-facing!), `/settings`,
+  `teacher/assignments`, `admin/branding`+`integrations`+`analytics`,
+  `teacher/students/[id]`, the `/` home, `t/[teacherId]`, checkout,
+  `parent`/`parental-consent`, `student/community`. So **R52-as-scoped is
+  DONE, but i18n is NOT at 100%** — the real remainder is tracked as **R55**
+  (P9). Honest > checkbox.)
 - **R53 · Test coverage for the thin routers + cron handlers** —
   `insight` + `parent` routers have ~1 caller test each, and the
   `/api/cron/*` route handlers (streak-rollover, weekly-digest, ai-insights,
@@ -599,6 +609,62 @@ hunts net-new gaps, each grounded in the code.
   crons share the identical check. cont.50: +`test/insight.test.ts`
   [forTeacher cache read + teacher-only authz + health]; `parent` was
   already covered by `parentSelfLink.test`. R53 fully done.)
+
+---
+
+## P9 — post-R52 review (2026-06-17)
+
+R52 closed every page it enumerated, but the enumeration was incomplete (see
+the ⚠️ on R52). Comparing `next-intl` usage against the 43 `page.tsx` routes
++ their client components surfaced the real remainder. The product is
+otherwise feature-complete — the feature board has been exhausted since P7 —
+so the genuine net-new work is: finish i18n for real, plus two small
+hardening tails.
+
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: OPEN
+`<html lang>` is already locale-correct (`getLocale()` in the root layout)
+and the catalogs + parity harness exist, so this is pure breadth, same
+`useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
+Ordered by learner/public impact:
+1. **Auth flow** (HIGH — public, every user): `login`, `signup`,
+   `forgot-password`, `reset-password`, `verify-email`. Confirmed English
+   (`login/page.tsx` renders a literal "Sign in").
+2. **Lesson reader blocks** (HIGH — learner-facing): `BlockReader.tsx` imports
+   zero next-intl; the block affordances (check/submit/next/feedback across
+   READING/QUIZ/POLL/SPEAK/DRAG_MATCH/BRANCHING/AI_QUIZ/FREE_RESPONSE) are
+   English. Authored *content* stays as-authored — only UI chrome is in scope.
+3. **Learner/public pages**: `/settings`, the `/` home, `t/[teacherId]`
+   public storefront, `student/community`, `parent`/`parental-consent`,
+   `checkout/success` + `demo-checkout`.
+4. **Course builder** (teacher power tool): `CourseBuilderClient`,
+   `BlockInspector`, `BlockLibrary`, `AddBlockPopover` + `teacher/courses/new`
+   `/new/ai` `/[courseId]/edit`, `teacher/assignments` (`AssignmentsClient`),
+   `teacher/students/[id]`.
+5. **Admin power tools**: `admin/branding` (`BrandingEditor`),
+   `admin/integrations`, `admin/analytics` (`AdminInsights`/`AnalyticsCharts`).
+Big but mechanical — chunk a surface or two per cycle (ICU plurals +
+locale-aware dates where present). This is the honest "100%".
+
+### R56 · Localize page `<title>` metadata · Status: OPEN · LOW
+Every page sets a static `metadata = { title: "X · Lyceum" }`, so the browser
+tab stays English even when the body localizes. Convert user-facing routes to
+async `generateMetadata` + `getTranslations`. Low priority (tab title, not
+content); bundle opportunistically with R55 per route.
+
+### R57 · Content-Security-Policy (the R50 tail) · Status: OPEN · MED-LOW
+R50 shipped HSTS/X-Frame/etc. but no CSP, because the app styles via pervasive
+inline `style={{}}` and emits JSON-LD via `dangerouslySetInnerHTML` — a real
+CSP needs a nonce strategy or a refactor away from inline styles. Start
+**report-only** to measure violations before enforcing. Genuine hardening, a
+real chunk of work, not urgent.
+
+### Verified clean in the P9 pass (don't re-audit)
+- `<html lang={locale}>` is set from `getLocale()` (root layout) — the lang
+  attribute is correct for a11y/SEO across en/es/hi.
+- KNOWN_ISSUES **S1 tier is clear** (S1-1 prod TLS verified removed
+  2026-06-16; S1-2/S1-3 resolved).
+- Unchanged user-owned carry-overs: **R44** (transactional email), **R54**
+  (`sslmode=verify-full` pin), **R31** (WhatsApp keys — blocked).
 
 ---
 
