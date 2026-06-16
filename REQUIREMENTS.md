@@ -658,9 +658,10 @@ Ordered by learner/public impact:
    only lesson-reader remainder is the block-type *labels* (`meta.label` from
    `@/lib/blocks` BLOCK_GROUPS) — shared with the course builder, so do them
    together.**
-3. **Learner/public pages**: `/settings`, the `/` home, `t/[teacherId]`
-   public storefront, `student/community`, `parent`/`parental-consent`,
-   `checkout/success` + `demo-checkout`.
+3. **Learner/public pages**: `/settings` **DONE (cont.65** — Settings ns,
+   ~52 keys, all-roles account page) + `parental-consent` **DONE (cont.59)**.
+   Remaining: the `/` home, `t/[teacherId]` public storefront,
+   `student/community`, `parent`, `checkout/success` + `demo-checkout`.
 4. **Course builder** (teacher power tool): `CourseBuilderClient`,
    `BlockInspector`, `BlockLibrary`, `AddBlockPopover` + `teacher/courses/new`
    `/new/ai` `/[courseId]/edit`, `teacher/assignments` (`AssignmentsClient`),
