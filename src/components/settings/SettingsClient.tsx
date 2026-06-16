@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { Btn, Card, Eyebrow, Icon, Toggle } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
@@ -61,7 +62,7 @@ function SavedFlag({
         color: state.kind === "err" ? "var(--wf-accent)" : "var(--wf-good)",
       }}
     >
-      {state.kind === "err" ? state.msg : `✓ ${state.msg ?? "Saved"}`}
+      {state.kind === "err" ? state.msg : `✓ ${state.msg ?? ""}`}
     </span>
   );
 }
@@ -73,6 +74,7 @@ export function SettingsClient({
   user: SettingsUser;
   homeHref: string;
 }) {
+  const t = useTranslations("Settings");
   const isTeacher = user.role === "TEACHER" || user.role === "ADMIN";
 
   return (
@@ -96,11 +98,11 @@ export function SettingsClient({
           background: "white",
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>Settings</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
         <div style={{ flex: 1 }} />
         <Link href={homeHref} style={{ textDecoration: "none" }}>
           <Btn variant="ghost" sm icon={<Icon name="arrow" size={12} />}>
-            Back to app
+            {t("backToApp")}
           </Btn>
         </Link>
       </header>
@@ -110,7 +112,7 @@ export function SettingsClient({
           {/* Identity strip — read-only. Email is the login key; changing it
               touches auth + Stripe and is deferred. */}
           <Card p={16} style={{ marginBottom: 16 }}>
-            <Eyebrow>Account</Eyebrow>
+            <Eyebrow>{t("account")}</Eyebrow>
             <div
               style={{
                 display: "flex",
@@ -159,12 +161,13 @@ export function SettingsClient({
  * replaces the previous code.
  */
 function FamilySection() {
+  const t = useTranslations("Settings");
   const gen = trpc.student.generateParentCode.useMutation();
   const [copied, setCopied] = useState(false);
 
   return (
     <Card p={16} style={{ marginBottom: 16 }}>
-      <Eyebrow>Family</Eyebrow>
+      <Eyebrow>{t("family")}</Eyebrow>
       <div
         style={{
           fontSize: 12,
@@ -173,10 +176,7 @@ function FamilySection() {
           lineHeight: 1.5,
         }}
       >
-        Link a parent or guardian: generate a code, share it with them
-        (WhatsApp works fine), and they enter it on their Lyceum parent
-        dashboard. Each code works once and expires in 7 days —
-        generating a new one replaces the old.
+        {t("familyIntro")}
       </div>
       {gen.data ? (
         <div
@@ -211,13 +211,14 @@ function FamilySection() {
                 .catch(() => {});
             }}
           >
-            {copied ? "✓ Copied" : "Copy"}
+            {copied ? t("copied") : t("copy")}
           </Btn>
           <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-            expires{" "}
-            {new Date(gen.data.expiresAt).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
+            {t("expires", {
+              date: new Date(gen.data.expiresAt).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              }),
             })}
           </span>
           <Btn
@@ -229,7 +230,7 @@ function FamilySection() {
               gen.mutate();
             }}
           >
-            New code
+            {t("newCode")}
           </Btn>
         </div>
       ) : (
@@ -239,7 +240,7 @@ function FamilySection() {
           disabled={gen.isPending}
           onClick={() => gen.mutate()}
         >
-          {gen.isPending ? "Generating…" : "Generate family code"}
+          {gen.isPending ? t("generating") : t("generateCode")}
         </Btn>
       )}
       {gen.error && (
@@ -262,6 +263,7 @@ function ProfileSection({
   user: SettingsUser;
   isTeacher: boolean;
 }) {
+  const t = useTranslations("Settings");
   const router = useRouter();
   const [firstName, setFirstName] = useState(user.firstName ?? "");
   const [name, setName] = useState(user.name ?? "");
@@ -274,7 +276,7 @@ function ProfileSection({
 
   const update = trpc.account.updateProfile.useMutation({
     onSuccess: () => {
-      setFlag({ kind: "ok", msg: "Saved" });
+      setFlag({ kind: "ok", msg: t("saved") });
       router.refresh();
       setTimeout(() => setFlag({ kind: "idle" }), 3000);
     },
@@ -289,29 +291,26 @@ function ProfileSection({
 
   return (
     <Card p={20} style={{ marginBottom: 16 }}>
-      <Eyebrow>Profile</Eyebrow>
-      <p style={helpText}>
-        Your first name is used in greetings across the app. Display name shows
-        in menus and on your activity.
-      </p>
+      <Eyebrow>{t("profile")}</Eyebrow>
+      <p style={helpText}>{t("profileHelp")}</p>
 
       <label style={{ display: "block", marginBottom: 14 }}>
-        <FieldLabel>FIRST NAME</FieldLabel>
+        <FieldLabel>{t("firstName")}</FieldLabel>
         <input
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
-          placeholder="e.g. Jordan"
+          placeholder={t("firstNamePlaceholder")}
           maxLength={80}
           style={inputStyle}
         />
       </label>
 
       <label style={{ display: "block", marginBottom: isTeacher ? 14 : 16 }}>
-        <FieldLabel>DISPLAY NAME</FieldLabel>
+        <FieldLabel>{t("displayName")}</FieldLabel>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Jordan Riley"
+          placeholder={t("displayNamePlaceholder")}
           maxLength={120}
           style={inputStyle}
         />
@@ -320,28 +319,28 @@ function ProfileSection({
       {isTeacher && (
         <>
           <label style={{ display: "block", marginBottom: 14 }}>
-            <FieldLabel>HEADLINE</FieldLabel>
+            <FieldLabel>{t("headline")}</FieldLabel>
             <input
               value={headline}
               onChange={(e) => setHeadline(e.target.value)}
-              placeholder="e.g. Middle-school math, made visual"
+              placeholder={t("headlinePlaceholder")}
               maxLength={120}
               style={inputStyle}
             />
           </label>
           <label style={{ display: "block", marginBottom: 16 }}>
-            <FieldLabel>BIO</FieldLabel>
+            <FieldLabel>{t("bio")}</FieldLabel>
             <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              placeholder="Tell learners about your teaching background and approach."
+              placeholder={t("bioPlaceholder")}
               rows={5}
               maxLength={2000}
               style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
             />
           </label>
           <p style={{ ...helpText, marginTop: -6 }}>
-            Headline and bio appear on your public storefront.
+            {t("profileStorefrontNote")}
           </p>
         </>
       )}
@@ -359,7 +358,7 @@ function ProfileSection({
             )
           }
         >
-          {update.isPending ? "Saving…" : "Save profile"}
+          {update.isPending ? t("saving") : t("saveProfile")}
         </Btn>
         <SavedFlag state={flag} />
       </div>
@@ -370,6 +369,7 @@ function ProfileSection({
 /* --------------------------------------------------------------- Password */
 
 function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
+  const t = useTranslations("Settings");
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -380,7 +380,7 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
 
   const change = trpc.account.changePassword.useMutation({
     onSuccess: () => {
-      setFlag({ kind: "ok", msg: "Password updated" });
+      setFlag({ kind: "ok", msg: t("pwUpdated") });
       setCurrent("");
       setNext("");
       setConfirm("");
@@ -392,20 +392,17 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
   if (!hasPassword) {
     return (
       <Card p={20} style={{ marginBottom: 16 }}>
-        <Eyebrow>Password</Eyebrow>
-        <p style={{ ...helpText, marginBottom: 0 }}>
-          Your account signs in without a password (single sign-on / demo
-          login), so there&apos;s no password to change here.
-        </p>
+        <Eyebrow>{t("password")}</Eyebrow>
+        <p style={{ ...helpText, marginBottom: 0 }}>{t("noPassword")}</p>
       </Card>
     );
   }
 
   const localError =
     next.length > 0 && next.length < 8
-      ? "New password must be at least 8 characters."
+      ? t("pwTooShort")
       : confirm.length > 0 && next !== confirm
-        ? "New password and confirmation don't match."
+        ? t("pwMismatch")
         : null;
 
   const canSubmit =
@@ -416,11 +413,11 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
 
   return (
     <Card p={20} style={{ marginBottom: 16 }}>
-      <Eyebrow>Password</Eyebrow>
-      <p style={helpText}>Use at least 8 characters.</p>
+      <Eyebrow>{t("password")}</Eyebrow>
+      <p style={helpText}>{t("passwordHelp")}</p>
 
       <label style={{ display: "block", marginBottom: 14 }}>
-        <FieldLabel>CURRENT PASSWORD</FieldLabel>
+        <FieldLabel>{t("currentPassword")}</FieldLabel>
         <input
           type="password"
           autoComplete="current-password"
@@ -430,7 +427,7 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
         />
       </label>
       <label style={{ display: "block", marginBottom: 14 }}>
-        <FieldLabel>NEW PASSWORD</FieldLabel>
+        <FieldLabel>{t("newPassword")}</FieldLabel>
         <input
           type="password"
           autoComplete="new-password"
@@ -440,7 +437,7 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
         />
       </label>
       <label style={{ display: "block", marginBottom: 16 }}>
-        <FieldLabel>CONFIRM NEW PASSWORD</FieldLabel>
+        <FieldLabel>{t("confirmNewPassword")}</FieldLabel>
         <input
           type="password"
           autoComplete="new-password"
@@ -459,7 +456,7 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
             change.mutate({ currentPassword: current, newPassword: next })
           }
         >
-          {change.isPending ? "Updating…" : "Update password"}
+          {change.isPending ? t("updating") : t("updatePassword")}
         </Btn>
         {localError ? (
           <span style={{ fontSize: 11, color: "var(--wf-accent)" }}>
@@ -476,6 +473,7 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
 /* ------------------------------------------------------------------ Email */
 
 function EmailSection({ initial }: { initial: boolean }) {
+  const t = useTranslations("Settings");
   // Store the *opt-out* but render the friendlier *opt-in* ("emails on").
   const [optOut, setOptOut] = useState(initial);
   const [flag, setFlag] = useState<{
@@ -485,7 +483,7 @@ function EmailSection({ initial }: { initial: boolean }) {
 
   const update = trpc.account.updatePreferences.useMutation({
     onSuccess: () => {
-      setFlag({ kind: "ok", msg: "Saved" });
+      setFlag({ kind: "ok", msg: t("saved") });
       setTimeout(() => setFlag({ kind: "idle" }), 2500);
     },
     onError: (e) => {
@@ -502,10 +500,10 @@ function EmailSection({ initial }: { initial: boolean }) {
 
   return (
     <Card p={20} style={{ marginBottom: 16 }}>
-      <Eyebrow>Email</Eyebrow>
+      <Eyebrow>{t("email")}</Eyebrow>
       <ToggleRow
-        label="Product & progress emails"
-        hint="Weekly progress digest and re-engagement nudges. Purchase receipts and other transactional email always send."
+        label={t("emailToggle")}
+        hint={t("emailHint")}
         on={!optOut}
         disabled={update.isPending}
         onChange={toggle}
@@ -526,6 +524,7 @@ function PrivacySection({
   initialTutorOptOut: boolean;
   initialConsentAt: string | null;
 }) {
+  const t = useTranslations("Settings");
   const [tutorOptOut, setTutorOptOut] = useState(initialTutorOptOut);
   const [consentAt, setConsentAt] = useState<string | null>(initialConsentAt);
   const [flag, setFlag] = useState<{
@@ -535,7 +534,7 @@ function PrivacySection({
 
   const update = trpc.account.updatePreferences.useMutation({
     onSuccess: () => {
-      setFlag({ kind: "ok", msg: "Saved" });
+      setFlag({ kind: "ok", msg: t("saved") });
       setTimeout(() => setFlag({ kind: "idle" }), 2500);
     },
     onError: (e) => setFlag({ kind: "err", msg: e.message }),
@@ -562,11 +561,11 @@ function PrivacySection({
 
   return (
     <Card p={20} style={{ marginBottom: 16 }}>
-      <Eyebrow>Privacy &amp; data</Eyebrow>
+      <Eyebrow>{t("privacy")}</Eyebrow>
 
       <ToggleRow
-        label="Store my AI tutor conversations"
-        hint="When off, your tutor chats aren't saved — the tutor still works live, but nothing is kept after the session. (COPPA/FERPA.)"
+        label={t("tutorToggle")}
+        hint={t("tutorHint")}
         on={!tutorOptOut}
         disabled={update.isPending}
         onChange={toggleTutor}
@@ -575,11 +574,13 @@ function PrivacySection({
       <div style={{ height: 1, background: "var(--wf-hairline)", margin: "14px 0" }} />
 
       <ToggleRow
-        label="I consent to data & AI processing"
+        label={t("consentToggle")}
         hint={
           consentAt
-            ? `Consent recorded ${new Date(consentAt).toLocaleDateString()}.`
-            : "Acknowledge that lesson activity and AI tutor usage are processed to personalize learning."
+            ? t("consentRecorded", {
+                date: new Date(consentAt).toLocaleDateString(),
+              })
+            : t("consentHint")
         }
         on={!!consentAt}
         disabled={update.isPending}
@@ -603,6 +604,7 @@ function PrivacySection({
  * server-side — the error surfaces inline.
  */
 function DangerZone({ userId }: { userId: string }) {
+  const t = useTranslations("Settings");
   const utils = trpc.useUtils();
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState<string | null>(null);
@@ -629,7 +631,7 @@ function DangerZone({ userId }: { userId: string }) {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setExportErr(e instanceof Error ? e.message : "Export failed.");
+      setExportErr(e instanceof Error ? e.message : t("exportFailed"));
     } finally {
       setExporting(false);
     }
@@ -640,16 +642,12 @@ function DangerZone({ userId }: { userId: string }) {
       p={20}
       style={{ marginBottom: 16, borderColor: "var(--wf-accent)" }}
     >
-      <Eyebrow>Your data</Eyebrow>
-      <p style={helpText}>
-        Download everything we hold about your account, or permanently
-        delete it. Deletion anonymises your profile and signs you out — it
-        can&apos;t be undone.
-      </p>
+      <Eyebrow>{t("yourData")}</Eyebrow>
+      <p style={helpText}>{t("dataHelp")}</p>
 
       <div style={{ ...saveRow, marginBottom: 16 }}>
         <Btn sm variant="ghost" disabled={exporting} onClick={download}>
-          {exporting ? "Preparing…" : "Download my data"}
+          {exporting ? t("preparing") : t("downloadData")}
         </Btn>
         {exportErr && (
           <span style={{ fontSize: 11, color: "var(--wf-accent)" }}>
@@ -662,16 +660,16 @@ function DangerZone({ userId }: { userId: string }) {
         style={{ height: 1, background: "var(--wf-hairline)", margin: "4px 0 16px" }}
       />
 
-      <FieldLabel>DELETE ACCOUNT</FieldLabel>
+      <FieldLabel>{t("deleteAccount")}</FieldLabel>
       <p style={{ ...helpText, marginTop: 6 }}>
-        Type <strong>DELETE</strong> to confirm.
+        {t.rich("typeDelete", { strong: (c) => <strong>{c}</strong> })}
       </p>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <input
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
-          placeholder="DELETE"
-          aria-label="Type DELETE to confirm account deletion"
+          placeholder={t("deletePlaceholder")}
+          aria-label={t("deleteAria")}
           style={{ ...inputStyle, marginTop: 0, maxWidth: 160 }}
         />
         <Btn
@@ -683,7 +681,7 @@ function DangerZone({ userId }: { userId: string }) {
             del.mutate({ confirm: "DELETE" });
           }}
         >
-          {del.isPending ? "Deleting…" : "Delete my account"}
+          {del.isPending ? t("deleting") : t("deleteMyAccount")}
         </Btn>
       </div>
       {delErr && (
