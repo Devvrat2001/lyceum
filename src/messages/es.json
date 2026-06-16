@@ -503,5 +503,33 @@
     "createdSignIn": "Cuenta creada. Inicia sesión.",
     "submitting": "Creando cuenta…",
     "submit": "Crear cuenta →"
+  },
+  "AuthRecovery": {
+    "backToSignIn": "← Volver a iniciar sesión",
+    "fpEyebrow": "Restablecer contraseña",
+    "fpTitle": "¿Olvidaste tu contraseña?",
+    "fpSent": "Si existe una cuenta para <b>{email}</b>, un enlace de restablecimiento está en camino. Funciona durante 1 hora; revisa el spam si no llega.",
+    "fpIntro": "Introduce el correo de tu cuenta y te enviaremos un enlace para elegir una nueva contraseña.",
+    "fpEmailPlaceholder": "tu@ejemplo.com",
+    "fpSending": "Enviando…",
+    "fpSend": "Enviar enlace de restablecimiento",
+    "rpMissingTitle": "Falta el enlace de restablecimiento",
+    "rpMissingBody": "Abre el enlace de tu correo de restablecimiento: contiene el token que esta página necesita.",
+    "rpTitle": "Elige una nueva contraseña",
+    "rpDone": "Contraseña actualizada ✓: ya puedes iniciar sesión con ella.",
+    "rpNewPlaceholder": "Nueva contraseña (mín. 8 caracteres)",
+    "rpRepeatPlaceholder": "Repite la nueva contraseña",
+    "rpMismatch": "Las contraseñas no coinciden.",
+    "rpSaving": "Guardando…",
+    "rpSet": "Establecer nueva contraseña",
+    "oneMoment": "Un momento…",
+    "veMissing": "Abre el enlace de tu correo de verificación.",
+    "veEyebrow": "Verificación de correo",
+    "veTitle": "Verificando tu correo…",
+    "veOk": "Correo verificado ✓: los recibos y avisos de la cuenta llegarán a <b>{email}</b>.",
+    "pcMissing": "Abre el enlace del correo de consentimiento.",
+    "pcEyebrow": "Consentimiento parental",
+    "pcTitle": "Confirmando el consentimiento…",
+    "pcOk": "Gracias ✓: has aprobado esta cuenta de Lyceum. Tu hijo/a ya puede usarla por completo."
   }
 }

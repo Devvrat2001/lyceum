@@ -503,5 +503,33 @@
     "createdSignIn": "Account created. Please sign in.",
     "submitting": "Creating account…",
     "submit": "Create account →"
+  },
+  "AuthRecovery": {
+    "backToSignIn": "← Back to sign in",
+    "fpEyebrow": "Password reset",
+    "fpTitle": "Forgot your password?",
+    "fpSent": "If an account exists for <b>{email}</b>, a reset link is on its way. It works for 1 hour — check spam if it doesn't arrive.",
+    "fpIntro": "Enter your account email and we'll send a link to choose a new password.",
+    "fpEmailPlaceholder": "you@example.com",
+    "fpSending": "Sending…",
+    "fpSend": "Send reset link",
+    "rpMissingTitle": "Missing reset link",
+    "rpMissingBody": "Open the link from your reset email — it carries the token this page needs.",
+    "rpTitle": "Choose a new password",
+    "rpDone": "Password updated ✓ — sign in with it now.",
+    "rpNewPlaceholder": "New password (min 8 characters)",
+    "rpRepeatPlaceholder": "Repeat new password",
+    "rpMismatch": "Passwords don't match.",
+    "rpSaving": "Saving…",
+    "rpSet": "Set new password",
+    "oneMoment": "One moment…",
+    "veMissing": "Open the link from your verification email.",
+    "veEyebrow": "Email verification",
+    "veTitle": "Verifying your email…",
+    "veOk": "Email verified ✓ — receipts and account notices will reach you at <b>{email}</b>.",
+    "pcMissing": "Open the link from the consent email.",
+    "pcEyebrow": "Parental consent",
+    "pcTitle": "Confirming consent…",
+    "pcOk": "Thank you ✓ — you've approved this Lyceum account. Your child can now use it fully."
   }
 }

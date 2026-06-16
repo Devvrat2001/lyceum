@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { trpc } from "@/lib/trpc/react";
 import { Btn, Card, Eyebrow } from "@/components/wf/primitives";
 
@@ -24,6 +25,7 @@ function Shell({
   title: string;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("AuthRecovery");
   return (
     <div
       style={{
@@ -50,7 +52,7 @@ function Shell({
               textDecoration: "none",
             }}
           >
-            ← Back to sign in
+            {t("backToSignIn")}
           </Link>
         </div>
       </Card>
@@ -61,6 +63,7 @@ function Shell({
 /** /forgot-password — request a reset link. Response copy never reveals
  *  whether the address has an account. */
 export function ForgotPasswordForm() {
+  const t = useTranslations("AuthRecovery");
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const request = trpc.auth.requestPasswordReset.useMutation({
@@ -68,11 +71,10 @@ export function ForgotPasswordForm() {
   });
 
   return (
-    <Shell eyebrow="Password reset" title="Forgot your password?">
+    <Shell eyebrow={t("fpEyebrow")} title={t("fpTitle")}>
       {sent ? (
         <p style={{ fontSize: 13, color: "var(--wf-body)", lineHeight: 1.5 }}>
-          If an account exists for <b>{email}</b>, a reset link is on its way.
-          It works for 1 hour — check spam if it doesn&apos;t arrive.
+          {t.rich("fpSent", { email, b: (c) => <b>{c}</b> })}
         </p>
       ) : (
         <>
@@ -84,14 +86,13 @@ export function ForgotPasswordForm() {
               marginBottom: 14,
             }}
           >
-            Enter your account email and we&apos;ll send a link to choose a
-            new password.
+            {t("fpIntro")}
           </p>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            placeholder={t("fpEmailPlaceholder")}
             style={inputStyle}
             autoFocus
           />
@@ -109,7 +110,7 @@ export function ForgotPasswordForm() {
               disabled={!email.includes("@") || request.isPending}
               onClick={() => request.mutate({ email })}
             >
-              {request.isPending ? "Sending…" : "Send reset link"}
+              {request.isPending ? t("fpSending") : t("fpSend")}
             </Btn>
           </div>
         </>
@@ -126,6 +127,7 @@ export function ResetPasswordForm({
   token: string;
   email: string;
 }) {
+  const t = useTranslations("AuthRecovery");
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [done, setDone] = useState(false);
@@ -137,20 +139,19 @@ export function ResetPasswordForm({
 
   if (!token || !email) {
     return (
-      <Shell eyebrow="Password reset" title="Missing reset link">
+      <Shell eyebrow={t("fpEyebrow")} title={t("rpMissingTitle")}>
         <p style={{ fontSize: 13, color: "var(--wf-body)" }}>
-          Open the link from your reset email — it carries the token this
-          page needs.
+          {t("rpMissingBody")}
         </p>
       </Shell>
     );
   }
 
   return (
-    <Shell eyebrow="Password reset" title="Choose a new password">
+    <Shell eyebrow={t("fpEyebrow")} title={t("rpTitle")}>
       {done ? (
         <p style={{ fontSize: 13, color: "var(--wf-good)", lineHeight: 1.5 }}>
-          Password updated ✓ — sign in with it now.
+          {t("rpDone")}
         </p>
       ) : (
         <>
@@ -159,7 +160,7 @@ export function ResetPasswordForm({
               type="password"
               value={pw}
               onChange={(e) => setPw(e.target.value)}
-              placeholder="New password (min 8 characters)"
+              placeholder={t("rpNewPlaceholder")}
               style={inputStyle}
               autoFocus
             />
@@ -167,7 +168,7 @@ export function ResetPasswordForm({
               type="password"
               value={pw2}
               onChange={(e) => setPw2(e.target.value)}
-              placeholder="Repeat new password"
+              placeholder={t("rpRepeatPlaceholder")}
               style={inputStyle}
             />
           </div>
@@ -175,7 +176,7 @@ export function ResetPasswordForm({
             <div
               style={{ marginTop: 8, fontSize: 12, color: "var(--wf-bad)" }}
             >
-              Passwords don&apos;t match.
+              {t("rpMismatch")}
             </div>
           )}
           {reset.error && (
@@ -192,7 +193,7 @@ export function ResetPasswordForm({
               disabled={!canSubmit}
               onClick={() => reset.mutate({ email, token, password: pw })}
             >
-              {reset.isPending ? "Saving…" : "Set new password"}
+              {reset.isPending ? t("rpSaving") : t("rpSet")}
             </Btn>
           </div>
         </>
@@ -209,6 +210,7 @@ export function VerifyEmailClient({
   token: string;
   email: string;
 }) {
+  const t = useTranslations("AuthRecovery");
   // A missing token/email is knowable at render time — derive the
   // initial state from props instead of setState-ing in the effect.
   const missingLink = !token || !email;
@@ -217,7 +219,7 @@ export function VerifyEmailClient({
     missingLink ? "error" : "working"
   );
   const [message, setMessage] = useState(
-    missingLink ? "Open the link from your verification email." : ""
+    missingLink ? t("veMissing") : ""
   );
   const verify = trpc.auth.verifyEmail.useMutation({
     onSuccess: () => setState("ok"),
@@ -237,14 +239,13 @@ export function VerifyEmailClient({
   }, []);
 
   return (
-    <Shell eyebrow="Email verification" title="Verifying your email…">
+    <Shell eyebrow={t("veEyebrow")} title={t("veTitle")}>
       {state === "working" && (
-        <p style={{ fontSize: 13, color: "var(--wf-mute)" }}>One moment…</p>
+        <p style={{ fontSize: 13, color: "var(--wf-mute)" }}>{t("oneMoment")}</p>
       )}
       {state === "ok" && (
         <p style={{ fontSize: 13, color: "var(--wf-good)", lineHeight: 1.5 }}>
-          Email verified ✓ — receipts and account notices will reach you at{" "}
-          <b>{email}</b>.
+          {t.rich("veOk", { email, b: (c) => <b>{c}</b> })}
         </p>
       )}
       {state === "error" && (
@@ -268,13 +269,14 @@ export function ParentalConsentClient({
   token: string;
   email: string;
 }) {
+  const t = useTranslations("AuthRecovery");
   const missingLink = !token || !email;
   const firedRef = useRef(false);
   const [state, setState] = useState<"working" | "ok" | "error">(
     missingLink ? "error" : "working"
   );
   const [message, setMessage] = useState(
-    missingLink ? "Open the link from the consent email." : ""
+    missingLink ? t("pcMissing") : ""
   );
   const confirm = trpc.auth.confirmParentalConsent.useMutation({
     onSuccess: () => setState("ok"),
@@ -292,14 +294,13 @@ export function ParentalConsentClient({
   }, []);
 
   return (
-    <Shell eyebrow="Parental consent" title="Confirming consent…">
+    <Shell eyebrow={t("pcEyebrow")} title={t("pcTitle")}>
       {state === "working" && (
-        <p style={{ fontSize: 13, color: "var(--wf-mute)" }}>One moment…</p>
+        <p style={{ fontSize: 13, color: "var(--wf-mute)" }}>{t("oneMoment")}</p>
       )}
       {state === "ok" && (
         <p style={{ fontSize: 13, color: "var(--wf-good)", lineHeight: 1.5 }}>
-          Thank you ✓ — you&apos;ve approved this Lyceum account. Your child can
-          now use it fully.
+          {t("pcOk")}
         </p>
       )}
       {state === "error" && (
