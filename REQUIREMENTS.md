@@ -581,9 +581,12 @@ hunts net-new gaps, each grounded in the code.
   `t.rich` for inline emphasis]. cont.54 +`AdminTeachers` [third client
   component — accounts table + Razorpay payout-link form; locale-aware
   date that keeps en-IN order for en] +`AdminCurriculum` +`AdminBilling`
-  [server pages; ICU-plural seats/students]. Remaining: ~3 — teacher
-  paths/storefront, admin audit [deferred on purpose: its 21 `KIND_LABELS`
-  audit event-type labels are a focused sub-task, not a quick swap].)
+  [server pages; ICU-plural seats/students]. cont.56 +`TeacherPaths`
+  +`TeacherStorefront` [the last two teacher client components — finishes
+  the entire teacher surface]. **Remaining: 1 — admin audit only** [its 21
+  `KIND_LABELS` audit event-type labels + chrome (`timeAgo`, filters,
+  `[deleted user]`/`system`); a focused finale, after which R52 is done and
+  a fresh P9 review is due].)
 - **R53 · Test coverage for the thin routers + cron handlers** —
   `insight` + `parent` routers have ~1 caller test each, and the
   `/api/cron/*` route handlers (streak-rollover, weekly-digest, ai-insights,
