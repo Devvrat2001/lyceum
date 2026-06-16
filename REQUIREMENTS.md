@@ -560,7 +560,12 @@ hunts net-new gaps, each grounded in the code.
   done/unlocked/locked state chips]. Remaining: ~6 — teacher
   paths/storefront, admin teachers[client]/curriculum/audit/billing. The
   client-component i18n pattern is proven [next-intl `useTranslations`,
-  `t.rich` for inline emphasis].)
+  `t.rich` for inline emphasis]. cont.54 +`AdminTeachers` [third client
+  component — accounts table + Razorpay payout-link form; locale-aware
+  date that keeps en-IN order for en] +`AdminCurriculum` +`AdminBilling`
+  [server pages; ICU-plural seats/students]. Remaining: ~3 — teacher
+  paths/storefront, admin audit [deferred on purpose: its 21 `KIND_LABELS`
+  audit event-type labels are a focused sub-task, not a quick swap].)
 - **R53 · Test coverage for the thin routers + cron handlers** —
   `insight` + `parent` routers have ~1 caller test each, and the
   `/api/cron/*` route handlers (streak-rollover, weekly-digest, ai-insights,
