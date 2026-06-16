@@ -640,7 +640,14 @@ Ordered by learner/public impact:
    blocks — READING/MCQ/POLL/FREE_RESPONSE/QUIZ — first; locale-aware times
    in LIVE). Each body component is its own fn → its own `useTranslations`.
    The block-type *labels* (`meta.label` from `@/lib/blocks` BLOCK_GROUPS)
-   are a separate sub-item, shared with the builder.**
+   are a separate sub-item, shared with the builder.** **Part 1 DONE
+   (cont.60):** fallback(ComingSoonBlock) + READING + MCQ[unique strings] +
+   SLIDES + PDF + POLL + FREE_RESPONSE → appended 30 keys to the EXISTING
+   `LessonReader` ns (owned by LessonClient). **Part 2 (remaining):** the
+   **quiz family** — QUIZ/AI_QUIZ + MCQ's feedback strings (Sign in / streak
+   / offline) which are shared *verbatim* across all three (do them together
+   so the keys wire once), + LIVE (locale-aware relative times) + BRANCHING +
+   SPEAK + DRAG_MATCH/SIMULATION/SECTION/DISCUSSION.
 3. **Learner/public pages**: `/settings`, the `/` home, `t/[teacherId]`
    public storefront, `student/community`, `parent`/`parental-consent`,
    `checkout/success` + `demo-checkout`.
