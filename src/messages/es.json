@@ -327,5 +327,50 @@
     "posting": "Publicando…",
     "reply": "Responder",
     "postError": "No se pudo publicar tu respuesta. Inténtalo de nuevo."
+  },
+  "AdminTeachers": {
+    "title": "Profesores",
+    "accountCount": "{count, plural, one {# cuenta} other {# cuentas}}",
+    "intro": "Ocultar a un profesor solo retira su tarjeta del listado del mercado: su URL de tienda y sus cursos publicados siguen funcionando. Los enlaces de pago vinculan a un profesor con una cuenta de Razorpay Route (que tú creas en el panel de Razorpay); las transferencias comienzan una vez que la cuenta está activada.",
+    "loading": "Cargando profesores…",
+    "empty": "Aún no hay cuentas de profesor.",
+    "colTeacher": "Profesor",
+    "colJoined": "Se unió",
+    "colCourses": "Cursos",
+    "colStudents": "Estudiantes",
+    "colPayout": "Pagos",
+    "colMarketplace": "Mercado",
+    "cancel": "cancelar",
+    "edit": "editar",
+    "linkAccount": "Vincular cuenta",
+    "hide": "Ocultar",
+    "unhide": "Mostrar",
+    "hidden": "OCULTO",
+    "razorpayLinkedAccount": "CUENTA VINCULADA DE RAZORPAY",
+    "linking": "Vinculando…",
+    "saveLink": "Guardar vínculo",
+    "accIdHint": "Se esperaba un id como acc_LkbeXg1iCaWlYQ"
+  },
+  "AdminCurriculum": {
+    "title": "Plan de estudios",
+    "allGrades": "Todos los grados ▾",
+    "allSubjects": "Todas las materias ▾",
+    "browseMarketplace": "Explorar el mercado",
+    "adopted": "Adoptado en toda la institución",
+    "courseCount": "{count, plural, one {# curso} other {# cursos}}",
+    "empty": "Aún no se ha adoptado ningún plan de estudios. Explora el mercado para añadir uno.",
+    "gradeLabel": "Grado {grade}",
+    "studentsCount": "{count, plural, one {# estudiante} other {# estudiantes}}",
+    "manage": "Gestionar"
+  },
+  "AdminBilling": {
+    "title": "Facturación",
+    "plan": "Plan",
+    "current": "ACTUAL",
+    "seatsLine": "{seats, plural, one {# asiento} other {# asientos}} · {active, plural, one {# estudiante activo} other {# estudiantes activos}}",
+    "nextInvoice": "PRÓXIMA FACTURA",
+    "stripePhase": "La facturación con Stripe llega en la Fase 3",
+    "invoices": "Facturas",
+    "noInvoices": "Aún no hay facturas: tu institución está en la prueba gratuita."
   }
 }

@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { AdminChrome } from "@/components/layouts/AdminChrome";
 import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { db } from "@/lib/db";
@@ -22,6 +23,8 @@ export default async function AdminBillingPage() {
       })
     : 0;
 
+  const t = await getTranslations("AdminBilling");
+
   return (
     <AdminChrome active="billing">
       <header
@@ -35,7 +38,7 @@ export default async function AdminBillingPage() {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>Billing</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
         <div style={{ flex: 1 }} />
       </header>
 
@@ -47,7 +50,7 @@ export default async function AdminBillingPage() {
           maxWidth: 1200,
         }}
       >
-        <Eyebrow>Plan</Eyebrow>
+        <Eyebrow>{t("plan")}</Eyebrow>
         <Card p={20} style={{ marginTop: 8, marginBottom: 18 }}>
           <div
             style={{
@@ -65,7 +68,7 @@ export default async function AdminBillingPage() {
                   letterSpacing: "0.06em",
                 }}
               >
-                CURRENT
+                {t("current")}
               </div>
               <div
                 className="wf-serif"
@@ -80,7 +83,7 @@ export default async function AdminBillingPage() {
                   marginTop: 4,
                 }}
               >
-                {inst?.seats ?? 0} seats · {activeUsers} active students
+                {t("seatsLine", { seats: inst?.seats ?? 0, active: activeUsers })}
               </div>
             </div>
             <div
@@ -96,7 +99,7 @@ export default async function AdminBillingPage() {
                   letterSpacing: "0.06em",
                 }}
               >
-                NEXT INVOICE
+                {t("nextInvoice")}
               </div>
               <div
                 className="wf-serif"
@@ -110,14 +113,14 @@ export default async function AdminBillingPage() {
                 —
               </div>
               <div style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                Stripe billing lands in Phase 3
+                {t("stripePhase")}
               </div>
             </div>
           </div>
         </Card>
 
         <Eyebrow style={{ marginTop: 4, marginBottom: 8 }}>
-          Invoices
+          {t("invoices")}
         </Eyebrow>
         <Card p={20} style={{ marginBottom: 18 }}>
           <div
@@ -134,7 +137,7 @@ export default async function AdminBillingPage() {
               color="var(--wf-mute)"
               style={{ marginBottom: 6 }}
             />
-            <div>No invoices yet — your school is on the free trial.</div>
+            <div>{t("noInvoices")}</div>
           </div>
         </Card>
       </div>

@@ -327,5 +327,50 @@
     "posting": "Posting…",
     "reply": "Reply",
     "postError": "Couldn't post your reply. Try again."
+  },
+  "AdminTeachers": {
+    "title": "Teachers",
+    "accountCount": "{count, plural, one {# account} other {# accounts}}",
+    "intro": "Hiding a teacher removes their card from the marketplace rail only — their storefront URL and published courses keep working. Payout links bind a teacher to a Razorpay Route linked account (created by you in the Razorpay Dashboard); transfers start once the account is activated.",
+    "loading": "Loading teachers…",
+    "empty": "No teacher accounts yet.",
+    "colTeacher": "Teacher",
+    "colJoined": "Joined",
+    "colCourses": "Courses",
+    "colStudents": "Students",
+    "colPayout": "Payout",
+    "colMarketplace": "Marketplace",
+    "cancel": "cancel",
+    "edit": "edit",
+    "linkAccount": "Link account",
+    "hide": "Hide",
+    "unhide": "Unhide",
+    "hidden": "HIDDEN",
+    "razorpayLinkedAccount": "RAZORPAY LINKED ACCOUNT",
+    "linking": "Linking…",
+    "saveLink": "Save link",
+    "accIdHint": "Expected an id like acc_LkbeXg1iCaWlYQ"
+  },
+  "AdminCurriculum": {
+    "title": "Curriculum",
+    "allGrades": "All grades ▾",
+    "allSubjects": "All subjects ▾",
+    "browseMarketplace": "Browse marketplace",
+    "adopted": "Adopted across the institution",
+    "courseCount": "{count, plural, one {# course} other {# courses}}",
+    "empty": "No curricula adopted yet. Browse the marketplace to add one.",
+    "gradeLabel": "Grade {grade}",
+    "studentsCount": "{count, plural, one {# student} other {# students}}",
+    "manage": "Manage"
+  },
+  "AdminBilling": {
+    "title": "Billing",
+    "plan": "Plan",
+    "current": "CURRENT",
+    "seatsLine": "{seats, plural, one {# seat} other {# seats}} · {active, plural, one {# active student} other {# active students}}",
+    "nextInvoice": "NEXT INVOICE",
+    "stripePhase": "Stripe billing lands in Phase 3",
+    "invoices": "Invoices",
+    "noInvoices": "No invoices yet — your school is on the free trial."
   }
 }

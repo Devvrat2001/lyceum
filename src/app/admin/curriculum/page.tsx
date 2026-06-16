@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { AdminChrome } from "@/components/layouts/AdminChrome";
 import {
   Btn,
@@ -41,6 +42,8 @@ export default async function AdminCurriculumPage() {
     },
   });
 
+  const t = await getTranslations("AdminCurriculum");
+
   return (
     <AdminChrome active="curriculum">
       <header
@@ -54,13 +57,13 @@ export default async function AdminCurriculumPage() {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>Curriculum</span>
-        <span className="wf-chip">All grades ▾</span>
-        <span className="wf-chip">All subjects ▾</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
+        <span className="wf-chip">{t("allGrades")}</span>
+        <span className="wf-chip">{t("allSubjects")}</span>
         <div style={{ flex: 1 }} />
         <Link href="/" style={{ textDecoration: "none" }}>
           <Btn variant="primary" sm icon={<Icon name="plus" size={12} color="white" />}>
-            Browse marketplace
+            {t("browseMarketplace")}
           </Btn>
         </Link>
       </header>
@@ -75,7 +78,7 @@ export default async function AdminCurriculumPage() {
               alignItems: "center",
             }}
           >
-            <Eyebrow>Adopted across the institution</Eyebrow>
+            <Eyebrow>{t("adopted")}</Eyebrow>
             <span
               style={{
                 marginLeft: "auto",
@@ -83,7 +86,7 @@ export default async function AdminCurriculumPage() {
                 color: "var(--wf-mute)",
               }}
             >
-              {courses.length} {courses.length === 1 ? "course" : "courses"}
+              {t("courseCount", { count: courses.length })}
             </span>
           </div>
           {courses.length === 0 ? (
@@ -95,7 +98,7 @@ export default async function AdminCurriculumPage() {
                 color: "var(--wf-mute)",
               }}
             >
-              No curricula adopted yet. Browse the marketplace to add one.
+              {t("empty")}
             </div>
           ) : (
             courses.map((c, i) => {
@@ -135,7 +138,8 @@ export default async function AdminCurriculumPage() {
                         marginTop: 2,
                       }}
                     >
-                      {c.authorLabel} · Grade {c.grade} · {c.subject}
+                      {c.authorLabel} · {t("gradeLabel", { grade: c.grade })} ·{" "}
+                      {c.subject}
                       {c.ratingCount > 0 && ` · ★ ${c.ratingAvg.toFixed(1)}`}
                     </div>
                   </div>
@@ -149,11 +153,11 @@ export default async function AdminCurriculumPage() {
                         marginTop: 2,
                       }}
                     >
-                      {pct}% · {g?._count._all ?? 0} students
+                      {pct}% · {t("studentsCount", { count: g?._count._all ?? 0 })}
                     </div>
                   </div>
                   <Btn variant="ghost" sm>
-                    Manage
+                    {t("manage")}
                   </Btn>
                 </div>
               );

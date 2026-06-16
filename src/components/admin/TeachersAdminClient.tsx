@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { useState } from "react";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { Btn, Card } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
@@ -15,6 +16,11 @@ import { trpc } from "@/lib/trpc/react";
  * disambiguate at a glance.
  */
 export function TeachersAdminClient() {
+  const t = useTranslations("AdminTeachers");
+  const locale = useLocale();
+  // Keep the Indian date order for the default (en) audience; let other
+  // locales format in their own convention.
+  const dateLocale = locale === "en" ? "en-IN" : locale;
   const utils = trpc.useUtils();
   const teachers = trpc.admin.teachers.useQuery();
 
@@ -57,10 +63,10 @@ export function TeachersAdminClient() {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>Teachers</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
         {teachers.data && (
           <span className="wf-mono" style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-            {teachers.data.length} account{teachers.data.length === 1 ? "" : "s"}
+            {t("accountCount", { count: teachers.data.length })}
           </span>
         )}
       </header>
@@ -75,11 +81,7 @@ export function TeachersAdminClient() {
             maxWidth: 720,
           }}
         >
-          Hiding a teacher removes their card from the marketplace rail only —
-          their storefront URL and published courses keep working. Payout links
-          bind a teacher to a Razorpay Route linked account (created by you in
-          the Razorpay Dashboard); transfers start once the account is
-          activated.
+          {t("intro")}
         </p>
 
         {err && (
@@ -93,12 +95,12 @@ export function TeachersAdminClient() {
 
         {teachers.isLoading ? (
           <div style={{ fontSize: 13, color: "var(--wf-mute)" }}>
-            Loading teachers…
+            {t("loading")}
           </div>
         ) : !teachers.data || teachers.data.length === 0 ? (
           <Card p={24} style={{ textAlign: "center" }}>
             <span style={{ fontSize: 13, color: "var(--wf-mute)" }}>
-              No teacher accounts yet.
+              {t("empty")}
             </span>
           </Card>
         ) : (
@@ -106,45 +108,45 @@ export function TeachersAdminClient() {
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
               <thead>
                 <tr>
-                  <Th>Teacher</Th>
-                  <Th>Joined</Th>
-                  <Th align="right">Courses</Th>
-                  <Th align="right">Students</Th>
-                  <Th>Payout</Th>
-                  <Th>Marketplace</Th>
+                  <Th>{t("colTeacher")}</Th>
+                  <Th>{t("colJoined")}</Th>
+                  <Th align="right">{t("colCourses")}</Th>
+                  <Th align="right">{t("colStudents")}</Th>
+                  <Th>{t("colPayout")}</Th>
+                  <Th>{t("colMarketplace")}</Th>
                 </tr>
               </thead>
               <tbody>
-                {teachers.data.map((t) => (
-                  <Row key={t.id}>
+                {teachers.data.map((teacher) => (
+                  <Row key={teacher.id}>
                     <tr>
                       <Td>
                         <div
                           style={{
                             fontWeight: 600,
                             fontSize: 13,
-                            color: t.hiddenFromMarketplace
+                            color: teacher.hiddenFromMarketplace
                               ? "var(--wf-mute)"
                               : "var(--wf-ink)",
                           }}
                         >
                           <Link
-                            href={`/t/${t.id}`}
+                            href={`/t/${teacher.id}`}
                             style={{ color: "inherit", textDecoration: "none" }}
                           >
-                            {t.name}
+                            {teacher.name}
                           </Link>
                         </div>
                         <div
                           className="wf-mono"
                           style={{ fontSize: 11, color: "var(--wf-mute)" }}
                         >
-                          {t.email}
+                          {teacher.email}
                         </div>
                       </Td>
                       <Td>
                         <span className="wf-mono" style={{ fontSize: 11, color: "var(--wf-body)" }}>
-                          {t.createdAt.toLocaleDateString("en-IN", {
+                          {teacher.createdAt.toLocaleDateString(dateLocale, {
                             day: "numeric",
                             month: "short",
                             year: "numeric",
@@ -153,44 +155,44 @@ export function TeachersAdminClient() {
                       </Td>
                       <Td align="right">
                         <span className="wf-mono" style={{ fontSize: 12 }}>
-                          {t.publishedCourses}
+                          {teacher.publishedCourses}
                           <span style={{ color: "var(--wf-mute)" }}>
-                            /{t.totalCourses}
+                            /{teacher.totalCourses}
                           </span>
                         </span>
                       </Td>
                       <Td align="right">
                         <span className="wf-mono" style={{ fontSize: 12 }}>
-                          {t.studentsCount.toLocaleString()}
+                          {teacher.studentsCount.toLocaleString()}
                         </span>
                       </Td>
                       <Td>
-                        {t.payout ? (
+                        {teacher.payout ? (
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <StatusChip status={t.payout.status} />
+                            <StatusChip status={teacher.payout.status} />
                             <button
                               type="button"
                               onClick={() => {
-                                setLinkFor(linkFor === t.id ? null : t.id);
-                                setAccId(t.payout?.externalId ?? "");
+                                setLinkFor(linkFor === teacher.id ? null : teacher.id);
+                                setAccId(teacher.payout?.externalId ?? "");
                                 setErr(null);
                               }}
                               style={linkBtn}
                             >
-                              {linkFor === t.id ? "cancel" : "edit"}
+                              {linkFor === teacher.id ? t("cancel") : t("edit")}
                             </button>
                           </div>
                         ) : (
                           <button
                             type="button"
                             onClick={() => {
-                              setLinkFor(linkFor === t.id ? null : t.id);
+                              setLinkFor(linkFor === teacher.id ? null : teacher.id);
                               setAccId("");
                               setErr(null);
                             }}
                             style={linkBtn}
                           >
-                            {linkFor === t.id ? "cancel" : "Link account"}
+                            {linkFor === teacher.id ? t("cancel") : t("linkAccount")}
                           </button>
                         )}
                       </Td>
@@ -201,14 +203,14 @@ export function TeachersAdminClient() {
                           disabled={setVisibility.isPending}
                           onClick={() =>
                             setVisibility.mutate({
-                              teacherId: t.id,
-                              hidden: !t.hiddenFromMarketplace,
+                              teacherId: teacher.id,
+                              hidden: !teacher.hiddenFromMarketplace,
                             })
                           }
                         >
-                          {t.hiddenFromMarketplace ? "Unhide" : "Hide"}
+                          {teacher.hiddenFromMarketplace ? t("unhide") : t("hide")}
                         </Btn>
-                        {t.hiddenFromMarketplace && (
+                        {teacher.hiddenFromMarketplace && (
                           <span
                             className="wf-mono"
                             style={{
@@ -218,12 +220,12 @@ export function TeachersAdminClient() {
                               letterSpacing: "0.06em",
                             }}
                           >
-                            HIDDEN
+                            {t("hidden")}
                           </span>
                         )}
                       </Td>
                     </tr>
-                    {linkFor === t.id && (
+                    {linkFor === teacher.id && (
                       <tr>
                         <td colSpan={6} style={{ padding: "0 14px 12px" }}>
                           <div
@@ -242,7 +244,7 @@ export function TeachersAdminClient() {
                               className="wf-mono"
                               style={{ fontSize: 10, color: "var(--wf-mute)", letterSpacing: "0.06em" }}
                             >
-                              RAZORPAY LINKED ACCOUNT
+                              {t("razorpayLinkedAccount")}
                             </span>
                             <input
                               value={accId}
@@ -264,16 +266,16 @@ export function TeachersAdminClient() {
                               disabled={!accValid || linkAccount.isPending}
                               onClick={() =>
                                 linkAccount.mutate({
-                                  teacherId: t.id,
+                                  teacherId: teacher.id,
                                   accountId: accId.trim(),
                                 })
                               }
                             >
-                              {linkAccount.isPending ? "Linking…" : "Save link"}
+                              {linkAccount.isPending ? t("linking") : t("saveLink")}
                             </Btn>
                             {accId.trim() !== "" && !accValid && (
                               <span style={{ fontSize: 11, color: "var(--wf-accent)" }}>
-                                Expected an id like acc_LkbeXg1iCaWlYQ
+                                {t("accIdHint")}
                               </span>
                             )}
                           </div>

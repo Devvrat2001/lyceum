@@ -327,5 +327,50 @@
     "posting": "पोस्ट हो रहा है…",
     "reply": "उत्तर दें",
     "postError": "आपका उत्तर पोस्ट नहीं हो सका। पुनः प्रयास करें।"
+  },
+  "AdminTeachers": {
+    "title": "शिक्षक",
+    "accountCount": "{count, plural, one {# खाता} other {# खाते}}",
+    "intro": "किसी शिक्षक को छिपाने से केवल मार्केटप्लेस सूची से उनका कार्ड हटता है — उनका स्टोरफ़्रंट URL और प्रकाशित कोर्स काम करते रहते हैं। पेआउट लिंक एक शिक्षक को Razorpay Route लिंक्ड खाते से जोड़ते हैं (जिसे आप Razorpay डैशबोर्ड में बनाते हैं); खाता सक्रिय होने पर ट्रांसफ़र शुरू होते हैं।",
+    "loading": "शिक्षक लोड हो रहे हैं…",
+    "empty": "अभी तक कोई शिक्षक खाता नहीं।",
+    "colTeacher": "शिक्षक",
+    "colJoined": "शामिल हुए",
+    "colCourses": "कोर्स",
+    "colStudents": "छात्र",
+    "colPayout": "भुगतान",
+    "colMarketplace": "मार्केटप्लेस",
+    "cancel": "रद्द करें",
+    "edit": "संपादित करें",
+    "linkAccount": "खाता लिंक करें",
+    "hide": "छिपाएँ",
+    "unhide": "दिखाएँ",
+    "hidden": "छिपा हुआ",
+    "razorpayLinkedAccount": "RAZORPAY लिंक्ड खाता",
+    "linking": "लिंक हो रहा है…",
+    "saveLink": "लिंक सहेजें",
+    "accIdHint": "acc_LkbeXg1iCaWlYQ जैसा id अपेक्षित"
+  },
+  "AdminCurriculum": {
+    "title": "पाठ्यक्रम",
+    "allGrades": "सभी ग्रेड ▾",
+    "allSubjects": "सभी विषय ▾",
+    "browseMarketplace": "मार्केटप्लेस देखें",
+    "adopted": "संस्थान भर में अपनाया गया",
+    "courseCount": "{count, plural, one {# कोर्स} other {# कोर्स}}",
+    "empty": "अभी तक कोई पाठ्यक्रम नहीं अपनाया गया। जोड़ने के लिए मार्केटप्लेस देखें।",
+    "gradeLabel": "ग्रेड {grade}",
+    "studentsCount": "{count, plural, one {# छात्र} other {# छात्र}}",
+    "manage": "प्रबंधित करें"
+  },
+  "AdminBilling": {
+    "title": "बिलिंग",
+    "plan": "योजना",
+    "current": "वर्तमान",
+    "seatsLine": "{seats, plural, one {# सीट} other {# सीटें}} · {active, plural, one {# सक्रिय छात्र} other {# सक्रिय छात्र}}",
+    "nextInvoice": "अगला चालान",
+    "stripePhase": "Stripe बिलिंग फ़ेज़ 3 में आएगी",
+    "invoices": "चालान",
+    "noInvoices": "अभी तक कोई चालान नहीं — आपका स्कूल निःशुल्क परीक्षण पर है।"
   }
 }
