@@ -649,7 +649,12 @@ Ordered by learner/public impact:
    so the keys wire once), + LIVE (locale-aware relative times) + BRANCHING +
    DRAG_MATCH (shares streak/offline w/ the quiz family) + SECTION +
    DISCUSSION. **Part 2a DONE (cont.61):** SPEAK + SIMULATION (+20 keys;
-   both self-contained).
+   both self-contained). **Part 2b DONE (cont.62):** the whole **quiz
+   family** — MCQ (now finished) / QUIZ / AI_QUIZ / DRAG_MATCH (+18 keys;
+   resolved the shared streak/offline entanglement via `replace_all` once
+   all 6 sub-components had `t`). **Reader remaining: LIVE (locale-aware
+   times) + BRANCHING + DISCUSSION + SECTION + the block-type labels
+   (`@/lib/blocks`).**
 3. **Learner/public pages**: `/settings`, the `/` home, `t/[teacherId]`
    public storefront, `student/community`, `parent`/`parental-consent`,
    `checkout/success` + `demo-checkout`.
