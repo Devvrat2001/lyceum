@@ -17,7 +17,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Avatar, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import {
   findBlockMeta,
@@ -1342,6 +1342,7 @@ function BranchingBody({
   blockId: string;
   settings: SettingsFor<"BRANCHING">;
 }) {
+  const t = useTranslations("LessonReader");
   // settings.nodes is BranchingNode[] | undefined; runtime filter is
   // defensive against malformed JSON edited outside the inspector.
   const rawNodes: BranchingNode[] = (settings.nodes ?? []).filter(
@@ -1420,7 +1421,7 @@ function BranchingBody({
 
   if (rawNodes.length === 0 || !startId) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't built the branching scenario yet." />
+      <EmptyBlockHint message={t("brEmpty")} />
     );
   }
 
@@ -1451,7 +1452,7 @@ function BranchingBody({
             marginBottom: 10,
           }}
         >
-          This branch ends here — destination node is missing.
+          {t("brDangling")}
         </div>
         <button
           type="button"
@@ -1466,7 +1467,7 @@ function BranchingBody({
             color: "var(--wf-body)",
           }}
         >
-          Restart
+          {t("brRestart")}
         </button>
       </div>
     );
@@ -1492,7 +1493,7 @@ function BranchingBody({
       >
         {path.map((id, i) => {
           const n = byId.get(id);
-          const title = n?.title || "(missing)";
+          const title = n?.title || t("brMissing");
           return (
             <span key={`${id}-${i}`}>
               {i > 0 && <span style={{ margin: "0 4px" }}>›</span>}
@@ -1548,7 +1549,7 @@ function BranchingBody({
                 fontWeight: 700,
               }}
             >
-              ● END
+              {t("brEnd")}
             </span>
             {terminalFeedback?.nodeId === node.id &&
               terminalFeedback.points > 0 && (
@@ -1593,7 +1594,7 @@ function BranchingBody({
                     fontWeight: 600,
                   }}
                 >
-                  🔥 {terminalFeedback.streak.milestone}-day streak!
+                  {t("mcqStreak", { days: terminalFeedback.streak.milestone })}
                 </span>
               )}
           </div>
@@ -1611,7 +1612,7 @@ function BranchingBody({
                 color: "var(--wf-body)",
               }}
             >
-              ↺ Restart
+              ↺ {t("brRestart")}
             </button>
           )}
         </div>
@@ -1637,7 +1638,7 @@ function BranchingBody({
                   fontFamily: "inherit",
                 }}
               >
-                {c.label || `(unlabeled choice ${i + 1})`}
+                {c.label || t("brUnlabeledChoice", { num: i + 1 })}
                 {!targetExists && (
                   <span
                     style={{
@@ -1646,7 +1647,7 @@ function BranchingBody({
                       color: "var(--wf-mute)",
                     }}
                   >
-                    (missing target)
+                    {t("brMissingTarget")}
                   </span>
                 )}
               </button>
@@ -1668,7 +1669,7 @@ function BranchingBody({
                 alignSelf: "flex-start",
               }}
             >
-              ↺ Restart
+              ↺ {t("brRestart")}
             </button>
           )}
         </div>
@@ -3320,6 +3321,7 @@ function DiscussionBody({
   blockId: string;
   settings: Record<string, unknown>;
 }) {
+  const t = useTranslations("LessonReader");
   const prompt =
     typeof settings.prompt === "string" ? settings.prompt.trim() : "";
 
@@ -3334,8 +3336,8 @@ function DiscussionBody({
     onError: (err) => {
       setSubmitError(
         err.data?.code === "UNAUTHORIZED"
-          ? "Sign in to post."
-          : err.message ?? "Couldn't post your comment. Try again."
+          ? t("discSignIn")
+          : err.message ?? t("discPostError")
       );
     },
   });
@@ -3344,7 +3346,7 @@ function DiscussionBody({
       utils.lesson.discussionThread.setData({ blockId }, res);
     },
     onError: (err) => {
-      setSubmitError(err.message ?? "Couldn't delete that comment.");
+      setSubmitError(err.message ?? t("discDeleteError"));
     },
   });
 
@@ -3384,7 +3386,7 @@ function DiscussionBody({
             padding: "4px 0 14px",
           }}
         >
-          Loading thread…
+          {t("discLoading")}
         </div>
       ) : comments.length === 0 ? (
         <div
@@ -3395,7 +3397,7 @@ function DiscussionBody({
             padding: "4px 0 14px",
           }}
         >
-          No comments yet — be the first.
+          {t("discEmpty")}
         </div>
       ) : (
         <div
@@ -3430,7 +3432,7 @@ function DiscussionBody({
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Share a thought…"
+          placeholder={t("discPlaceholder")}
           rows={2}
           maxLength={2_000}
           disabled={post.isPending}
@@ -3465,7 +3467,7 @@ function DiscussionBody({
             alignSelf: "stretch",
           }}
         >
-          {post.isPending ? "Posting…" : "Post"}
+          {post.isPending ? t("discPosting") : t("discPost")}
         </button>
       </div>
       {submitError && (
@@ -3498,6 +3500,8 @@ function CommentRow({
   onDelete?: () => void;
   deleting?: boolean;
 }) {
+  const t = useTranslations("LessonReader");
+  const locale = useLocale();
   const created =
     typeof comment.createdAt === "string"
       ? new Date(comment.createdAt)
@@ -3537,19 +3541,19 @@ function CommentRow({
                   letterSpacing: "0.06em",
                 }}
               >
-                YOU
+                {t("discYou")}
               </span>
             )}
           </span>
           <span style={{ fontSize: 10, color: "var(--wf-mute)" }}>
-            {relativeTime(created)}
+            {relativeTime(created, t, locale)}
           </span>
           {onDelete && (
             <button
               type="button"
               onClick={onDelete}
               disabled={deleting}
-              title="Delete your comment"
+              title={t("discDeleteTitle")}
               style={{
                 marginLeft: "auto",
                 border: "none",
@@ -3560,7 +3564,7 @@ function CommentRow({
                 cursor: deleting ? "default" : "pointer",
               }}
             >
-              {deleting ? "Deleting…" : "Delete"}
+              {deleting ? t("discDeleting") : t("discDelete")}
             </button>
           )}
         </div>
@@ -3588,18 +3592,20 @@ function initialsOf(name: string): string {
 }
 
 /** Coarse relative time — minute / hour / day / explicit date. */
-function relativeTime(d: Date): string {
+type TFn = (key: string, values?: Record<string, string | number>) => string;
+
+function relativeTime(d: Date, t: TFn, locale: string): string {
   const now = Date.now();
   const diffMs = now - d.getTime();
   const sec = Math.floor(diffMs / 1_000);
-  if (sec < 45) return "just now";
+  if (sec < 45) return t("discJustNow");
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t("discMinAgo", { m: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("discHrAgo", { h: hr });
   const day = Math.floor(hr / 24);
-  if (day < 7) return `${day}d ago`;
-  return d.toLocaleDateString(undefined, {
+  if (day < 7) return t("discDayAgo", { d: day });
+  return d.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
   });
@@ -3608,6 +3614,7 @@ function relativeTime(d: Date): string {
 /* ── SECTION ──────────────────────────────────────────────── */
 
 function SectionBody({ settings }: { settings: Record<string, unknown> }) {
+  const t = useTranslations("LessonReader");
   const title =
     typeof settings.title === "string" ? settings.title.trim() : "";
   const subtitle =
@@ -3615,7 +3622,7 @@ function SectionBody({ settings }: { settings: Record<string, unknown> }) {
 
   if (!title) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't named this section yet." />
+      <EmptyBlockHint message={t("sectionEmpty")} />
     );
   }
 
