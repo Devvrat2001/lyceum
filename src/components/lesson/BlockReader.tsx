@@ -1909,6 +1909,7 @@ function FreeResponseBody({
 }
 
 function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
+  const t = useTranslations("LessonReader");
   const prompt =
     typeof settings.prompt === "string" ? settings.prompt.trim() : "";
   const expected =
@@ -1964,7 +1965,7 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
 
   if (!prompt) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't added a speaking prompt yet." />
+      <EmptyBlockHint message={t("speakEmpty")} />
     );
   }
 
@@ -2004,10 +2005,10 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
       // anything — friendlier wording than the raw event name.
       const friendly =
         event.error === "no-speech"
-          ? "Didn't catch anything — try again."
+          ? t("speakNoSpeech")
           : event.error === "not-allowed"
-            ? "Microphone permission denied. Allow access and retry."
-            : `Recognition error: ${event.error}`;
+            ? t("speakNotAllowed")
+            : t("speakRecError", { error: event.error });
       setErrorMsg(friendly);
       setListening(false);
     };
@@ -2017,7 +2018,7 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
       r.start();
       setListening(true);
     } catch {
-      setErrorMsg("Couldn't start recording. Refresh and try again.");
+      setErrorMsg(t("speakStartFail"));
     }
   };
 
@@ -2075,11 +2076,11 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
               fontWeight: 600,
             }}
           >
-            {speaking ? "🔊 Speaking…" : "🔊 Read aloud"}
+            {speaking ? t("speakSpeaking") : t("speakReadAloud")}
           </button>
         ) : (
           <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-            Text-to-speech isn&apos;t available in this browser.
+            {t("speakNoTts")}
           </span>
         )}
       </div>
@@ -2101,11 +2102,11 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
               fontWeight: 600,
             }}
           >
-            {listening ? "● Stop" : "🎤 Speak your answer"}
+            {listening ? t("speakStop") : t("speakSpeak")}
           </button>
           {listening && (
             <span style={{ fontSize: 11, color: "var(--wf-accent)" }}>
-              Listening — speak now.
+              {t("speakListening")}
             </span>
           )}
         </div>
@@ -2122,13 +2123,13 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
               letterSpacing: "0.06em",
             }}
           >
-            TYPE YOUR ANSWER (VOICE NOT AVAILABLE)
+            {t("speakTypeLabel")}
           </div>
           <input
             type="text"
             value={typedFallback}
             onChange={(e) => setTypedFallback(e.target.value)}
-            placeholder="Type what you would say…"
+            placeholder={t("speakTypePlaceholder")}
             maxLength={500}
             style={{
               width: "100%",
@@ -2165,7 +2166,7 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
               marginBottom: 4,
             }}
           >
-            HEARD
+            {t("speakHeard")}
           </div>
           {transcript || typedFallback}
         </div>
@@ -2186,10 +2187,10 @@ function SpeakBody({ settings }: { settings: Record<string, unknown> }) {
           }}
         >
           {checkResult === "match"
-            ? "✓ Match!"
+            ? t("speakMatch")
             : checkResult === "close"
-              ? "Close — try again for an exact match."
-              : `Different — expected: "${expected}"`}
+              ? t("speakClose")
+              : t("speakDifferent", { expected })}
         </div>
       )}
 
@@ -2236,6 +2237,7 @@ function matchScore(
 /* ── SIMULATION ───────────────────────────────────────────── */
 
 function SimulationBody({ settings }: { settings: Record<string, unknown> }) {
+  const t = useTranslations("LessonReader");
   const rawUrl =
     typeof settings.url === "string" ? settings.url.trim() : "";
   const caption =
@@ -2243,7 +2245,7 @@ function SimulationBody({ settings }: { settings: Record<string, unknown> }) {
 
   if (!rawUrl) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't added a simulation URL yet." />
+      <EmptyBlockHint message={t("simEmpty")} />
     );
   }
 
@@ -2315,7 +2317,7 @@ function SimulationBody({ settings }: { settings: Record<string, unknown> }) {
             marginBottom: 10,
           }}
         >
-          Open simulation ↗
+          {t("simOpen")}
         </a>
       )}
       <div
@@ -2340,7 +2342,7 @@ function SimulationBody({ settings }: { settings: Record<string, unknown> }) {
             letterSpacing: "0.06em",
           }}
         >
-          OPEN IN NEW TAB ↗
+          {t("simOpenTab")}
         </a>
         {caption && (
           <span style={{ color: "var(--wf-body)" }}>· {caption}</span>
