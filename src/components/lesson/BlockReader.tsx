@@ -451,8 +451,8 @@ function McqBody({
       // failing silently when the user isn't signed in.
       setSubmitError(
         err.data?.code === "UNAUTHORIZED"
-          ? "Sign in to save your answer."
-          : err.message ?? "Couldn't submit your answer. Try again."
+          ? t("mcqSignIn")
+          : err.message ?? t("mcqError")
       );
     },
   });
@@ -610,7 +610,7 @@ function McqBody({
               color: "var(--wf-body)",
             }}
           >
-            Try again
+            {t("mcqTryAgain")}
           </button>
         )}
         {feedback && (
@@ -664,7 +664,7 @@ function McqBody({
               fontWeight: 600,
             }}
           >
-            🔥 {feedback.streak.milestone}-day streak!
+            {t("mcqStreak", { days: feedback.streak.milestone })}
           </span>
         )}
         {feedback?.badgeAwarded && (
@@ -680,7 +680,7 @@ function McqBody({
         )}
         {offlineSaved && (
           <span style={{ fontSize: 12, color: "var(--wf-mute)", fontWeight: 600 }}>
-            ✓ Saved offline — syncs when you reconnect
+            {t("mcqOffline")}
           </span>
         )}
       </div>
@@ -2361,6 +2361,7 @@ function QuizBody({
   blockId: string;
   settings: SettingsFor<"QUIZ">;
 }) {
+  const t = useTranslations("LessonReader");
   const questions: QuizQuestion[] = settings.questions ?? [];
 
   // Validate each question has the expected shape — defensive in case
@@ -2378,7 +2379,7 @@ function QuizBody({
 
   if (valid.length === 0) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't added any questions to this quiz yet." />
+      <EmptyBlockHint message={t("quizEmpty")} />
     );
   }
 
@@ -2393,7 +2394,7 @@ function QuizBody({
           marginBottom: 12,
         }}
       >
-        {valid.length} QUESTION{valid.length === 1 ? "" : "S"} · SELF-CHECK
+        {t("quizHeader", { count: valid.length })}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {valid.map((q, i) => (
@@ -2419,6 +2420,7 @@ function DragMatchBody({
   blockId: string;
   settings: SettingsFor<"DRAG_MATCH">;
 }) {
+  const t = useTranslations("LessonReader");
   // DRAG_MATCH stores a `prompt` for the activity caption even though
   // it's not on `DragMatchSettings` — read defensively for legacy
   // JSON. (Move into DragMatchSettings if the inspector ever adopts a
@@ -2469,8 +2471,8 @@ function DragMatchBody({
     onError: (err) => {
       setSubmitError(
         err.data?.code === "UNAUTHORIZED"
-          ? "Sign in to save your matches."
-          : err.message ?? "Couldn't submit your matches. Try again."
+          ? t("dmSignIn")
+          : err.message ?? t("dmError")
       );
     },
   });
@@ -2486,7 +2488,7 @@ function DragMatchBody({
 
   if (rawPairs.length < 2) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't finished setting up the matching pairs yet." />
+      <EmptyBlockHint message={t("dmEmpty")} />
     );
   }
 
@@ -2670,7 +2672,7 @@ function DragMatchBody({
             fontWeight: 600,
           }}
         >
-          {pending ? "Checking…" : "Check matches"}
+          {pending ? t("mcqChecking") : t("dmCheck")}
         </button>
         {checked && (
           <button
@@ -2686,7 +2688,7 @@ function DragMatchBody({
               color: "var(--wf-body)",
             }}
           >
-            Reset
+            {t("dmReset")}
           </button>
         )}
         {feedback && (
@@ -2700,15 +2702,15 @@ function DragMatchBody({
             }}
           >
             {feedback.correct
-              ? "✓ All matched!"
-              : `${feedback.correctCount} / ${feedback.totalPairs} correct`}
+              ? t("dmAllMatched")
+              : t("dmScore", { correct: feedback.correctCount, total: feedback.totalPairs })}
           </span>
         )}
         {offlineSaved && (
           <span
             style={{ fontSize: 12, fontWeight: 600, color: "var(--wf-mute)" }}
           >
-            ✓ Saved offline — syncs when you reconnect
+            {t("mcqOffline")}
           </span>
         )}
         {feedback && feedback.points > 0 && (
@@ -2751,7 +2753,7 @@ function DragMatchBody({
               fontWeight: 600,
             }}
           >
-            🔥 {feedback.streak.milestone}-day streak!
+            {t("mcqStreak", { days: feedback.streak.milestone })}
           </span>
         )}
       </div>
@@ -2777,6 +2779,7 @@ function DragMatchPool({
   poolIndices: number[];
   pairs: DragMatchPair[];
 }) {
+  const t = useTranslations("LessonReader");
   const { setNodeRef, isOver } = useDroppable({ id: "pool" });
   return (
     <div
@@ -2805,7 +2808,7 @@ function DragMatchPool({
             letterSpacing: "0.06em",
           }}
         >
-          ALL PLACED — DRAG A SLOT ITEM HERE TO RETURN IT
+          {t("dmAllPlaced")}
         </span>
       ) : (
         poolIndices.map((rightIdx) => (
@@ -2835,6 +2838,7 @@ function DragMatchSlot({
   isWrong: boolean;
   disabled: boolean;
 }) {
+  const t = useTranslations("LessonReader");
   const { setNodeRef, isOver } = useDroppable({
     id: `slot-${slotIdx}`,
     disabled,
@@ -2880,7 +2884,7 @@ function DragMatchSlot({
             padding: "0 6px",
           }}
         >
-          DROP HERE
+          {t("dmDropHere")}
         </span>
       )}
     </div>
@@ -2950,6 +2954,7 @@ function AiQuizBody({
   blockId: string;
   settings: SettingsFor<"AI_QUIZ">;
 }) {
+  const t = useTranslations("LessonReader");
   const generated = settings.generated;
 
   if (
@@ -2958,7 +2963,7 @@ function AiQuizBody({
     generated.questions.length === 0
   ) {
     return (
-      <EmptyBlockHint message="Your teacher hasn't generated questions for this quiz yet." />
+      <EmptyBlockHint message={t("aiQuizEmpty")} />
     );
   }
 
@@ -2973,8 +2978,7 @@ function AiQuizBody({
           marginBottom: 12,
         }}
       >
-        AI-GENERATED · {generated.questions.length} QUESTION
-        {generated.questions.length === 1 ? "" : "S"} · SELF-CHECK
+        {t("aiQuizHeader", { count: generated.questions.length })}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {generated.questions.map((q, i) => (
@@ -3011,6 +3015,7 @@ function QuizQuestionCard({
   index: number;
   question: QuizQuestion;
 }) {
+  const t = useTranslations("LessonReader");
   const [selected, setSelected] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [feedback, setFeedback] = useState<QuizCardFeedback | null>(null);
@@ -3025,8 +3030,8 @@ function QuizQuestionCard({
     onError: (err) => {
       setSubmitError(
         err.data?.code === "UNAUTHORIZED"
-          ? "Sign in to save your answer."
-          : err.message ?? "Couldn't submit your answer. Try again."
+          ? t("mcqSignIn")
+          : err.message ?? t("mcqError")
       );
     },
   });
@@ -3089,7 +3094,7 @@ function QuizQuestionCard({
           className="wf-mono"
           style={{ color: "var(--wf-mute)", marginRight: 6 }}
         >
-          Q{index + 1}.
+          {t("quizQNum", { num: index + 1 })}
         </span>
         {question.stem}
       </div>
@@ -3176,7 +3181,7 @@ function QuizQuestionCard({
             fontWeight: 600,
           }}
         >
-          {pending ? "Checking…" : "Check"}
+          {pending ? t("mcqChecking") : t("quizCheck")}
         </button>
         {checked && (
           <button
@@ -3192,7 +3197,7 @@ function QuizQuestionCard({
               color: "var(--wf-body)",
             }}
           >
-            Try again
+            {t("mcqTryAgain")}
           </button>
         )}
         {question.hint && !checked && (
@@ -3210,7 +3215,7 @@ function QuizQuestionCard({
               fontWeight: 600,
             }}
           >
-            {showHint ? "Hide hint" : "💡 Hint"}
+            {showHint ? t("quizHideHint") : t("quizHint")}
           </button>
         )}
         {feedback && (
@@ -3222,8 +3227,8 @@ function QuizQuestionCard({
             }}
           >
             {feedback.correct
-              ? "✓ Correct"
-              : `Correct answer: ${correctKey || "—"}`}
+              ? t("mcqCorrect")
+              : t("quizCorrectAnswer", { key: correctKey || "—" })}
           </span>
         )}
         {feedback?.correct && feedback.points > 0 && (
@@ -3266,12 +3271,12 @@ function QuizQuestionCard({
               fontWeight: 600,
             }}
           >
-            🔥 {feedback.streak.milestone}-day streak!
+            {t("mcqStreak", { days: feedback.streak.milestone })}
           </span>
         )}
         {offlineSaved && (
           <span style={{ fontSize: 11, color: "var(--wf-mute)", fontWeight: 600 }}>
-            ✓ Saved offline — syncs when you reconnect
+            {t("mcqOffline")}
           </span>
         )}
       </div>
