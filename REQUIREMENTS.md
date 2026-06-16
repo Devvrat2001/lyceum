@@ -15,12 +15,30 @@
 
 ## P0 — money / security / correctness
 
-### R1 · Prod TLS verification disabled — **USER-OWNED** · Status: OPEN
-`NODE_TLS_REJECT_UNAUTHORIZED=0` on Vercel Production. Full steps +
-verification checklist: `KNOWN_ISSUES.md` §S1-1. Per policy Claude never
-edits Vercel env vars — the user runs this. After the user confirms removal
-+ redeploy: smoke a DB page, the tutor stream, and a demo checkout on prod,
-then mark DONE here and in KNOWN_ISSUES.
+### R1 · Prod TLS verification disabled — **USER-OWNED** · Status: DONE (verified 2026-06-16, cont.55)
+`NODE_TLS_REJECT_UNAUTHORIZED=0` on Vercel Production — the user removed it.
+**Verified from prod runtime telemetry** (not just "should be"): across 7
+days of live traffic (Jun 9–16, confirmed 200s on `/api/auth/session` +
+`notification.list`) the Node `"…makes TLS connections… insecure"` warning
+that the flag prints on every cold start appears **zero** times. The absence
+is conclusive, not suppressed: process warnings ARE enabled in prod (the
+`pg-connection-string` `verify-full` notice fires), so if the flag were set
+its warning would show. Postgres connects with full cert verification. Read
+the runtime logs via the Vercel MCP; never read the `DATABASE_URL` value.
+Residual TLS-posture hardening tracked as R54. (Update `KNOWN_ISSUES.md`
+§S1-1 to resolved.)
+
+### R54 · Pin `sslmode=verify-full` in prod `DATABASE_URL` — **USER-OWNED** · Status: OPEN
+Surfaced while verifying R1 (cont.55). The Neon connection string uses an
+sslmode of `prefer`/`require`/`verify-ca`, which current `pg` /
+`pg-connection-string` treat as `verify-full` (strict) — secure today, and
+the source of the benign `(node:4) Warning: SECURITY …` in prod logs
+(`node_modules/pg-connection-string/index.js:216`). In the next major (pg v9
+/ pg-connection-string v3) those aliases adopt weaker libpq semantics. **Fix
+(user-owned — it's the Vercel `DATABASE_URL` secret):** append
+`sslmode=verify-full` to the prod connection string so strict verification is
+pinned regardless of future driver defaults. Not urgent; posture already
+secure. No code change.
 
 ### R2 · Razorpay orders fall into the demo-refund path · Status: DONE (see git log "refund correctness")
 **Where:** `payment.refundOrder`, `src/server/routers/payment.ts` (~line 578).

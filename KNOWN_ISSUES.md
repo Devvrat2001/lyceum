@@ -28,7 +28,7 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 
 ## S1 — Correctness / will fail in production
 
-### S1-1 · Prod TLS verification is disabled app-wide
+### S1-1 · Prod TLS verification is disabled app-wide — ✅ RESOLVED 2026-06-16
 - **Where:** Vercel **Production** env var `NODE_TLS_REJECT_UNAUTHORIZED=0` (not in code — confirmed absent from `src`, config, `.env*`).
 - **Risk:** Disables *all* TLS certificate validation in the Node runtime → MITM exposure on every outbound HTTPS call (DB, Stripe, Mux, Anthropic) and it silently masks real cert errors. On a children's-data product this is a compliance problem, not just hygiene.
 - **Fix — exact steps (yours to run; per policy I can't change Vercel env vars):**
@@ -42,7 +42,7 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
   - **Stripe / Mux / Anthropic / OpenAI / Resend:** all use public CAs (should be unaffected), but still smoke one of each — a test checkout + webhook 200, a video playback-token mint, the tutor stream, a receipt send.
   - **Logs:** Vercel Runtime Logs (or `vercel logs <url>`) — grep `SELF_SIGNED_CERT_IN_CHAIN`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `DEPTH_ZERO_SELF_SIGNED_CERT` for ~10 min post-deploy.
   - **Rollback:** re-adding the var restores the (insecure) status quo if the DB breaks before you can land the cert fix — treat that as strictly temporary.
-- **Effort:** ~10 min + a watchful redeploy. *(Diagnosed 2026-06-03. With S1-2 + S1-3 + the S2-1 cluster resolved, **this is the only remaining S1 — and it's operational, not a code change.**)*
+- **✅ Resolved 2026-06-16 (cont.55):** the user removed the var; **verified from prod runtime telemetry** — 7 days (Jun 9–16) of live traffic with **zero** occurrences of the Node `"…makes TLS connections… insecure"` cold-start warning, while process warnings are demonstrably enabled (the `pg-connection-string` `verify-full` notice fires), so the absence is conclusive rather than suppressed. Postgres now connects with full cert verification. Read via the Vercel runtime-logs MCP; the `DATABASE_URL` value was never read. Residual hardening — pin `?sslmode=verify-full` on `DATABASE_URL` — tracked as REQUIREMENTS **R54**. *(Diagnosed 2026-06-03; ~10 min fix as predicted.)*
 
 ### S1-2 · Unvalidated `Json`-column cast in the AI generator worker — ✅ RESOLVED 2026-06-06
 - **Where:** `src/lib/jobs/processOutlineJob.ts:99` — was `const partial = job.partial as unknown as Outline | null`.
@@ -53,7 +53,7 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 ### S1-3 · Ref mutation flagged by React Compiler (SPEAK block) — ✅ RESOLVED 2026-06-06
 - **Where:** `src/components/lesson/BlockReader.tsx` SPEAK block — was `recognitionRef.current = r` where `recognitionRef` came from `useMemo(() => ({ current: null }))`.
 - **Fix shipped:** switched `recognitionRef` to a real **`useRef`** — `.current` is mutable by contract, so the assignment is allowed under the React Compiler (a `useMemo` value is treated as immutable, which is what tripped `react-hooks/immutability`). One-line change + the `useRef` import; the error is gone (BlockReader 5→4 lint problems). No behavior change — the ref was already a stable single instance. The original code comment had even flagged `useRef` as "more conventional."
-- **Note:** with S1-2 + S1-3 done, the only remaining **S1 is S1-1** (the prod `NODE_TLS_REJECT_UNAUTHORIZED` Vercel var) — operational, not a code fix.
+- **Note:** with S1-1 (prod TLS — verified removed 2026-06-16), S1-2, and S1-3 all resolved, the **S1 tier is clear**.
 
 ---
 
