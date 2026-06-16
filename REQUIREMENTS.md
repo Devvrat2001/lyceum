@@ -653,9 +653,11 @@ Ordered by learner/public impact:
    family** — MCQ (now finished) / QUIZ / AI_QUIZ / DRAG_MATCH (+18 keys;
    resolved the shared streak/offline entanglement via `replace_all` once
    all 6 sub-components had `t`). **Part 2c DONE (cont.63):** BRANCHING + DISCUSSION (+ locale-aware
-   `relativeTime`) + SECTION (+24 keys). **Reader remaining: just LIVE**
-   (locale-aware relative times — the last block body) + the block-type
-   *labels* (`@/lib/blocks`, shared with the builder).**
+   `relativeTime`) + SECTION (+24 keys). **LIVE DONE (cont.64) → `BlockReader`
+   is FULLY localized** (all ~16 block types + sub-components, en/es/hi). The
+   only lesson-reader remainder is the block-type *labels* (`meta.label` from
+   `@/lib/blocks` BLOCK_GROUPS) — shared with the course builder, so do them
+   together.**
 3. **Learner/public pages**: `/settings`, the `/` home, `t/[teacherId]`
    public storefront, `student/community`, `parent`/`parental-consent`,
    `checkout/success` + `demo-checkout`.
