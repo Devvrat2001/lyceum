@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { trpc } from "@/lib/trpc/react";
 import { Btn, Card, Eyebrow } from "@/components/wf/primitives";
 import { formatPrice as fmtPrice } from "@/lib/currency";
@@ -14,6 +15,7 @@ import { formatPrice as fmtPrice } from "@/lib/currency";
  * "Save N%" label. Deleting a bundle never touches course enrollments.
  */
 export function PathsClient() {
+  const t = useTranslations("TeacherPaths");
   const utils = trpc.useUtils();
   const myPaths = trpc.path.myPaths.useQuery();
   const eligible = trpc.path.myEligibleCourses.useQuery();
@@ -58,9 +60,9 @@ export function PathsClient() {
 
   return (
     <div style={{ padding: "24px 28px 40px", maxWidth: 980 }}>
-      <Eyebrow>Bundles</Eyebrow>
+      <Eyebrow>{t("eyebrow")}</Eyebrow>
       <h1 className="wf-h1" style={{ fontSize: 26, margin: "6px 0 4px" }}>
-        Multi-course paths
+        {t("title")}
       </h1>
       <div
         style={{
@@ -70,15 +72,13 @@ export function PathsClient() {
           maxWidth: 560,
         }}
       >
-        Bundle your published courses into an end-to-end path. Bundles show
-        on the marketplace homepage; students enroll in every course with
-        one click.
+        {t("intro")}
       </div>
 
       {/* Create */}
       <Card p={18} style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
-          New bundle
+          {t("newBundle")}
         </div>
         <div
           style={{
@@ -91,21 +91,21 @@ export function PathsClient() {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title — e.g. Grade 6 Math, end to end"
+            placeholder={t("titlePlaceholder")}
             maxLength={120}
             style={inputStyle}
           />
           <input
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="Subtitle (optional)"
+            placeholder={t("subtitlePlaceholder")}
             maxLength={160}
             style={inputStyle}
           />
           <input
             value={priceDollars}
             onChange={(e) => setPriceDollars(e.target.value)}
-            placeholder="Price ₹"
+            placeholder={t("pricePlaceholder")}
             inputMode="decimal"
             style={inputStyle}
           />
@@ -118,10 +118,10 @@ export function PathsClient() {
             marginBottom: 8,
           }}
         >
-          Pick at least 2 courses — click order sets the path order.
+          {t("pickHint")}
           {savePct !== null && savePct > 0 && (
             <span style={{ color: "var(--wf-good)", marginLeft: 8 }}>
-              Save {savePct}% vs. buying separately
+              {t("savePct", { pct: savePct })}
             </span>
           )}
         </div>
@@ -134,7 +134,7 @@ export function PathsClient() {
               padding: "8px 0",
             }}
           >
-            You need at least 2 published courses to make a bundle.
+            {t("needTwo")}
           </div>
         ) : (
           <div
@@ -178,7 +178,7 @@ export function PathsClient() {
               })
             }
           >
-            {create.isPending ? "Creating…" : "Create bundle"}
+            {create.isPending ? t("creating") : t("createBundle")}
           </Btn>
           {create.isError && (
             <span style={{ fontSize: 12, color: "var(--wf-accent)" }}>
@@ -187,7 +187,7 @@ export function PathsClient() {
           )}
           {create.isSuccess && !create.isPending && (
             <span style={{ fontSize: 12, color: "var(--wf-mute)" }}>
-              Bundle created — it&apos;s live on the marketplace homepage.
+              {t("created")}
             </span>
           )}
         </div>
@@ -195,11 +195,11 @@ export function PathsClient() {
 
       {/* My bundles */}
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
-        Your bundles
+        {t("yourBundles")}
       </div>
       {myPaths.isLoading ? null : (myPaths.data?.length ?? 0) === 0 ? (
         <Card p={22} style={{ textAlign: "center" }}>
-          <Eyebrow>No bundles yet</Eyebrow>
+          <Eyebrow>{t("noBundles")}</Eyebrow>
         </Card>
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
@@ -247,7 +247,7 @@ export function PathsClient() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm(`Delete the bundle "${p.title}"?`)) {
+                    if (window.confirm(t("deleteConfirm", { title: p.title }))) {
                       remove.mutate({ pathId: p.id });
                     }
                   }}
@@ -263,7 +263,7 @@ export function PathsClient() {
                     padding: "4px 6px",
                   }}
                 >
-                  DELETE
+                  {t("delete")}
                 </button>
               </div>
             </Card>

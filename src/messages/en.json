@@ -372,5 +372,39 @@
     "stripePhase": "Stripe billing lands in Phase 3",
     "invoices": "Invoices",
     "noInvoices": "No invoices yet — your school is on the free trial."
+  },
+  "TeacherPaths": {
+    "eyebrow": "Bundles",
+    "title": "Multi-course paths",
+    "intro": "Bundle your published courses into an end-to-end path. Bundles show on the marketplace homepage; students enroll in every course with one click.",
+    "newBundle": "New bundle",
+    "titlePlaceholder": "Title — e.g. Grade 6 Math, end to end",
+    "subtitlePlaceholder": "Subtitle (optional)",
+    "pricePlaceholder": "Price ₹",
+    "pickHint": "Pick at least 2 courses — click order sets the path order.",
+    "savePct": "Save {pct}% vs. buying separately",
+    "needTwo": "You need at least 2 published courses to make a bundle.",
+    "creating": "Creating…",
+    "createBundle": "Create bundle",
+    "created": "Bundle created — it's live on the marketplace homepage.",
+    "yourBundles": "Your bundles",
+    "noBundles": "No bundles yet",
+    "deleteConfirm": "Delete the bundle \"{title}\"?",
+    "delete": "DELETE"
+  },
+  "TeacherStorefront": {
+    "title": "Storefront",
+    "viewPublic": "View public storefront",
+    "profileEyebrow": "Your public profile",
+    "intro": "This is what learners see on your storefront — {name}'s headline, bio, and published courses.",
+    "headlineLabel": "HEADLINE",
+    "headlinePlaceholder": "e.g. Middle-school math, made visual",
+    "bioLabel": "BIO",
+    "bioPlaceholder": "Tell learners about your teaching background and approach.",
+    "saving": "Saving…",
+    "saveProfile": "Save profile",
+    "saved": "Saved",
+    "roadmapEyebrow": "STILL ON THE ROADMAP",
+    "roadmapBody": "Custom storefront URL, brand color, cover photo, pinned courses and referral codes are still planned. Your name, headline, bio, and published courses are live on your storefront now."
   }
 }

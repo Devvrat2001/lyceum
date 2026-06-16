@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Btn, Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
@@ -35,6 +36,7 @@ export function StorefrontEditor({
   headline: string | null;
   bio: string | null;
 }) {
+  const t = useTranslations("TeacherStorefront");
   const router = useRouter();
   const [headline, setHeadline] = useState(initialHeadline ?? "");
   const [bio, setBio] = useState(initialBio ?? "");
@@ -42,7 +44,7 @@ export function StorefrontEditor({
 
   const update = trpc.teacher.updateProfile.useMutation({
     onSuccess: () => {
-      setSavedMsg("Saved");
+      setSavedMsg(t("saved"));
       router.refresh();
       setTimeout(() => setSavedMsg(null), 3000);
     },
@@ -65,7 +67,7 @@ export function StorefrontEditor({
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 16, fontWeight: 600 }}>Storefront</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("title")}</span>
         <div style={{ flex: 1 }} />
         <Link
           href={`/t/${teacherId}`}
@@ -73,7 +75,7 @@ export function StorefrontEditor({
           style={{ textDecoration: "none" }}
         >
           <Btn variant="ghost" sm icon={<Icon name="arrow" size={12} />}>
-            View public storefront
+            {t("viewPublic")}
           </Btn>
         </Link>
       </header>
@@ -81,7 +83,7 @@ export function StorefrontEditor({
       <div style={{ flex: 1, overflow: "auto", padding: "24px 28px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
           <Card p={20} style={{ marginBottom: 16 }}>
-            <Eyebrow>Your public profile</Eyebrow>
+            <Eyebrow>{t("profileEyebrow")}</Eyebrow>
             <p
               style={{
                 fontSize: 12,
@@ -90,8 +92,7 @@ export function StorefrontEditor({
                 lineHeight: 1.5,
               }}
             >
-              This is what learners see on your storefront — {name}&apos;s
-              headline, bio, and published courses.
+              {t("intro", { name })}
             </p>
 
             <label style={{ display: "block", marginBottom: 14 }}>
@@ -103,12 +104,12 @@ export function StorefrontEditor({
                   letterSpacing: "0.06em",
                 }}
               >
-                HEADLINE
+                {t("headlineLabel")}
               </span>
               <input
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
-                placeholder="e.g. Middle-school math, made visual"
+                placeholder={t("headlinePlaceholder")}
                 maxLength={120}
                 style={inputStyle}
               />
@@ -123,12 +124,12 @@ export function StorefrontEditor({
                   letterSpacing: "0.06em",
                 }}
               >
-                BIO
+                {t("bioLabel")}
               </span>
               <textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Tell learners about your teaching background and approach."
+                placeholder={t("bioPlaceholder")}
                 rows={6}
                 maxLength={2000}
                 style={{
@@ -147,7 +148,7 @@ export function StorefrontEditor({
                 disabled={!dirty || update.isPending}
                 onClick={() => update.mutate({ headline, bio })}
               >
-                {update.isPending ? "Saving…" : "Save profile"}
+                {update.isPending ? t("saving") : t("saveProfile")}
               </Btn>
               {savedMsg && (
                 <span
@@ -180,7 +181,7 @@ export function StorefrontEditor({
                 marginBottom: 4,
               }}
             >
-              STILL ON THE ROADMAP
+              {t("roadmapEyebrow")}
             </div>
             <div
               style={{
@@ -189,9 +190,7 @@ export function StorefrontEditor({
                 lineHeight: 1.5,
               }}
             >
-              Custom storefront URL, brand color, cover photo, pinned courses
-              and referral codes are still planned. Your name, headline, bio,
-              and published courses are live on your storefront now.
+              {t("roadmapBody")}
             </div>
           </Card>
         </div>

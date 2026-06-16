@@ -372,5 +372,39 @@
     "stripePhase": "La facturación con Stripe llega en la Fase 3",
     "invoices": "Facturas",
     "noInvoices": "Aún no hay facturas: tu institución está en la prueba gratuita."
+  },
+  "TeacherPaths": {
+    "eyebrow": "Paquetes",
+    "title": "Rutas de varios cursos",
+    "intro": "Agrupa tus cursos publicados en una ruta completa. Los paquetes aparecen en la página principal del mercado; los estudiantes se inscriben en todos los cursos con un solo clic.",
+    "newBundle": "Nuevo paquete",
+    "titlePlaceholder": "Título — p. ej. Matemáticas de 6.º, de principio a fin",
+    "subtitlePlaceholder": "Subtítulo (opcional)",
+    "pricePlaceholder": "Precio ₹",
+    "pickHint": "Elige al menos 2 cursos: el orden de clic define el orden de la ruta.",
+    "savePct": "Ahorra {pct}% frente a comprarlos por separado",
+    "needTwo": "Necesitas al menos 2 cursos publicados para crear un paquete.",
+    "creating": "Creando…",
+    "createBundle": "Crear paquete",
+    "created": "Paquete creado: ya está activo en la página principal del mercado.",
+    "yourBundles": "Tus paquetes",
+    "noBundles": "Aún no hay paquetes",
+    "deleteConfirm": "¿Eliminar el paquete \"{title}\"?",
+    "delete": "ELIMINAR"
+  },
+  "TeacherStorefront": {
+    "title": "Tienda",
+    "viewPublic": "Ver tienda pública",
+    "profileEyebrow": "Tu perfil público",
+    "intro": "Esto es lo que ven los estudiantes en tu tienda: el titular, la biografía y los cursos publicados de {name}.",
+    "headlineLabel": "TITULAR",
+    "headlinePlaceholder": "p. ej. Matemáticas de secundaria, de forma visual",
+    "bioLabel": "BIOGRAFÍA",
+    "bioPlaceholder": "Cuéntales a los estudiantes sobre tu experiencia y enfoque docente.",
+    "saving": "Guardando…",
+    "saveProfile": "Guardar perfil",
+    "saved": "Guardado",
+    "roadmapEyebrow": "AÚN EN LA HOJA DE RUTA",
+    "roadmapBody": "La URL personalizada de la tienda, el color de marca, la foto de portada, los cursos fijados y los códigos de referido aún están planificados. Tu nombre, titular, biografía y cursos publicados ya están activos en tu tienda."
   }
 }
