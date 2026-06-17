@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { formatPrice as fmtPrice } from "@/lib/currency";
 import { MarketChrome } from "@/components/layouts/MarketChrome";
 import {
@@ -45,6 +46,7 @@ export default async function MarketplacePage({
   }>;
 }) {
   const sp = await searchParams;
+  const t = await getTranslations("Marketplace");
   const activeTopic = findTopic(sp.topic);
   // Filter defaults: when the user hasn't picked anything, fall back
   // to "Grade 6 · Math" so the page lands on a populated grid.
@@ -92,13 +94,19 @@ export default async function MarketplacePage({
 
   // Section header reflects the most specific dimension the user has
   // selected. Topic wins (it's the highest-level), then subject,
-  // then a plain grade label as fallback.
+  // then a plain grade label as fallback. The grade/subject labels are
+  // catalog data (@/lib/marketplace) — localized with the block-type
+  // labels, not here.
   const gradeLabel = labelFor(MARKETPLACE_GRADES, sp.grade) ?? "Grade 6";
   const subjectLabel = labelFor(MARKETPLACE_SUBJECTS, sp.subject);
   const priceLabel = labelFor(MARKETPLACE_PRICE_BUCKETS, sp.price);
-  const featuredHeader = `Top picks for ${gradeLabel} · ${
-    activeTopic?.label ?? subjectLabel ?? "Math"
-  }${priceLabel ? ` · ${priceLabel}` : ""}`;
+  const featuredDetail =
+    (activeTopic?.label ?? subjectLabel ?? "Math") +
+    (priceLabel ? ` · ${priceLabel}` : "");
+  const featuredHeader = t("featuredHeader", {
+    grade: gradeLabel,
+    detail: featuredDetail,
+  });
 
   return (
     <MarketChrome role={role}>
@@ -125,26 +133,25 @@ export default async function MarketplacePage({
           }}
         >
           <div>
-            <Eyebrow>For Grade 6 · Personalized</Eyebrow>
+            <Eyebrow>{t("heroEyebrow")}</Eyebrow>
             <h1
               className="wf-h1"
               style={{ fontSize: 42, margin: "8px 0 14px", maxWidth: 540 }}
             >
-              What do you want to{" "}
-              <span className="wf-serif" style={{ fontStyle: "italic" }}>
-                learn
-              </span>{" "}
-              this week?
+              {t.rich("heroTitle", {
+                i: (c) => (
+                  <span className="wf-serif" style={{ fontStyle: "italic" }}>
+                    {c}
+                  </span>
+                ),
+              })}
             </h1>
 
             <Suspense fallback={null}>
               <MarketplaceHeroSearch />
             </Suspense>
 
-            <Annot ai>
-              Conversational · returns curated learning path, not just course
-              list
-            </Annot>
+            <Annot ai>{t("heroAiNote")}</Annot>
             <div
               style={{
                 marginTop: 16,
@@ -153,18 +160,18 @@ export default async function MarketplacePage({
                 flexWrap: "wrap",
               }}
             >
-              {MARKETPLACE_TOPICS.map((t) => {
-                const isActive = activeTopic?.slug === t.slug;
+              {MARKETPLACE_TOPICS.map((topic) => {
+                const isActive = activeTopic?.slug === topic.slug;
                 return (
                   <Link
-                    key={t.slug}
+                    key={topic.slug}
                     // Clicking the active chip again clears the filter
                     // (toggle UX matches what users expect from chip groups).
-                    href={isActive ? "/" : `/?topic=${t.slug}`}
+                    href={isActive ? "/" : `/?topic=${topic.slug}`}
                     className={`wf-chip${isActive ? " wf-chip--accent" : ""}`}
                     style={{ textDecoration: "none" }}
                   >
-                    {t.label}
+                    {topic.label}
                   </Link>
                 );
               })}
@@ -178,8 +185,12 @@ export default async function MarketplacePage({
                 marginBottom: 10,
               }}
             >
-              <Eyebrow>Recommended for {displayName ?? "you"}</Eyebrow>
-              <Annot>{recommended.personalized ? "For you" : "Top-rated"}</Annot>
+              <Eyebrow>
+                {t("recommendedFor", { name: displayName ?? t("you") })}
+              </Eyebrow>
+              <Annot>
+                {recommended.personalized ? t("forYou") : t("topRated")}
+              </Annot>
             </div>
             <div
               style={{
@@ -191,8 +202,8 @@ export default async function MarketplacePage({
               {/* Copy follows the resolver's `personalized` flag so we
                   never imply personalization that didn't happen. */}
               {recommended.personalized
-                ? "Picked from the subjects and grades you're studying:"
-                : "Highest-rated courses across the marketplace right now:"}
+                ? t("recPersonalized")
+                : t("recTopRated")}
             </div>
             {recommended.items.map((p, i) => (
               <div
@@ -245,7 +256,7 @@ export default async function MarketplacePage({
                 full
                 icon={<Icon name="sparkles" size={12} color="var(--wf-ai)" />}
               >
-                Add to my path
+                {t("addToPath")}
               </Btn>
             </Link>
           </Card>
@@ -262,14 +273,14 @@ export default async function MarketplacePage({
             flexWrap: "wrap",
           }}
         >
-          <Eyebrow style={{ marginRight: 8 }}>Filter</Eyebrow>
+          <Eyebrow style={{ marginRight: 8 }}>{t("filter")}</Eyebrow>
           <MarketplaceFilters />
           <div style={{ flex: 1 }} />
           <span
             className="wf-mono"
             style={{ fontSize: 11, color: "var(--wf-mute)" }}
           >
-            {featured.total.toLocaleString()} courses
+            {t("coursesCount", { count: featured.total.toLocaleString() })}
           </span>
           <MarketplaceSort />
         </div>
@@ -293,7 +304,7 @@ export default async function MarketplacePage({
                   letterSpacing: "0.08em",
                 }}
               >
-                FILTER:
+                {t("filterPrefix")}
               </span>
               <Link
                 href="/"
@@ -333,12 +344,12 @@ export default async function MarketplacePage({
                 textDecoration: "none",
               }}
             >
-              See all {featured.total} →
+              {t("seeAll", { count: featured.total })}
             </Link>
           </div>
           {featured.courses.length === 0 ? (
             <Card p={28} style={{ textAlign: "center" }}>
-              <Eyebrow>No courses found</Eyebrow>
+              <Eyebrow>{t("noCourses")}</Eyebrow>
               <div
                 style={{
                   marginTop: 8,
@@ -347,19 +358,20 @@ export default async function MarketplacePage({
                 }}
               >
                 {activeTopic ? (
-                  <>
-                    No published courses match{" "}
-                    <b>{activeTopic.label}</b> yet.{" "}
-                    <Link
-                      href="/"
-                      style={{ color: "var(--wf-accent)", fontWeight: 600 }}
-                    >
-                      Clear filter
-                    </Link>{" "}
-                    to see everything.
-                  </>
+                  t.rich("noCoursesTopic", {
+                    topic: activeTopic.label,
+                    b: (c) => <b>{c}</b>,
+                    link: (c) => (
+                      <Link
+                        href="/"
+                        style={{ color: "var(--wf-accent)", fontWeight: 600 }}
+                      >
+                        {c}
+                      </Link>
+                    ),
+                  })
                 ) : (
-                  "Try clearing the filters or seeding the database."
+                  t("noCoursesGeneric")
                 )}
               </div>
             </Card>
@@ -388,7 +400,7 @@ export default async function MarketplacePage({
           >
             <div>
               <h2 className="wf-h2" style={{ fontSize: 18 }}>
-                Multi-course paths
+                {t("pathsTitle")}
               </h2>
               <div
                 style={{
@@ -397,7 +409,7 @@ export default async function MarketplacePage({
                   marginTop: 4,
                 }}
               >
-                End-to-end curricula · save vs. buying separately
+                {t("pathsSubtitle")}
               </div>
             </div>
           </div>
@@ -433,7 +445,7 @@ export default async function MarketplacePage({
                     }}
                   >
                     <Icon name="branch" size={14} color="var(--wf-accent)" />
-                    <Eyebrow>Curriculum path</Eyebrow>
+                    <Eyebrow>{t("curriculumPath")}</Eyebrow>
                     <span
                       className="wf-mono"
                       style={{
@@ -522,14 +534,14 @@ export default async function MarketplacePage({
             }}
           >
             <h2 className="wf-h2" style={{ fontSize: 18 }}>
-              Teachers to follow
+              {t("teachersTitle")}
             </h2>
           </div>
           <div className="wf-grid-cards-4">
-            {teachers.map((t) => (
-              <Card key={t.id} p={14} style={{ textAlign: "center" }}>
+            {teachers.map((teacher) => (
+              <Card key={teacher.id} p={14} style={{ textAlign: "center" }}>
                 <Link
-                  href={`/t/${t.id}`}
+                  href={`/t/${teacher.id}`}
                   style={{
                     textDecoration: "none",
                     color: "inherit",
@@ -537,7 +549,7 @@ export default async function MarketplacePage({
                   }}
                 >
                   <Avatar
-                    initials={t.name
+                    initials={teacher.name
                       .split(" ")
                       .map((x) => x[0])
                       .join("")
@@ -546,7 +558,7 @@ export default async function MarketplacePage({
                     style={{ margin: "0 auto 10px", fontSize: 16 }}
                   />
                   <div style={{ fontSize: 13, fontWeight: 600 }}>
-                    {t.name}
+                    {teacher.name}
                   </div>
                   <div
                     style={{
@@ -555,7 +567,10 @@ export default async function MarketplacePage({
                       marginTop: 2,
                     }}
                   >
-                    {t.subjectsLabel} · {fmtCount(t.studentsCount)} students
+                    {teacher.subjectsLabel} ·{" "}
+                    {t("studentsCount", {
+                      count: fmtCount(teacher.studentsCount),
+                    })}
                   </div>
                   <div
                     className="wf-mono"
@@ -565,11 +580,10 @@ export default async function MarketplacePage({
                       marginTop: 8,
                     }}
                   >
-                    {t.courseCount}{" "}
-                    {t.courseCount === 1 ? "course" : "courses"}
+                    {t("courseCount", { count: teacher.courseCount })}
                   </div>
                 </Link>
-                <FollowButton teacherId={t.id} />
+                <FollowButton teacherId={teacher.id} />
               </Card>
             ))}
           </div>
@@ -582,9 +596,9 @@ export default async function MarketplacePage({
           style={{ background: "var(--wf-fillsoft)" }}
         >
           <div>
-            <Eyebrow>For institutions</Eyebrow>
+            <Eyebrow>{t("schoolsEyebrow")}</Eyebrow>
             <h2 className="wf-h2" style={{ fontSize: 22, margin: "6px 0" }}>
-              Run Lyceum across your school
+              {t("schoolsTitle")}
             </h2>
             <div
               style={{
@@ -593,15 +607,13 @@ export default async function MarketplacePage({
                 color: "var(--wf-body)",
               }}
             >
-              Manage rosters, build curricula across grades, see live cohort
-              analytics, and integrate with your LMS / SIS. Bulk pricing,
-              branding, and SSO included.
+              {t("schoolsBlurb")}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <Btn variant="ghost">See plans</Btn>
+            <Btn variant="ghost">{t("seePlans")}</Btn>
             <Link href="/signup" style={{ textDecoration: "none" }}>
-              <Btn variant="primary">Talk to us</Btn>
+              <Btn variant="primary">{t("talkToUs")}</Btn>
             </Link>
           </div>
         </Card>
@@ -646,28 +658,28 @@ function friendlyName(full: string | null | undefined): string | null {
  * redirect the way the old one-size-fits-all "/student" / "/admin"
  * links did.
  */
-function RoleHero({
+async function RoleHero({
   role,
   displayName,
 }: {
   role: "TEACHER" | "ADMIN" | "PARENT";
   displayName: string | null;
 }) {
+  const t = await getTranslations("Marketplace");
   const config = {
     TEACHER: {
-      eyebrow: "Teacher",
-      lead: "your teaching workspace",
-      blurb:
-        "Jump back into your courses, see how students are doing, or spin up a new course with AI.",
+      eyebrow: t("roleTeacher"),
+      lead: t("teacherLead"),
+      blurb: t("teacherBlurb"),
       actions: [
         {
-          label: "Go to your courses",
+          label: t("teacherAction1"),
           href: "/teacher",
           variant: "primary" as const,
           ai: false,
         },
         {
-          label: "Build a course with AI",
+          label: t("teacherAction2"),
           href: "/teacher/courses/new",
           variant: "ai" as const,
           ai: true,
@@ -675,13 +687,12 @@ function RoleHero({
       ],
     },
     ADMIN: {
-      eyebrow: "Administrator",
-      lead: "your institution console",
-      blurb:
-        "Manage people and curriculum, organize classes, and track cohort analytics across your school.",
+      eyebrow: t("roleAdmin"),
+      lead: t("adminLead"),
+      blurb: t("adminBlurb"),
       actions: [
         {
-          label: "Open admin console",
+          label: t("adminAction1"),
           href: "/admin",
           variant: "primary" as const,
           ai: false,
@@ -689,13 +700,12 @@ function RoleHero({
       ],
     },
     PARENT: {
-      eyebrow: "Parent",
-      lead: "your family dashboard",
-      blurb:
-        "See each kid's courses, streaks, and recent practice — all in one place.",
+      eyebrow: t("roleParent"),
+      lead: t("parentLead"),
+      blurb: t("parentBlurb"),
       actions: [
         {
-          label: "See your kids' progress",
+          label: t("parentAction1"),
           href: "/parent",
           variant: "primary" as const,
           ai: false,
@@ -717,10 +727,15 @@ function RoleHero({
         className="wf-h1"
         style={{ fontSize: 42, margin: "8px 0 14px", maxWidth: 620 }}
       >
-        Welcome back{displayName ? `, ${displayName}` : ""} — here&apos;s{" "}
-        <span className="wf-serif" style={{ fontStyle: "italic" }}>
-          {config.lead}
-        </span>
+        {t.rich("welcomeBack", {
+          name: displayName ? `, ${displayName}` : "",
+          lead: config.lead,
+          i: (c) => (
+            <span className="wf-serif" style={{ fontStyle: "italic" }}>
+              {c}
+            </span>
+          ),
+        })}
       </h1>
       <div
         style={{
@@ -750,7 +765,7 @@ function RoleHero({
         ))}
       </div>
       <div style={{ marginTop: 14, fontSize: 12, color: "var(--wf-mute)" }}>
-        Or browse the full course marketplace below.
+        {t("orBrowse")}
       </div>
     </section>
   );
