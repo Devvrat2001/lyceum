@@ -660,8 +660,10 @@ Ordered by learner/public impact:
    together.**
 3. **Learner/public pages**: `/settings` **DONE (cont.65** — Settings ns,
    ~52 keys, all-roles account page) + `parental-consent` **DONE (cont.59)**.
-   Remaining: the `/` home, `t/[teacherId]` public storefront,
-   `student/community`, `parent`, `checkout/success` + `demo-checkout`.
+   + the `/` **home DONE (cont.66** — Marketplace ns, ~43 keys, the biggest
+   public page: discovery + role hero + 3 rich strings). Remaining:
+   `t/[teacherId]` public storefront, `student/community`, `parent`,
+   `checkout/success` + `demo-checkout`.
 4. **Course builder** (teacher power tool): `CourseBuilderClient`,
    `BlockInspector`, `BlockLibrary`, `AddBlockPopover` + `teacher/courses/new`
    `/new/ai` `/[courseId]/edit`, `teacher/assignments` (`AssignmentsClient`),
