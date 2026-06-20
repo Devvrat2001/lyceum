@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–59 — auth flow fully done; next: lesson reader blocks)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–67 — auth flow + full BlockReader + /settings + home + storefront/community/parent/checkout all done; next: course builder + the shared data-catalog labels)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -661,9 +661,15 @@ Ordered by learner/public impact:
 3. **Learner/public pages**: `/settings` **DONE (cont.65** — Settings ns,
    ~52 keys, all-roles account page) + `parental-consent` **DONE (cont.59)**.
    + the `/` **home DONE (cont.66** — Marketplace ns, ~43 keys, the biggest
-   public page: discovery + role hero + 3 rich strings). Remaining:
-   `t/[teacherId]` public storefront, `student/community`, `parent`,
-   `checkout/success` + `demo-checkout`.
+   public page: discovery + role hero + 3 rich strings). + the **smaller
+   public pages DONE (cont.67)** — `t/[teacherId]` public storefront
+   (PublicStorefront ns), `student/community` (Community ns; `t`→`thread`
+   map rename), `parent` + ParentHeader + LinkChildForm (ParentDashboard ns),
+   `checkout/success` (CheckoutSuccess ns). 4 ns / ~57 keys; 2 `t.rich`
+   (checkout `inLibrary`, community `empty`); ICU plurals for
+   course/student/follower/comment counts; locale-aware relative-times
+   threaded via the shared `TFn` param. **Only tail: `demo-checkout/[orderId]`**
+   — demo-only payment page (prod uses Stripe-hosted checkout), low priority.
 4. **Course builder** (teacher power tool): `CourseBuilderClient`,
    `BlockInspector`, `BlockLibrary`, `AddBlockPopover` + `teacher/courses/new`
    `/new/ai` `/[courseId]/edit`, `teacher/assignments` (`AssignmentsClient`),
