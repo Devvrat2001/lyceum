@@ -812,5 +812,89 @@
     "minutesAgo": "{count}m ago",
     "hoursAgo": "{count}h ago",
     "daysAgo": "{count}d ago"
+  },
+  "MarketplaceCatalog": {
+    "topics": {
+      "stem": "STEM",
+      "reading": "Reading",
+      "coding": "Coding for kids",
+      "science-fair": "Science fair",
+      "test-prep": "Test prep",
+      "spanish": "Spanish",
+      "art": "Art",
+      "music": "Music"
+    },
+    "grades": {
+      "1": "Grade 1",
+      "2": "Grade 2",
+      "3": "Grade 3",
+      "4": "Grade 4",
+      "5": "Grade 5",
+      "6": "Grade 6",
+      "7": "Grade 7",
+      "8": "Grade 8",
+      "9": "Grade 9",
+      "10": "Grade 10",
+      "11": "Grade 11",
+      "12": "Grade 12",
+      "K": "Kindergarten"
+    },
+    "subjects": {
+      "math": "Math",
+      "science": "Science",
+      "ela": "ELA / Reading",
+      "coding": "Coding",
+      "spanish": "Spanish",
+      "art": "Art",
+      "music": "Music"
+    },
+    "price": {
+      "free": "Free",
+      "under500": "Under ₹500",
+      "500to2000": "₹500 – ₹2,000",
+      "2000plus": "₹2,000 and up"
+    },
+    "length": {
+      "short": "Short · ≤4 lessons",
+      "medium": "Medium · 5–9",
+      "long": "Long · 10+"
+    },
+    "rating": {
+      "45plus": "4.5★ & up",
+      "40plus": "4.0★ & up",
+      "35plus": "3.5★ & up",
+      "30plus": "3.0★ & up"
+    },
+    "format": {
+      "self_paced": "Self-paced",
+      "live": "Live",
+      "cohort": "Cohort-based"
+    },
+    "board": {
+      "cbse": "CBSE",
+      "icse": "ICSE",
+      "state": "State board",
+      "ib": "IB",
+      "cambridge": "Cambridge"
+    },
+    "sorts": {
+      "popular": "Popular",
+      "newest": "Newest",
+      "rating": "Top rated",
+      "price_asc": "Price: low to high",
+      "price_desc": "Price: high to low"
+    }
+  },
+  "MarketplaceFilters": {
+    "dimGrade": "Grade",
+    "dimBoard": "Board",
+    "dimSubject": "Subject",
+    "dimPrice": "Price",
+    "dimLength": "Length",
+    "dimRating": "Rating",
+    "dimFormat": "Format",
+    "dimSort": "Sort",
+    "triggerActive": "{dim} · {label}",
+    "clearFilters": "CLEAR FILTERS"
   }
 }

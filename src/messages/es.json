@@ -812,5 +812,89 @@
     "minutesAgo": "hace {count} min",
     "hoursAgo": "hace {count} h",
     "daysAgo": "hace {count} d"
+  },
+  "MarketplaceCatalog": {
+    "topics": {
+      "stem": "STEM",
+      "reading": "Lectura",
+      "coding": "Programación para niños",
+      "science-fair": "Feria de ciencias",
+      "test-prep": "Preparación de exámenes",
+      "spanish": "Español",
+      "art": "Arte",
+      "music": "Música"
+    },
+    "grades": {
+      "1": "Grado 1",
+      "2": "Grado 2",
+      "3": "Grado 3",
+      "4": "Grado 4",
+      "5": "Grado 5",
+      "6": "Grado 6",
+      "7": "Grado 7",
+      "8": "Grado 8",
+      "9": "Grado 9",
+      "10": "Grado 10",
+      "11": "Grado 11",
+      "12": "Grado 12",
+      "K": "Kínder"
+    },
+    "subjects": {
+      "math": "Matemáticas",
+      "science": "Ciencias",
+      "ela": "Lengua / Lectura",
+      "coding": "Programación",
+      "spanish": "Español",
+      "art": "Arte",
+      "music": "Música"
+    },
+    "price": {
+      "free": "Gratis",
+      "under500": "Menos de ₹500",
+      "500to2000": "₹500 – ₹2,000",
+      "2000plus": "₹2,000 o más"
+    },
+    "length": {
+      "short": "Corto · ≤4 lecciones",
+      "medium": "Medio · 5–9",
+      "long": "Largo · 10+"
+    },
+    "rating": {
+      "45plus": "4.5★ o más",
+      "40plus": "4.0★ o más",
+      "35plus": "3.5★ o más",
+      "30plus": "3.0★ o más"
+    },
+    "format": {
+      "self_paced": "A tu ritmo",
+      "live": "En vivo",
+      "cohort": "Por cohortes"
+    },
+    "board": {
+      "cbse": "CBSE",
+      "icse": "ICSE",
+      "state": "Junta estatal",
+      "ib": "IB",
+      "cambridge": "Cambridge"
+    },
+    "sorts": {
+      "popular": "Popular",
+      "newest": "Más nuevos",
+      "rating": "Mejor valorados",
+      "price_asc": "Precio: de menor a mayor",
+      "price_desc": "Precio: de mayor a menor"
+    }
+  },
+  "MarketplaceFilters": {
+    "dimGrade": "Grado",
+    "dimBoard": "Junta",
+    "dimSubject": "Materia",
+    "dimPrice": "Precio",
+    "dimLength": "Duración",
+    "dimRating": "Valoración",
+    "dimFormat": "Formato",
+    "dimSort": "Ordenar",
+    "triggerActive": "{dim} · {label}",
+    "clearFilters": "QUITAR FILTROS"
   }
 }

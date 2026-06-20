@@ -25,7 +25,6 @@ import {
   MARKETPLACE_SUBJECTS,
   MARKETPLACE_TOPICS,
   findTopic,
-  labelFor,
 } from "@/lib/marketplace";
 import { Suspense } from "react";
 
@@ -47,6 +46,7 @@ export default async function MarketplacePage({
 }) {
   const sp = await searchParams;
   const t = await getTranslations("Marketplace");
+  const tc = await getTranslations("MarketplaceCatalog");
   const activeTopic = findTopic(sp.topic);
   // Filter defaults: when the user hasn't picked anything, fall back
   // to "Grade 6 · Math" so the page lands on a populated grid.
@@ -94,14 +94,25 @@ export default async function MarketplacePage({
 
   // Section header reflects the most specific dimension the user has
   // selected. Topic wins (it's the highest-level), then subject,
-  // then a plain grade label as fallback. The grade/subject labels are
-  // catalog data (@/lib/marketplace) — localized with the block-type
-  // labels, not here.
-  const gradeLabel = labelFor(MARKETPLACE_GRADES, sp.grade) ?? "Grade 6";
-  const subjectLabel = labelFor(MARKETPLACE_SUBJECTS, sp.subject);
-  const priceLabel = labelFor(MARKETPLACE_PRICE_BUCKETS, sp.price);
+  // then a plain grade label as fallback. Grade/subject/topic/price
+  // labels are catalog data (@/lib/marketplace), translated via the
+  // MarketplaceCatalog namespace keyed by the stable value/slug.
+  const catLabel = (
+    items: { value: string }[],
+    cat: string,
+    value: string | undefined
+  ): string | null =>
+    value && items.some((i) => i.value === value)
+      ? tc(`${cat}.${value}`)
+      : null;
+  const gradeLabel =
+    catLabel(MARKETPLACE_GRADES, "grades", sp.grade) ?? tc("grades.6");
+  const subjectLabel = catLabel(MARKETPLACE_SUBJECTS, "subjects", sp.subject);
+  const priceLabel = catLabel(MARKETPLACE_PRICE_BUCKETS, "price", sp.price);
   const featuredDetail =
-    (activeTopic?.label ?? subjectLabel ?? "Math") +
+    (activeTopic
+      ? tc(`topics.${activeTopic.slug}`)
+      : (subjectLabel ?? tc("subjects.math"))) +
     (priceLabel ? ` · ${priceLabel}` : "");
   const featuredHeader = t("featuredHeader", {
     grade: gradeLabel,
@@ -171,7 +182,7 @@ export default async function MarketplacePage({
                     className={`wf-chip${isActive ? " wf-chip--accent" : ""}`}
                     style={{ textDecoration: "none" }}
                   >
-                    {topic.label}
+                    {tc(`topics.${topic.slug}`)}
                   </Link>
                 );
               })}
@@ -359,7 +370,7 @@ export default async function MarketplacePage({
               >
                 {activeTopic ? (
                   t.rich("noCoursesTopic", {
-                    topic: activeTopic.label,
+                    topic: tc(`topics.${activeTopic.slug}`),
                     b: (c) => <b>{c}</b>,
                     link: (c) => (
                       <Link

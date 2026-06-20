@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { Popover, PopoverOption } from "@/components/ui/Popover";
 import {
   MARKETPLACE_BOARD_BUCKETS,
@@ -11,7 +12,6 @@ import {
   MARKETPLACE_PRICE_BUCKETS,
   MARKETPLACE_RATING_BUCKETS,
   MARKETPLACE_SUBJECTS,
-  labelFor,
 } from "@/lib/marketplace";
 
 /**
@@ -42,6 +42,21 @@ export function MarketplaceFilters() {
   const rating = sp?.get("rating") ?? null;
   const format = sp?.get("format") ?? null;
 
+  // Catalog labels (option + trigger text) come from MarketplaceCatalog,
+  // keyed by the stable value; the filter chrome (dimension names, the
+  // "Dim · value" trigger, CLEAR FILTERS) from MarketplaceFilters.
+  const tc = useTranslations("MarketplaceCatalog");
+  const tf = useTranslations("MarketplaceFilters");
+  // Translate a stored value via its catalog category, guarding unknown
+  // (junk URL) values to null so a bad `?grade=zzz` degrades to the
+  // dimension fallback instead of throwing on a missing message key.
+  const catLabel = (
+    items: { value: string }[],
+    cat: string,
+    value: string | null
+  ): string | null =>
+    value && items.some((i) => i.value === value) ? tc(`${cat}.${value}`) : null;
+
   // Preserve any other params (notably `topic`) when we mutate one
   // dimension — losing the topic filter when picking a grade would be
   // a surprise.
@@ -53,13 +68,17 @@ export function MarketplaceFilters() {
     router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
-  const gradeLabel = labelFor(MARKETPLACE_GRADES, grade ?? undefined);
-  const boardLabel = labelFor(MARKETPLACE_BOARD_BUCKETS, board ?? undefined);
-  const subjectLabel = labelFor(MARKETPLACE_SUBJECTS, subject ?? undefined);
-  const priceLabel = labelFor(MARKETPLACE_PRICE_BUCKETS, price ?? undefined);
-  const lengthLabel = labelFor(MARKETPLACE_LENGTH_BUCKETS, length ?? undefined);
-  const ratingLabel = labelFor(MARKETPLACE_RATING_BUCKETS, rating ?? undefined);
-  const formatLabel = labelFor(MARKETPLACE_FORMAT_BUCKETS, format ?? undefined);
+  const gradeLabel = catLabel(MARKETPLACE_GRADES, "grades", grade);
+  const boardLabel = catLabel(MARKETPLACE_BOARD_BUCKETS, "board", board);
+  const subjectLabel = catLabel(MARKETPLACE_SUBJECTS, "subjects", subject);
+  const priceLabel = catLabel(MARKETPLACE_PRICE_BUCKETS, "price", price);
+  const lengthLabel = catLabel(MARKETPLACE_LENGTH_BUCKETS, "length", length);
+  const ratingLabel = catLabel(MARKETPLACE_RATING_BUCKETS, "rating", rating);
+  const formatLabel = catLabel(MARKETPLACE_FORMAT_BUCKETS, "format", format);
+
+  // "Dim · value" trigger for an active filter; bare dimension name otherwise.
+  const trigger = (dimKey: string, label: string | null) =>
+    label ? tf("triggerActive", { dim: tf(dimKey), label }) : tf(dimKey);
 
   const anyActive = !!(
     grade ||
@@ -93,7 +112,7 @@ export function MarketplaceFilters() {
         active={!!grade}
         // gradeLabel already includes "Grade" / "Kindergarten" — no
         // double-prefix needed.
-        triggerLabel={gradeLabel ?? "Grade"}
+        triggerLabel={gradeLabel ?? tf("dimGrade")}
       >
         {({ close }) => (
           <>
@@ -106,17 +125,14 @@ export function MarketplaceFilters() {
                   close();
                 }}
               >
-                {g.label}
+                {tc(`grades.${g.value}`)}
               </PopoverOption>
             ))}
           </>
         )}
       </Popover>
 
-      <Popover
-        active={!!board}
-        triggerLabel={boardLabel ? `Board · ${boardLabel}` : "Board"}
-      >
+      <Popover active={!!board} triggerLabel={trigger("dimBoard", boardLabel)}>
         {({ close }) => (
           <>
             {MARKETPLACE_BOARD_BUCKETS.map((b) => (
@@ -128,7 +144,7 @@ export function MarketplaceFilters() {
                   close();
                 }}
               >
-                {b.label}
+                {tc(`board.${b.value}`)}
               </PopoverOption>
             ))}
           </>
@@ -137,7 +153,7 @@ export function MarketplaceFilters() {
 
       <Popover
         active={!!subject}
-        triggerLabel={subjectLabel ? `Subject · ${subjectLabel}` : "Subject"}
+        triggerLabel={trigger("dimSubject", subjectLabel)}
       >
         {({ close }) => (
           <>
@@ -153,17 +169,14 @@ export function MarketplaceFilters() {
                   close();
                 }}
               >
-                {s.label}
+                {tc(`subjects.${s.value}`)}
               </PopoverOption>
             ))}
           </>
         )}
       </Popover>
 
-      <Popover
-        active={!!price}
-        triggerLabel={priceLabel ? `Price · ${priceLabel}` : "Price"}
-      >
+      <Popover active={!!price} triggerLabel={trigger("dimPrice", priceLabel)}>
         {({ close }) => (
           <>
             {MARKETPLACE_PRICE_BUCKETS.map((b) => (
@@ -175,7 +188,7 @@ export function MarketplaceFilters() {
                   close();
                 }}
               >
-                {b.label}
+                {tc(`price.${b.value}`)}
               </PopoverOption>
             ))}
           </>
@@ -184,7 +197,7 @@ export function MarketplaceFilters() {
 
       <Popover
         active={!!length}
-        triggerLabel={lengthLabel ? `Length · ${lengthLabel}` : "Length"}
+        triggerLabel={trigger("dimLength", lengthLabel)}
       >
         {({ close }) => (
           <>
@@ -197,7 +210,7 @@ export function MarketplaceFilters() {
                   close();
                 }}
               >
-                {b.label}
+                {tc(`length.${b.value}`)}
               </PopoverOption>
             ))}
           </>
@@ -206,7 +219,7 @@ export function MarketplaceFilters() {
 
       <Popover
         active={!!rating}
-        triggerLabel={ratingLabel ? `Rating · ${ratingLabel}` : "Rating"}
+        triggerLabel={trigger("dimRating", ratingLabel)}
       >
         {({ close }) => (
           <>
@@ -219,7 +232,7 @@ export function MarketplaceFilters() {
                   close();
                 }}
               >
-                {b.label}
+                {tc(`rating.${b.value}`)}
               </PopoverOption>
             ))}
           </>
@@ -228,7 +241,7 @@ export function MarketplaceFilters() {
 
       <Popover
         active={!!format}
-        triggerLabel={formatLabel ? `Format · ${formatLabel}` : "Format"}
+        triggerLabel={trigger("dimFormat", formatLabel)}
       >
         {({ close }) => (
           <>
@@ -241,7 +254,7 @@ export function MarketplaceFilters() {
                   close();
                 }}
               >
-                {b.label}
+                {tc(`format.${b.value}`)}
               </PopoverOption>
             ))}
           </>
@@ -263,7 +276,7 @@ export function MarketplaceFilters() {
             padding: "4px 8px",
           }}
         >
-          CLEAR FILTERS
+          {tf("clearFilters")}
         </button>
       )}
     </>

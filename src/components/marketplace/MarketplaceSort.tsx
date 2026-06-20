@@ -1,11 +1,11 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Popover, PopoverOption } from "@/components/ui/Popover";
 import {
   MARKETPLACE_DEFAULT_SORT,
   MARKETPLACE_SORTS,
-  labelFor,
 } from "@/lib/marketplace";
 
 /**
@@ -24,11 +24,15 @@ export function MarketplaceSort() {
   const pathname = usePathname() ?? "/";
   const sp = useSearchParams();
   const sort = sp?.get("sort") ?? null;
+  const tc = useTranslations("MarketplaceCatalog");
+  const tf = useTranslations("MarketplaceFilters");
   // Unknown / missing slug shows the default label (mirrors the server,
   // which falls back to the popularity ranking for the same input).
-  const sortLabel =
-    labelFor(MARKETPLACE_SORTS, sort ?? undefined) ??
-    labelFor(MARKETPLACE_SORTS, MARKETPLACE_DEFAULT_SORT)!;
+  const effectiveSort =
+    sort && MARKETPLACE_SORTS.some((s) => s.value === sort)
+      ? sort
+      : MARKETPLACE_DEFAULT_SORT;
+  const sortLabel = tc(`sorts.${effectiveSort}`);
 
   const pick = (value: string) => {
     const next = new URLSearchParams(sp?.toString() ?? "");
@@ -43,7 +47,7 @@ export function MarketplaceSort() {
       // Non-default sort gets the accent treatment so it's visible the grid
       // isn't in its default order.
       active={!!sort && sort !== MARKETPLACE_DEFAULT_SORT}
-      triggerLabel={`Sort · ${sortLabel}`}
+      triggerLabel={tf("triggerActive", { dim: tf("dimSort"), label: sortLabel })}
     >
       {({ close }) => (
         <>
@@ -56,7 +60,7 @@ export function MarketplaceSort() {
                 close();
               }}
             >
-              {s.label}
+              {tc(`sorts.${s.value}`)}
             </PopoverOption>
           ))}
         </>
