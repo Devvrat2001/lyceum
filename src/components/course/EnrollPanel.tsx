@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { Annot, Btn, Eyebrow, Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
@@ -42,6 +43,7 @@ export function EnrollPanel({
   firstLessonSlug = null,
 }: Props) {
   const { status } = useSession();
+  const t = useTranslations("EnrollPanel");
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
 
@@ -113,7 +115,7 @@ export function EnrollPanel({
     addToLibrary.mutate({ courseId });
   };
 
-  const cta = isPaid ? "Buy & start" : "Enroll & start";
+  const cta = isPaid ? t("buyStart") : t("enrollStart");
   const isPending = isPaid ? checkout.isPending : enroll.isPending;
 
   const continueHref = firstLessonSlug
@@ -138,13 +140,13 @@ export function EnrollPanel({
               marginBottom: 6,
             }}
           >
-            ✓ IN YOUR LIBRARY
+            {t("inYourLibrary")}
           </div>
           <div
             className="wf-serif"
             style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}
           >
-            Pick up where you left off
+            {t("pickUp")}
           </div>
         </div>
       ) : (
@@ -174,7 +176,7 @@ export function EnrollPanel({
             style={{ textDecoration: "none", display: "block" }}
           >
             <Btn variant="primary" full>
-              Continue learning →
+              {t("continueLearning")}
             </Btn>
           </Link>
           <Link
@@ -188,7 +190,7 @@ export function EnrollPanel({
               textDecoration: "none",
             }}
           >
-            Open library
+            {t("openLibrary")}
           </Link>
         </>
       ) : (
@@ -199,7 +201,11 @@ export function EnrollPanel({
             onClick={handleEnroll}
             disabled={isPending}
           >
-            {isPending ? (isPaid ? "Starting checkout…" : "Enrolling…") : cta}
+            {isPending
+              ? isPaid
+                ? t("startingCheckout")
+                : t("enrolling")
+              : cta}
           </Btn>
 
           {error && (
@@ -226,10 +232,10 @@ export function EnrollPanel({
             disabled={addToLibrary.isPending}
           >
             {savedFlash
-              ? "✓ Added to library"
+              ? t("addedToLibrary")
               : addToLibrary.isPending
-              ? "Saving…"
-              : "Add to library"}
+              ? t("saving")
+              : t("addToLibrary")}
           </Btn>
         </>
       )}
@@ -241,17 +247,17 @@ export function EnrollPanel({
           paddingTop: 14,
         }}
       >
-        <Eyebrow style={{ marginBottom: 10 }}>This course includes</Eyebrow>
+        <Eyebrow style={{ marginBottom: 10 }}>{t("includes")}</Eyebrow>
         {[
-          ["play", `${totalLessons}+ lessons`],
-          ["sparkles", "AI tutor · always available"],
-          ["star", "Adaptive practice"],
-          ["trophy", "Mini-games & XP rewards"],
-          ["download", "Offline access · mobile"],
-          ["check", "Progress synced to teacher"],
-        ].map(([ic, t]) => (
+          ["play", t("featLessons", { count: totalLessons })],
+          ["sparkles", t("featTutor")],
+          ["star", t("featAdaptive")],
+          ["trophy", t("featGames")],
+          ["download", t("featOffline")],
+          ["check", t("featSynced")],
+        ].map(([ic, label]) => (
           <div
-            key={t}
+            key={label}
             style={{
               display: "flex",
               gap: 10,
@@ -264,7 +270,7 @@ export function EnrollPanel({
               size={13}
               color={ic === "sparkles" ? "var(--wf-ai)" : "var(--wf-body)"}
             />
-            <span>{t}</span>
+            <span>{label}</span>
           </div>
         ))}
       </div>

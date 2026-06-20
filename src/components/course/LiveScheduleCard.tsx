@@ -8,14 +8,9 @@
  * everyone else sees an "enroll to get the link" nudge.
  */
 import { Card, Eyebrow } from "@/components/wf/primitives";
+import { getTranslations } from "next-intl/server";
 
-const RECURRENCE_LABEL: Record<string, string> = {
-  weekly: "Repeats weekly",
-  biweekly: "Repeats every 2 weeks",
-  monthly: "Repeats monthly",
-};
-
-export function LiveScheduleCard({
+export async function LiveScheduleCard({
   format,
   whenText,
   joinUrl,
@@ -35,10 +30,12 @@ export function LiveScheduleCard({
 }) {
   if (format !== "live" && format !== "cohort") return null;
 
-  const label = format === "live" ? "Live class" : "Cohort";
-  const recurrenceLabel = recurrence
-    ? (RECURRENCE_LABEL[recurrence] ?? null)
-    : null;
+  const t = await getTranslations("LiveSchedule");
+  const label = format === "live" ? t("liveClass") : t("cohort");
+  const recurrenceLabel =
+    recurrence && ["weekly", "biweekly", "monthly"].includes(recurrence)
+      ? t(`recurrence.${recurrence}`)
+      : null;
 
   return (
     <Card
@@ -59,10 +56,10 @@ export function LiveScheduleCard({
       >
         <div>
           <Eyebrow style={{ marginBottom: 4 }}>
-            {label} · {whenText ? "Scheduled" : "Schedule"}
+            {label} · {whenText ? t("scheduled") : t("schedule")}
           </Eyebrow>
           <div style={{ fontSize: 15, fontWeight: 600 }}>
-            {whenText ?? "Schedule to be announced"}
+            {whenText ?? t("tba")}
             {recurrenceLabel && (
               <span
                 className="wf-mono"
@@ -80,9 +77,7 @@ export function LiveScheduleCard({
           <div
             style={{ fontSize: 12, color: "var(--wf-mute)", marginTop: 2 }}
           >
-            {format === "live"
-              ? "Taught live — join at the scheduled time."
-              : "A guided cohort that moves together from this start date."}
+            {format === "live" ? t("liveDesc") : t("cohortDesc")}
           </div>
           {whenText && (
             <a
@@ -96,7 +91,7 @@ export function LiveScheduleCard({
                 textDecoration: "none",
               }}
             >
-              + Add to calendar
+              {t("addToCalendar")}
             </a>
           )}
         </div>
@@ -109,14 +104,14 @@ export function LiveScheduleCard({
               className="wf-btn wf-btn--accent"
               style={{ textDecoration: "none" }}
             >
-              Join session →
+              {t("joinSession")}
             </a>
           ) : (
             <span
               className="wf-mono"
               style={{ fontSize: 10, color: "var(--wf-mute)" }}
             >
-              ENROLL TO GET THE LINK
+              {t("enrollForLink")}
             </span>
           )
         ) : null}

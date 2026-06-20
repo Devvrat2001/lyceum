@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { trpc } from "@/lib/trpc/react";
 import { Btn, Card } from "@/components/wf/primitives";
 
@@ -39,6 +40,7 @@ function ReviewFormInner({
   initialBody: string;
   hadReview: boolean;
 }) {
+  const t = useTranslations("CourseReview");
   const router = useRouter();
   const [rating, setRating] = useState(initialRating);
   const [body, setBody] = useState(initialBody);
@@ -51,14 +53,14 @@ function ReviewFormInner({
   return (
     <Card p={16} style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
-        {hadReview ? "Your review" : "Rate this course"}
+        {hadReview ? t("yourReview") : t("rateTitle")}
       </div>
       <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
-            aria-label={`${n} star${n === 1 ? "" : "s"}`}
+            aria-label={t("starsAria", { count: n })}
             aria-pressed={n <= rating}
             onClick={() => setRating(n)}
             style={{
@@ -78,7 +80,7 @@ function ReviewFormInner({
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="What did you think of this course? (Shown publicly on the course page.)"
+        placeholder={t("placeholder")}
         maxLength={2000}
         rows={3}
         style={{
@@ -101,14 +103,14 @@ function ReviewFormInner({
           onClick={() => submit.mutate({ courseId, rating, body: body.trim() })}
         >
           {submit.isPending
-            ? "Saving…"
+            ? t("saving")
             : hadReview
-              ? "Update review"
-              : "Submit review"}
+              ? t("update")
+              : t("submit")}
         </Btn>
         {submit.isSuccess && !submit.isPending && (
           <span style={{ fontSize: 12, color: "var(--wf-mute)" }}>
-            Thanks — your review is live.
+            {t("thanks")}
           </span>
         )}
         {submit.isError && (

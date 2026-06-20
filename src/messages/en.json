@@ -907,5 +907,57 @@
     "inLibrary": "✓ IN LIBRARY",
     "notRated": "Not yet rated",
     "continueLabel": "Continue →"
+  },
+  "EnrollPanel": {
+    "inYourLibrary": "✓ IN YOUR LIBRARY",
+    "pickUp": "Pick up where you left off",
+    "continueLearning": "Continue learning →",
+    "openLibrary": "Open library",
+    "buyStart": "Buy & start",
+    "enrollStart": "Enroll & start",
+    "startingCheckout": "Starting checkout…",
+    "enrolling": "Enrolling…",
+    "addedToLibrary": "✓ Added to library",
+    "saving": "Saving…",
+    "addToLibrary": "Add to library",
+    "includes": "This course includes",
+    "featLessons": "{count}+ lessons",
+    "featTutor": "AI tutor · always available",
+    "featAdaptive": "Adaptive practice",
+    "featGames": "Mini-games & XP rewards",
+    "featOffline": "Offline access · mobile",
+    "featSynced": "Progress synced to teacher"
+  },
+  "Curriculum": {
+    "unit": "Unit {order}",
+    "lessonsCount": "{count, plural, one {# lesson} other {# lessons}}",
+    "freePreview": "FREE PREVIEW"
+  },
+  "LiveSchedule": {
+    "liveClass": "Live class",
+    "cohort": "Cohort",
+    "scheduled": "Scheduled",
+    "schedule": "Schedule",
+    "tba": "Schedule to be announced",
+    "liveDesc": "Taught live — join at the scheduled time.",
+    "cohortDesc": "A guided cohort that moves together from this start date.",
+    "addToCalendar": "+ Add to calendar",
+    "joinSession": "Join session →",
+    "enrollForLink": "ENROLL TO GET THE LINK",
+    "recurrence": {
+      "weekly": "Repeats weekly",
+      "biweekly": "Repeats every 2 weeks",
+      "monthly": "Repeats monthly"
+    }
+  },
+  "CourseReview": {
+    "rateTitle": "Rate this course",
+    "yourReview": "Your review",
+    "starsAria": "{count, plural, one {# star} other {# stars}}",
+    "placeholder": "What did you think of this course? (Shown publicly on the course page.)",
+    "saving": "Saving…",
+    "update": "Update review",
+    "submit": "Submit review",
+    "thanks": "Thanks — your review is live."
   }
 }

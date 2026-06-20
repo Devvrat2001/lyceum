@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Card, Icon } from "@/components/wf/primitives";
 
 type Lesson = {
@@ -20,6 +21,7 @@ type Unit = {
 };
 
 export function CurriculumAccordion({ units }: { units: Unit[] }) {
+  const t = useTranslations("Curriculum");
   const [open, setOpen] = useState<number>(0);
 
   return (
@@ -56,7 +58,7 @@ export function CurriculumAccordion({ units }: { units: Unit[] }) {
                   width: 50,
                 }}
               >
-                Unit {u.order}
+                {t("unit", { order: u.order })}
               </span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{u.title}</div>
@@ -67,7 +69,7 @@ export function CurriculumAccordion({ units }: { units: Unit[] }) {
                     marginTop: 2,
                   }}
                 >
-                  {u.estLabel ?? `${u.lessons.length} lessons`}
+                  {u.estLabel ?? t("lessonsCount", { count: u.lessons.length })}
                 </div>
               </div>
               <Icon
@@ -104,7 +106,7 @@ export function CurriculumAccordion({ units }: { units: Unit[] }) {
                             color: "var(--wf-mute)",
                           }}
                         >
-                          FREE PREVIEW
+                          {t("freePreview")}
                         </span>
                       )}
                     </div>

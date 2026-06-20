@@ -907,5 +907,57 @@
     "inLibrary": "✓ EN TU BIBLIOTECA",
     "notRated": "Sin valoraciones aún",
     "continueLabel": "Continuar →"
+  },
+  "EnrollPanel": {
+    "inYourLibrary": "✓ EN TU BIBLIOTECA",
+    "pickUp": "Continúa donde lo dejaste",
+    "continueLearning": "Seguir aprendiendo →",
+    "openLibrary": "Abrir biblioteca",
+    "buyStart": "Comprar y empezar",
+    "enrollStart": "Inscribirse y empezar",
+    "startingCheckout": "Iniciando el pago…",
+    "enrolling": "Inscribiendo…",
+    "addedToLibrary": "✓ Añadido a la biblioteca",
+    "saving": "Guardando…",
+    "addToLibrary": "Añadir a la biblioteca",
+    "includes": "Este curso incluye",
+    "featLessons": "{count}+ lecciones",
+    "featTutor": "Tutor de IA · siempre disponible",
+    "featAdaptive": "Práctica adaptativa",
+    "featGames": "Minijuegos y recompensas XP",
+    "featOffline": "Acceso sin conexión · móvil",
+    "featSynced": "Progreso sincronizado con el profesor"
+  },
+  "Curriculum": {
+    "unit": "Unidad {order}",
+    "lessonsCount": "{count, plural, one {# lección} other {# lecciones}}",
+    "freePreview": "VISTA PREVIA GRATIS"
+  },
+  "LiveSchedule": {
+    "liveClass": "Clase en vivo",
+    "cohort": "Cohorte",
+    "scheduled": "Programada",
+    "schedule": "Horario",
+    "tba": "Horario por anunciar",
+    "liveDesc": "Impartida en vivo: únete a la hora programada.",
+    "cohortDesc": "Una cohorte guiada que avanza junta desde esta fecha de inicio.",
+    "addToCalendar": "+ Añadir al calendario",
+    "joinSession": "Unirse a la sesión →",
+    "enrollForLink": "INSCRÍBETE PARA OBTENER EL ENLACE",
+    "recurrence": {
+      "weekly": "Se repite cada semana",
+      "biweekly": "Se repite cada 2 semanas",
+      "monthly": "Se repite cada mes"
+    }
+  },
+  "CourseReview": {
+    "rateTitle": "Valora este curso",
+    "yourReview": "Tu reseña",
+    "starsAria": "{count, plural, one {# estrella} other {# estrellas}}",
+    "placeholder": "¿Qué te pareció este curso? (Se muestra públicamente en la página del curso.)",
+    "saving": "Guardando…",
+    "update": "Actualizar reseña",
+    "submit": "Enviar reseña",
+    "thanks": "Gracias — tu reseña ya está publicada."
   }
 }

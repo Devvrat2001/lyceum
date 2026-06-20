@@ -907,5 +907,57 @@
     "inLibrary": "✓ आपकी लाइब्रेरी में",
     "notRated": "अभी कोई रेटिंग नहीं",
     "continueLabel": "जारी रखें →"
+  },
+  "EnrollPanel": {
+    "inYourLibrary": "✓ आपकी लाइब्रेरी में",
+    "pickUp": "जहाँ छोड़ा था वहीं से शुरू करें",
+    "continueLearning": "सीखना जारी रखें →",
+    "openLibrary": "लाइब्रेरी खोलें",
+    "buyStart": "खरीदें और शुरू करें",
+    "enrollStart": "नामांकन करें और शुरू करें",
+    "startingCheckout": "चेकआउट शुरू हो रहा है…",
+    "enrolling": "नामांकन हो रहा है…",
+    "addedToLibrary": "✓ लाइब्रेरी में जोड़ा गया",
+    "saving": "सहेजा जा रहा है…",
+    "addToLibrary": "लाइब्रेरी में जोड़ें",
+    "includes": "इस कोर्स में शामिल है",
+    "featLessons": "{count}+ पाठ",
+    "featTutor": "AI ट्यूटर · हमेशा उपलब्ध",
+    "featAdaptive": "अनुकूली अभ्यास",
+    "featGames": "मिनी-गेम और XP पुरस्कार",
+    "featOffline": "ऑफ़लाइन एक्सेस · मोबाइल",
+    "featSynced": "प्रगति शिक्षक के साथ सिंक"
+  },
+  "Curriculum": {
+    "unit": "इकाई {order}",
+    "lessonsCount": "{count, plural, one {# पाठ} other {# पाठ}}",
+    "freePreview": "मुफ़्त झलक"
+  },
+  "LiveSchedule": {
+    "liveClass": "लाइव क्लास",
+    "cohort": "कोहोर्ट",
+    "scheduled": "निर्धारित",
+    "schedule": "समय-सारणी",
+    "tba": "समय-सारणी की घोषणा बाकी",
+    "liveDesc": "लाइव पढ़ाया जाता है — निर्धारित समय पर जुड़ें।",
+    "cohortDesc": "एक निर्देशित कोहोर्ट जो इस आरंभ तिथि से एक साथ आगे बढ़ती है।",
+    "addToCalendar": "+ कैलेंडर में जोड़ें",
+    "joinSession": "सत्र में शामिल हों →",
+    "enrollForLink": "लिंक पाने के लिए नामांकन करें",
+    "recurrence": {
+      "weekly": "हर सप्ताह दोहराता है",
+      "biweekly": "हर 2 सप्ताह में दोहराता है",
+      "monthly": "हर महीने दोहराता है"
+    }
+  },
+  "CourseReview": {
+    "rateTitle": "इस कोर्स को रेट करें",
+    "yourReview": "आपकी समीक्षा",
+    "starsAria": "{count, plural, one {# तारा} other {# तारे}}",
+    "placeholder": "आपको यह कोर्स कैसा लगा? (कोर्स पेज पर सार्वजनिक रूप से दिखाया जाता है।)",
+    "saving": "सहेजा जा रहा है…",
+    "update": "समीक्षा अपडेट करें",
+    "submit": "समीक्षा सबमिट करें",
+    "thanks": "धन्यवाद — आपकी समीक्षा लाइव है।"
   }
 }
