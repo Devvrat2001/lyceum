@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Btn } from "@/components/wf/primitives";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { NotificationBell } from "@/components/layouts/NotificationBell";
@@ -15,6 +16,7 @@ import { LocaleToggle } from "@/components/i18n/LocaleToggle";
  */
 export function ParentHeader({ email }: { email?: string | null }) {
   const isMobile = useIsMobile();
+  const t = useTranslations("ParentDashboard");
   return (
     <header
       style={{
@@ -36,7 +38,7 @@ export function ParentHeader({ email }: { email?: string | null }) {
           color: "var(--wf-ink)",
         }}
       >
-        Lyceum · Parent
+        {t("brand")}
       </Link>
       <span style={{ flex: 1 }} />
       {!isMobile && email && (
@@ -46,7 +48,7 @@ export function ParentHeader({ email }: { email?: string | null }) {
       <NotificationBell />
       <Link href="/api/auth/signout" style={{ textDecoration: "none" }}>
         <Btn variant="ghost" sm>
-          Sign out
+          {t("signOut")}
         </Btn>
       </Link>
     </header>

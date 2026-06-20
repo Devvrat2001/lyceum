@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Btn, Card, Eyebrow, Icon } from "@/components/wf/primitives";
@@ -17,6 +18,8 @@ export default async function CheckoutSuccessPage({
   const session = await auth();
   if (!session?.user) redirect("/login");
   if (!sp.courseSlug && !sp.pathSlug) redirect("/student/library");
+
+  const t = await getTranslations("CheckoutSuccess");
 
   // Single-course purchases deep-link into lesson 1; bundle purchases
   // land on the library (every course in the bundle is now enrolled).
@@ -44,7 +47,7 @@ export default async function CheckoutSuccessPage({
       select: { title: true },
     });
     if (!path) redirect("/student/library");
-    title = `the "${path.title}" bundle`;
+    title = t("bundleTitle", { title: path.title });
   }
 
   return (
@@ -74,9 +77,9 @@ export default async function CheckoutSuccessPage({
         >
           <Icon name="check" size={28} color="var(--wf-good)" />
         </div>
-        <Eyebrow>Purchase complete</Eyebrow>
+        <Eyebrow>{t("purchaseComplete")}</Eyebrow>
         <h1 className="wf-h1" style={{ fontSize: 26, margin: "8px 0 6px" }}>
-          You&apos;re enrolled.
+          {t("enrolled")}
         </h1>
         <p
           style={{
@@ -86,8 +89,10 @@ export default async function CheckoutSuccessPage({
             lineHeight: 1.5,
           }}
         >
-          <b>{title}</b> is now in your library. Pick up where the
-          teacher recommends starting, or browse the full curriculum first.
+          {t.rich("inLibrary", {
+            title,
+            b: (c) => <b>{c}</b>,
+          })}
         </p>
         <div
           style={{
@@ -101,11 +106,11 @@ export default async function CheckoutSuccessPage({
               href={`/student/lesson/${firstLessonSlug}`}
               style={{ textDecoration: "none" }}
             >
-              <Btn variant="primary">Start lesson 1 →</Btn>
+              <Btn variant="primary">{t("startLesson")}</Btn>
             </Link>
           )}
           <Link href="/student/library" style={{ textDecoration: "none" }}>
-            <Btn variant="ghost">Open library</Btn>
+            <Btn variant="ghost">{t("openLibrary")}</Btn>
           </Link>
         </div>
       </Card>

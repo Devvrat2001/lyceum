@@ -6,6 +6,7 @@ import { MarketChrome } from "@/components/layouts/MarketChrome";
 import { Avatar, Card, Eyebrow } from "@/components/wf/primitives";
 import { FollowButton } from "@/components/marketplace/FollowButton";
 import { getServerCaller } from "@/lib/trpc/server";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/lib/auth";
 
 function initialsOf(name: string) {
@@ -40,6 +41,7 @@ export default async function StorefrontPage({
   }
 
   const session = await auth();
+  const t = await getTranslations("PublicStorefront");
 
   return (
     <MarketChrome role={session?.user?.role ?? null}>
@@ -55,9 +57,9 @@ export default async function StorefrontPage({
           style={{ fontSize: 11, color: "var(--wf-mute)", marginBottom: 16 }}
         >
           <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>
-            Browse
+            {t("breadcrumbBrowse")}
           </Link>{" "}
-          · Teachers ·{" "}
+          · {t("breadcrumbTeachers")} ·{" "}
           <span style={{ color: "var(--wf-ink)" }}>{profile.name}</span>
         </div>
 
@@ -93,17 +95,15 @@ export default async function StorefrontPage({
                 }}
               >
                 <span>
-                  {profile.courses.length} course
-                  {profile.courses.length === 1 ? "" : "s"}
+                  {t("courseCount", { count: profile.courses.length })}
                 </span>
                 <span>·</span>
                 <span>
-                  {profile.studentsCount.toLocaleString("en-US")} students
+                  {t("studentsCount", { count: profile.studentsCount })}
                 </span>
                 <span>·</span>
                 <span>
-                  {profile.followerCount.toLocaleString("en-US")} follower
-                  {profile.followerCount === 1 ? "" : "s"}
+                  {t("followerCount", { count: profile.followerCount })}
                 </span>
               </div>
             </div>
@@ -125,7 +125,7 @@ export default async function StorefrontPage({
         </Card>
 
         <Eyebrow style={{ marginBottom: 10 }}>
-          Courses by {profile.name}
+          {t("coursesBy", { name: profile.name })}
         </Eyebrow>
         {profile.courses.length === 0 ? (
           <Card
@@ -136,7 +136,7 @@ export default async function StorefrontPage({
               color: "var(--wf-mute)",
             }}
           >
-            No published courses yet.
+            {t("noCourses")}
           </Card>
         ) : (
           <div
@@ -162,7 +162,10 @@ export default async function StorefrontPage({
                       marginBottom: 6,
                     }}
                   >
-                    {c.subject.toUpperCase()} · GRADE {c.grade}
+                    {t("gradeLabel", {
+                      subject: c.subject.toUpperCase(),
+                      grade: c.grade,
+                    })}
                   </div>
                   <div
                     style={{

@@ -1,8 +1,11 @@
+import { getTranslations, getLocale } from "next-intl/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Avatar, Card, Eyebrow, Icon, Meter } from "@/components/wf/primitives";
 import { ParentHeader } from "@/components/layouts/ParentHeader";
 import { LinkChildForm } from "@/components/parent/LinkChildForm";
+
+type TFn = (key: string, values?: Record<string, string | number>) => string;
 
 /**
  * Parent dashboard (Tier 2.3, second commit). Shows each linked
@@ -20,6 +23,8 @@ import { LinkChildForm } from "@/components/parent/LinkChildForm";
 export default async function ParentDashboardPage() {
   const session = await auth();
   const me = session!.user;
+  const t = await getTranslations("ParentDashboard");
+  const locale = await getLocale();
 
   const links = await db.parentChild.findMany({
     where: { parentId: me.id },
@@ -123,16 +128,16 @@ export default async function ParentDashboardPage() {
           width: "100%",
         }}
       >
-        <Eyebrow>Your kids&apos; progress</Eyebrow>
+        <Eyebrow>{t("eyebrow")}</Eyebrow>
         <h1
           className="wf-h1"
           style={{ fontSize: 28, margin: "6px 0 18px" }}
         >
           {children.length === 0
-            ? "No children linked yet"
+            ? t("h1None")
             : children.length === 1
-              ? `How ${children[0].name} is doing`
-              : `How your ${children.length} kids are doing`}
+              ? t("h1One", { name: children[0].name })
+              : t("h1Many", { count: children.length })}
         </h1>
 
         {children.length === 0 ? (
@@ -154,7 +159,7 @@ export default async function ParentDashboardPage() {
                 className="wf-h2"
                 style={{ fontSize: 20, marginBottom: 8 }}
               >
-                Link your first child
+                {t("linkFirstTitle")}
               </h2>
               <p
                 style={{
@@ -164,8 +169,7 @@ export default async function ParentDashboardPage() {
                   margin: 0,
                 }}
               >
-                Once linked, you&apos;ll see each kid&apos;s progress,
-                recent practice, and streaks here.
+                {t("linkFirstBlurb")}
               </p>
             </div>
             <LinkChildForm />
@@ -183,7 +187,7 @@ export default async function ParentDashboardPage() {
               }}
             >
               {children.map((c) => (
-                <ChildCard key={c.id} child={c} />
+                <ChildCard key={c.id} child={c} t={t} locale={locale} />
               ))}
             </div>
             <Card p={18} style={{ marginTop: 18, maxWidth: 480 }}>
@@ -198,7 +202,11 @@ export default async function ParentDashboardPage() {
 
 function ChildCard({
   child,
+  t,
+  locale,
 }: {
+  t: TFn;
+  locale: string;
   child: {
     id: string;
     name: string;
@@ -259,8 +267,10 @@ function ChildCard({
           }}
         >
           {child.lastActivity
-            ? `Active ${relativeTime(child.lastActivity)}`
-            : "No activity yet"}
+            ? t("activeAgo", {
+                time: relativeTime(child.lastActivity, t, locale),
+              })
+            : t("noActivity")}
         </div>
       </div>
 
@@ -273,22 +283,22 @@ function ChildCard({
           marginBottom: 14,
         }}
       >
-        <Kpi label="XP" value={child.totalXp.toLocaleString()} />
+        <Kpi label={t("kpiXp")} value={child.totalXp.toLocaleString(locale)} />
         <Kpi
-          label="STREAK"
-          value={`${child.streakCurrent}d`}
+          label={t("kpiStreak")}
+          value={t("streakDays", { count: child.streakCurrent })}
           sub={
             child.streakLongest > child.streakCurrent
-              ? `best ${child.streakLongest}d`
+              ? t("streakBest", { count: child.streakLongest })
               : undefined
           }
         />
         <Kpi
-          label="IN PROGRESS"
+          label={t("kpiInProgress")}
           value={child.inProgress.length.toString()}
         />
         <Kpi
-          label="COMPLETED"
+          label={t("kpiCompleted")}
           value={child.completedCount.toString()}
         />
       </div>
@@ -296,7 +306,7 @@ function ChildCard({
       {/* Course list */}
       {child.inProgress.length > 0 && (
         <div style={{ marginBottom: 14 }}>
-          <Eyebrow style={{ marginBottom: 8 }}>Current courses</Eyebrow>
+          <Eyebrow style={{ marginBottom: 8 }}>{t("currentCourses")}</Eyebrow>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {child.inProgress.slice(0, 3).map((e) => (
               <div key={e.id}>
@@ -327,7 +337,7 @@ function ChildCard({
                   textAlign: "right",
                 }}
               >
-                + {child.inProgress.length - 3} more
+                {t("moreCount", { count: child.inProgress.length - 3 })}
               </div>
             )}
           </div>
@@ -337,7 +347,7 @@ function ChildCard({
       {/* Recent attempts */}
       {child.recentAttempts.length > 0 && (
         <div>
-          <Eyebrow style={{ marginBottom: 8 }}>Recent practice</Eyebrow>
+          <Eyebrow style={{ marginBottom: 8 }}>{t("recentPractice")}</Eyebrow>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {child.recentAttempts.map((a) => (
               <div
@@ -362,7 +372,7 @@ function ChildCard({
                   {a.correct ? "✓" : "✗"}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  {a.lesson?.title ?? "(deleted lesson)"}
+                  {a.lesson?.title ?? t("deletedLesson")}
                 </span>
                 <span
                   style={{
@@ -371,7 +381,7 @@ function ChildCard({
                     flexShrink: 0,
                   }}
                 >
-                  {relativeTime(a.createdAt)}
+                  {relativeTime(a.createdAt, t, locale)}
                 </span>
               </div>
             ))}
@@ -431,18 +441,18 @@ function initialsOf(name: string): string {
 }
 
 /** Coarse relative-time — minutes / hours / days, then explicit date. */
-function relativeTime(d: Date | string): string {
+function relativeTime(d: Date | string, t: TFn, locale: string): string {
   const date = typeof d === "string" ? new Date(d) : d;
   const diffMs = Date.now() - date.getTime();
   const sec = Math.floor(diffMs / 1_000);
-  if (sec < 45) return "just now";
+  if (sec < 45) return t("justNow");
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t("minutesAgo", { count: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("hoursAgo", { count: hr });
   const day = Math.floor(hr / 24);
-  if (day < 7) return `${day}d ago`;
-  return date.toLocaleDateString(undefined, {
+  if (day < 7) return t("daysAgo", { count: day });
+  return date.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
   });

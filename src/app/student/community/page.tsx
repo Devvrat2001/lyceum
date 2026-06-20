@@ -1,25 +1,30 @@
 import Link from "next/link";
+import { getTranslations, getLocale } from "next-intl/server";
 import { StudentChrome } from "@/components/layouts/StudentChrome";
 import { Card, Eyebrow, Icon } from "@/components/wf/primitives";
 import { getServerCaller } from "@/lib/trpc/server";
 
+type TFn = (key: string, values?: Record<string, string | number>) => string;
+
 /** Coarse relative time for a thread's last activity. */
-function fmtTime(d: Date): string {
+function fmtTime(d: Date, t: TFn, locale: string): string {
   const sec = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (sec < 45) return "just now";
+  if (sec < 45) return t("justNow");
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t("minutesAgo", { count: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("hoursAgo", { count: hr });
   const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (day < 30) return t("daysAgo", { count: day });
+  return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
 export default async function StudentCommunityPage() {
   const trpc = await getServerCaller();
   const data = await trpc.lesson.studentCommunity();
   const threads = data.threads;
+  const t = await getTranslations("Community");
+  const locale = await getLocale();
 
   return (
     <StudentChrome active="community">
@@ -35,7 +40,7 @@ export default async function StudentCommunityPage() {
           >
             <Icon name="chat" size={20} color="var(--wf-ink)" />
             <h1 className="wf-h1" style={{ fontSize: 24, margin: 0 }}>
-              Community
+              {t("title")}
             </h1>
           </div>
           <p
@@ -46,8 +51,7 @@ export default async function StudentCommunityPage() {
               lineHeight: 1.5,
             }}
           >
-            Discussion threads from the lessons you&apos;re taking. Jump in,
-            ask a question, or help a classmate out.
+            {t("subtitle")}
           </p>
 
           {threads.length > 0 && (
@@ -60,7 +64,9 @@ export default async function StudentCommunityPage() {
               }}
             >
               <Card p={14}>
-                <Eyebrow style={{ marginBottom: 6 }}>Threads</Eyebrow>
+                <Eyebrow style={{ marginBottom: 6 }}>
+                  {t("statThreads")}
+                </Eyebrow>
                 <div
                   className="wf-serif"
                   style={{ fontSize: 22, fontWeight: 700, lineHeight: 1 }}
@@ -69,7 +75,9 @@ export default async function StudentCommunityPage() {
                 </div>
               </Card>
               <Card p={14}>
-                <Eyebrow style={{ marginBottom: 6 }}>You&apos;ve joined</Eyebrow>
+                <Eyebrow style={{ marginBottom: 6 }}>
+                  {t("statJoined")}
+                </Eyebrow>
                 <div
                   className="wf-serif"
                   style={{ fontSize: 22, fontWeight: 700, lineHeight: 1 }}
@@ -89,26 +97,28 @@ export default async function StudentCommunityPage() {
                   lineHeight: 1.55,
                 }}
               >
-                No discussions yet. Once a lesson in one of your courses has a
-                discussion thread, it&apos;ll show up here.{" "}
-                <Link
-                  href="/student/library"
-                  style={{ color: "var(--wf-accent)" }}
-                >
-                  Browse your library →
-                </Link>
+                {t.rich("empty", {
+                  link: (c) => (
+                    <Link
+                      href="/student/library"
+                      style={{ color: "var(--wf-accent)" }}
+                    >
+                      {c}
+                    </Link>
+                  ),
+                })}
               </div>
             </Card>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {threads.map((t) => {
+              {threads.map((thread) => {
                 const inner = (
                   <Card
-                    key={t.blockId}
+                    key={thread.blockId}
                     p={16}
                     style={{
                       transition: "none",
-                      cursor: t.lessonSlug ? "pointer" : "default",
+                      cursor: thread.lessonSlug ? "pointer" : "default",
                     }}
                   >
                     <div
@@ -128,9 +138,9 @@ export default async function StudentCommunityPage() {
                           color: "var(--wf-mute)",
                         }}
                       >
-                        {t.courseTitle} · {t.lessonTitle}
+                        {thread.courseTitle} · {thread.lessonTitle}
                       </span>
-                      {t.youPosted && (
+                      {thread.youPosted && (
                         <span
                           className="wf-mono"
                           style={{
@@ -142,7 +152,7 @@ export default async function StudentCommunityPage() {
                             letterSpacing: "0.04em",
                           }}
                         >
-                          JOINED
+                          {t("joinedBadge")}
                         </span>
                       )}
                       <span
@@ -153,9 +163,10 @@ export default async function StudentCommunityPage() {
                           color: "var(--wf-mute)",
                         }}
                       >
-                        {t.commentCount}{" "}
-                        {t.commentCount === 1 ? "comment" : "comments"}
-                        {t.lastActivity ? ` · ${fmtTime(t.lastActivity)}` : ""}
+                        {t("commentCount", { count: thread.commentCount })}
+                        {thread.lastActivity
+                          ? ` · ${fmtTime(thread.lastActivity, t, locale)}`
+                          : ""}
                       </span>
                     </div>
                     <div
@@ -166,14 +177,14 @@ export default async function StudentCommunityPage() {
                         lineHeight: 1.4,
                       }}
                     >
-                      {t.prompt ?? "Join the discussion"}
+                      {thread.prompt ?? t("joinDiscussion")}
                     </div>
                   </Card>
                 );
-                return t.lessonSlug ? (
+                return thread.lessonSlug ? (
                   <Link
-                    key={t.blockId}
-                    href={`/student/lesson/${t.lessonSlug}`}
+                    key={thread.blockId}
+                    href={`/student/lesson/${thread.lessonSlug}`}
                     style={{ textDecoration: "none", color: "inherit" }}
                   >
                     {inner}

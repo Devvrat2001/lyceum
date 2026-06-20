@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Btn, Eyebrow } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 
@@ -12,6 +13,7 @@ import { trpc } from "@/lib/trpc/react";
  */
 export function LinkChildForm() {
   const router = useRouter();
+  const t = useTranslations("ParentDashboard");
   const [code, setCode] = useState("");
   const [linkedName, setLinkedName] = useState<string | null>(null);
 
@@ -25,7 +27,7 @@ export function LinkChildForm() {
 
   return (
     <div style={{ textAlign: "left" }}>
-      <Eyebrow style={{ marginBottom: 8 }}>Link a child</Eyebrow>
+      <Eyebrow style={{ marginBottom: 8 }}>{t("linkChild")}</Eyebrow>
       <div
         style={{
           fontSize: 12,
@@ -34,9 +36,7 @@ export function LinkChildForm() {
           marginBottom: 10,
         }}
       >
-        Ask your kid to open Settings → Family on their Lyceum account
-        and tap &quot;Generate family code&quot;, then enter the code
-        here. Your school can also link you from their side.
+        {t("linkInstructions")}
       </div>
       <form
         onSubmit={(e) => {
@@ -51,9 +51,9 @@ export function LinkChildForm() {
         <input
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="e.g. K7MX2P"
+          placeholder={t("codePlaceholder")}
           maxLength={16}
-          aria-label="Family code"
+          aria-label={t("codeAria")}
           className="wf-mono"
           style={{
             flex: 1,
@@ -74,7 +74,7 @@ export function LinkChildForm() {
           type="submit"
           disabled={link.isPending || code.trim().length < 4}
         >
-          {link.isPending ? "Linking…" : "Link"}
+          {link.isPending ? t("linking") : t("linkAction")}
         </Btn>
       </form>
       {link.error && (
@@ -86,7 +86,7 @@ export function LinkChildForm() {
       )}
       {linkedName && (
         <div style={{ marginTop: 8, fontSize: 12, color: "var(--wf-good)" }}>
-          ✓ Linked {linkedName} — their progress will appear above.
+          {t("linkedSuccess", { name: linkedName })}
         </div>
       )}
     </div>
