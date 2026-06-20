@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–67 — auth flow + full BlockReader + /settings + home + storefront/community/parent/checkout all done; next: course builder + the shared data-catalog labels)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–68 — auth + full BlockReader + /settings + all public pages + the marketplace data-catalog labels all done; next: block-type labels + the course-builder shell + admin tools)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -670,6 +670,15 @@ Ordered by learner/public impact:
    course/student/follower/comment counts; locale-aware relative-times
    threaded via the shared `TFn` param. **Only tail: `demo-checkout/[orderId]`**
    — demo-only payment page (prod uses Stripe-hosted checkout), low priority.
+   **Marketplace data-catalog labels DONE (cont.68)** — the
+   grade/subject/topic/price/length/rating/format/board/sort *option* labels
+   (`@/lib/marketplace`) now translate via a new `MarketplaceCatalog` ns
+   (52 keys, keyed by the stable value/slug) + a `MarketplaceFilters` ns
+   (filter/sort chrome); wired into the home (chips + featured header),
+   `MarketplaceFilters`, `MarketplaceSort`. Still English: `CourseCard` board
+   tag + its 3 strings (hook-free → needs prop-threading), `/course/[slug]`,
+   `/browse` BrowseClient, and the **block-type labels** (`@/lib/blocks`
+   BLOCK_GROUPS) — do those alongside the builder.
 4. **Course builder** (teacher power tool): `CourseBuilderClient`,
    `BlockInspector`, `BlockLibrary`, `AddBlockPopover` + `teacher/courses/new`
    `/new/ai` `/[courseId]/edit`, `teacher/assignments` (`AssignmentsClient`),
