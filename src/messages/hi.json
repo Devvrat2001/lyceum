@@ -238,7 +238,13 @@
     "whatYoullMaster": "आप क्या सीखेंगे",
     "curriculum": "पाठ्यक्रम",
     "reviewThisCourse": "इस कोर्स की समीक्षा करें",
-    "whatStudentsSay": "छात्र क्या कहते हैं"
+    "whatStudentsSay": "छात्र क्या कहते हैं",
+    "gradeLabel": "ग्रेड {grade}",
+    "notRated": "अभी कोई रेटिंग नहीं",
+    "by": "<b>{author}</b> द्वारा",
+    "updated": "{date} को अपडेट किया गया",
+    "unitsCount": "{count, plural, one {# इकाई} other {# इकाइयाँ}}",
+    "lessonsCount": "{count, plural, one {# पाठ} other {# पाठ}}"
   },
   "TeacherNav": {
     "courses": "मेरे कोर्स",
@@ -896,5 +902,10 @@
     "dimSort": "क्रमबद्ध करें",
     "triggerActive": "{dim} · {label}",
     "clearFilters": "फ़िल्टर हटाएँ"
+  },
+  "CourseCard": {
+    "inLibrary": "✓ आपकी लाइब्रेरी में",
+    "notRated": "अभी कोई रेटिंग नहीं",
+    "continueLabel": "जारी रखें →"
   }
 }

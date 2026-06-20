@@ -238,7 +238,13 @@
     "whatYoullMaster": "What you'll master",
     "curriculum": "Curriculum",
     "reviewThisCourse": "Review this course",
-    "whatStudentsSay": "What students say"
+    "whatStudentsSay": "What students say",
+    "gradeLabel": "Grade {grade}",
+    "notRated": "Not yet rated",
+    "by": "By <b>{author}</b>",
+    "updated": "Updated {date}",
+    "unitsCount": "{count, plural, one {# unit} other {# units}}",
+    "lessonsCount": "{count, plural, one {# lesson} other {# lessons}}"
   },
   "TeacherNav": {
     "courses": "My courses",
@@ -896,5 +902,10 @@
     "dimSort": "Sort",
     "triggerActive": "{dim} · {label}",
     "clearFilters": "CLEAR FILTERS"
+  },
+  "CourseCard": {
+    "inLibrary": "✓ IN LIBRARY",
+    "notRated": "Not yet rated",
+    "continueLabel": "Continue →"
   }
 }

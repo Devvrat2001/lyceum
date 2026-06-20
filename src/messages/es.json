@@ -238,7 +238,13 @@
     "whatYoullMaster": "Lo que dominarás",
     "curriculum": "Plan de estudios",
     "reviewThisCourse": "Reseña este curso",
-    "whatStudentsSay": "Lo que dicen los estudiantes"
+    "whatStudentsSay": "Lo que dicen los estudiantes",
+    "gradeLabel": "Grado {grade}",
+    "notRated": "Sin valoraciones aún",
+    "by": "Por <b>{author}</b>",
+    "updated": "Actualizado el {date}",
+    "unitsCount": "{count, plural, one {# unidad} other {# unidades}}",
+    "lessonsCount": "{count, plural, one {# lección} other {# lecciones}}"
   },
   "TeacherNav": {
     "courses": "Mis cursos",
@@ -896,5 +902,10 @@
     "dimSort": "Ordenar",
     "triggerActive": "{dim} · {label}",
     "clearFilters": "QUITAR FILTROS"
+  },
+  "CourseCard": {
+    "inLibrary": "✓ EN TU BIBLIOTECA",
+    "notRated": "Sin valoraciones aún",
+    "continueLabel": "Continuar →"
   }
 }

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Card } from "@/components/wf/primitives";
 import { formatPrice } from "@/lib/currency";
 import { fmtCount } from "@/lib/format";
-import { boardLabel } from "@/lib/marketplace";
 import { courseGradient, subjectGlyph } from "@/lib/thumbnail";
 
 export type CourseCardData = {
@@ -34,9 +33,16 @@ export type CourseCardData = {
 export function CourseCard({
   course,
   owned,
+  boardLabel,
+  labels,
 }: {
   course: CourseCardData;
   owned: boolean;
+  /** Pre-translated board label for this card's board, or null. */
+  boardLabel: string | null;
+  /** Static card strings, pre-translated by the caller — the card stays a
+   *  hook-free leaf so it renders in both server and client trees. */
+  labels: { inLibrary: string; notRated: string; continueLabel: string };
 }) {
   return (
     <Link
@@ -92,10 +98,8 @@ export function CourseCard({
                 · CBSE"); ownership replaces both — "in library" beats any
                 shopping signal. */}
             {owned
-              ? "✓ IN LIBRARY"
-              : [course.tag, boardLabel(course.board)]
-                  .filter(Boolean)
-                  .join(" · ")}
+              ? labels.inLibrary
+              : [course.tag, boardLabel].filter(Boolean).join(" · ")}
           </div>
           <div
             style={{
@@ -132,7 +136,7 @@ export function CourseCard({
               </span>
             ) : (
               <span style={{ fontSize: 11, color: "var(--wf-mute)" }}>
-                Not yet rated
+                {labels.notRated}
               </span>
             )}
             {owned ? (
@@ -143,7 +147,7 @@ export function CourseCard({
                   color: "var(--wf-good)",
                 }}
               >
-                Continue →
+                {labels.continueLabel}
               </span>
             ) : (
               <span

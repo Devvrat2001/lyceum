@@ -24,6 +24,7 @@ import {
   MARKETPLACE_PRICE_BUCKETS,
   MARKETPLACE_SUBJECTS,
   MARKETPLACE_TOPICS,
+  boardLabelKey,
   findTopic,
 } from "@/lib/marketplace";
 import { Suspense } from "react";
@@ -47,6 +48,19 @@ export default async function MarketplacePage({
   const sp = await searchParams;
   const t = await getTranslations("Marketplace");
   const tc = await getTranslations("MarketplaceCatalog");
+  const tcard = await getTranslations("CourseCard");
+  // CourseCard is a hook-free leaf, so the home (server) resolves its
+  // strings here: the static labels (same for every card) once, plus a
+  // per-card translated board label.
+  const cardLabels = {
+    inLibrary: tcard("inLibrary"),
+    notRated: tcard("notRated"),
+    continueLabel: tcard("continueLabel"),
+  };
+  const boardText = (v: string | null | undefined) => {
+    const k = boardLabelKey(v);
+    return k ? tc(k) : null;
+  };
   const activeTopic = findTopic(sp.topic);
   // Filter defaults: when the user hasn't picked anything, fall back
   // to "Grade 6 · Math" so the page lands on a populated grid.
@@ -393,6 +407,8 @@ export default async function MarketplacePage({
                   key={c.slug}
                   course={c}
                   owned={enrolledIds.has(c.id)}
+                  boardLabel={boardText(c.board)}
+                  labels={cardLabels}
                 />
               ))}
             </div>

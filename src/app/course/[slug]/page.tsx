@@ -3,9 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketChrome } from "@/components/layouts/MarketChrome";
 import { Annot, Avatar, Card, Icon } from "@/components/wf/primitives";
-import { boardLabel } from "@/lib/marketplace";
+import { boardLabelKey } from "@/lib/marketplace";
 import { courseGradient, subjectGlyph } from "@/lib/thumbnail";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, getLocale } from "next-intl/server";
 import { getServerCaller } from "@/lib/trpc/server";
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -48,6 +48,10 @@ export default async function CourseDetailPage({
   }
 
   const t = await getTranslations("CourseDetail");
+  const tc = await getTranslations("MarketplaceCatalog");
+  const locale = await getLocale();
+  const boardKey = boardLabelKey(course.board);
+  const boardText = boardKey ? tc(boardKey) : null;
   const [reviews, myStatus, session] = await Promise.all([
     trpc.course.reviews({ courseId: course.id, limit: 4 }),
     trpc.course.myStatus({ courseId: course.id }),
@@ -123,8 +127,8 @@ export default async function CourseDetailPage({
             {t("browse")}
           </Link>{" "}
           · {course.subject.toUpperCase()} ·{" "}
-          {boardLabel(course.board) ? `${boardLabel(course.board)} · ` : ""}
-          Grade {course.grade} ·{" "}
+          {boardText ? `${boardText} · ` : ""}
+          {t("gradeLabel", { grade: course.grade })} ·{" "}
           <span style={{ color: "var(--wf-ink)" }}>{course.title}</span>
         </div>
         <div className="wf-two-col--wide">
@@ -167,19 +171,23 @@ export default async function CourseDetailPage({
                   </span>
                 </span>
               ) : (
-                <span style={{ color: "var(--wf-mute)" }}>Not yet rated</span>
+                <span style={{ color: "var(--wf-mute)" }}>{t("notRated")}</span>
               )}
               <span style={{ color: "var(--wf-mute)" }}>·</span>
               <span>
-                By <b>{course.authorLabel ?? course.author.name ?? "—"}</b>
+                {t.rich("by", {
+                  author: course.authorLabel ?? course.author.name ?? "—",
+                  b: (c) => <b>{c}</b>,
+                })}
               </span>
               <span style={{ color: "var(--wf-mute)" }}>·</span>
               <span>
-                Updated{" "}
-                {new Date(course.updatedAt).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
+                {t("updated", {
+                  date: new Date(course.updatedAt).toLocaleDateString(locale, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  }),
                 })}
               </span>
             </div>
@@ -282,7 +290,8 @@ export default async function CourseDetailPage({
                 {t("curriculum")}
               </h2>
               <span style={{ fontSize: 12, color: "var(--wf-mute)" }}>
-                {course.units.length} units · {totalLessons} lessons
+                {t("unitsCount", { count: course.units.length })} ·{" "}
+                {t("lessonsCount", { count: totalLessons })}
                 {estimatedMinutes > 0
                   ? ` · ${durationExact ? "" : "~"}${formatDuration(estimatedMinutes)}`
                   : ""}

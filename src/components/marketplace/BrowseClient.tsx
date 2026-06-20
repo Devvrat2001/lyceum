@@ -10,6 +10,7 @@ import { CourseCard } from "./CourseCard";
 import { MarketplaceFilters } from "./MarketplaceFilters";
 import { MarketplaceSort } from "./MarketplaceSort";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { boardLabelKey } from "@/lib/marketplace";
 
 /**
  * The /browse catalog body: a search box that filters the full course
@@ -21,6 +22,18 @@ import { useDebouncedValue } from "@/lib/useDebouncedValue";
  */
 export function BrowseClient({ initialQ }: { initialQ: string }) {
   const t = useTranslations("Browse");
+  const tcard = useTranslations("CourseCard");
+  const tc = useTranslations("MarketplaceCatalog");
+  // CourseCard is a hook-free leaf — resolve its strings here and pass them in.
+  const cardLabels = {
+    inLibrary: tcard("inLibrary"),
+    notRated: tcard("notRated"),
+    continueLabel: tcard("continueLabel"),
+  };
+  const boardText = (v: string | null | undefined) => {
+    const k = boardLabelKey(v);
+    return k ? tc(k) : null;
+  };
   const [q, setQ] = useState(initialQ);
   const debouncedQ = useDebouncedValue(q.trim(), 250);
 
@@ -159,7 +172,13 @@ export function BrowseClient({ initialQ }: { initialQ: string }) {
           }}
         >
           {courses.map((c) => (
-            <CourseCard key={c.id} course={c} owned={enrolledIds.has(c.id)} />
+            <CourseCard
+              key={c.id}
+              course={c}
+              owned={enrolledIds.has(c.id)}
+              boardLabel={boardText(c.board)}
+              labels={cardLabels}
+            />
           ))}
         </div>
       )}

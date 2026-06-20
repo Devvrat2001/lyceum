@@ -201,6 +201,20 @@ export function boardLabel(value: string | null | undefined): string | null {
   return value ? labelFor(MARKETPLACE_BOARD_BUCKETS, value) : null;
 }
 
+/**
+ * Message-key path under the `MarketplaceCatalog` `board` group for a stored
+ * board value, or null when unset/unknown. Render sites translate it via
+ * `tc(key)`; mirrors `boardLabel`'s validity guard so a junk value degrades
+ * to "no tag" instead of a missing-key error.
+ */
+export function boardLabelKey(
+  value: string | null | undefined
+): string | null {
+  return value && MARKETPLACE_BOARD_BUCKETS.some((b) => b.value === value)
+    ? `board.${value}`
+    : null;
+}
+
 export function labelFor<T extends { value: string; label: string }>(
   items: T[],
   value: string | undefined
