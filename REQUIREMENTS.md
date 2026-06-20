@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–68 — auth + full BlockReader + /settings + all public pages + the marketplace data-catalog labels all done; next: block-type labels + the course-builder shell + admin tools)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–69 — auth + full BlockReader + /settings + all public pages + marketplace catalog labels + CourseCard + the course-detail page all done; next: the 4 course-detail sub-components, then block-type labels + course-builder shell + admin tools)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -675,10 +675,17 @@ Ordered by learner/public impact:
    (`@/lib/marketplace`) now translate via a new `MarketplaceCatalog` ns
    (52 keys, keyed by the stable value/slug) + a `MarketplaceFilters` ns
    (filter/sort chrome); wired into the home (chips + featured header),
-   `MarketplaceFilters`, `MarketplaceSort`. Still English: `CourseCard` board
-   tag + its 3 strings (hook-free → needs prop-threading), `/course/[slug]`,
-   `/browse` BrowseClient, and the **block-type labels** (`@/lib/blocks`
-   BLOCK_GROUPS) — do those alongside the builder.
+   `MarketplaceFilters`, `MarketplaceSort`. **`CourseCard` + course-detail
+   page DONE (cont.69)** — `CourseCard` made to take pre-translated `labels`
+   + `boardLabel` props (it stays a hook-free leaf, so the home/`BrowseClient`
+   callers resolve via a new `CourseCard` ns + `boardLabelKey` helper);
+   `/course/[slug]` page-body stragglers finished (breadcrumb Grade + board,
+   Not-yet-rated, By [rich], Updated [locale date], unit/lesson ICU plurals →
+   +6 keys on the existing `CourseDetail` ns). **Public surface remaining: the
+   4 course-detail sub-components** — `EnrollPanel` (price + buy/enroll CTA),
+   `CurriculumAccordion`, `CourseReviewForm`, `LiveScheduleCard` (none import
+   next-intl yet). Then the **block-type labels** (`@/lib/blocks` BLOCK_GROUPS)
+   — do those alongside the builder.
 4. **Course builder** (teacher power tool): `CourseBuilderClient`,
    `BlockInspector`, `BlockLibrary`, `AddBlockPopover` + `teacher/courses/new`
    `/new/ai` `/[courseId]/edit`, `teacher/assignments` (`AssignmentsClient`),
