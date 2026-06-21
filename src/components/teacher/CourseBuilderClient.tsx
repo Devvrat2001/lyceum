@@ -182,29 +182,29 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
   const addLesson = trpc.teacher.addLesson.useMutation();
   const updateLesson = trpc.teacher.updateLesson.useMutation();
   const updateUnit = trpc.teacher.updateUnit.useMutation({
-    onError: (e) => setErr(`Failed to rename unit: ${e.message}`),
+    onError: (e) => setErr(t("errRenameUnit", { msg: e.message })),
   });
   const deleteUnit = trpc.teacher.deleteUnit.useMutation({
     onError: (e) => {
-      setErr(`Failed to delete unit: ${e.message}`);
+      setErr(t("errDeleteUnit", { msg: e.message }));
       setUnits(course.units);
     },
   });
   const deleteLesson = trpc.teacher.deleteLesson.useMutation({
     onError: (e) => {
-      setErr(`Failed to delete lesson: ${e.message}`);
+      setErr(t("errDeleteLesson", { msg: e.message }));
       setUnits(course.units);
     },
   });
   const reorderUnits = trpc.teacher.reorderUnits.useMutation({
     onError: (e) => {
-      setErr(`Failed to reorder units: ${e.message}`);
+      setErr(t("errReorderUnits", { msg: e.message }));
       setUnits(course.units);
     },
   });
   const reorderLessons = trpc.teacher.reorderLessons.useMutation({
     onError: (e) => {
-      setErr(`Failed to reorder lessons: ${e.message}`);
+      setErr(t("errReorderLessons", { msg: e.message }));
       setUnits(course.units);
     },
   });
@@ -215,19 +215,19 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
   const deleteBlock = trpc.teacher.deleteBlock.useMutation();
   const reorderBlocks = trpc.teacher.reorderBlocks.useMutation({
     onError: (e) => {
-      setErr(`Failed to save block order: ${e.message}`);
+      setErr(t("errReorderBlocks", { msg: e.message }));
       setUnits(course.units);
     },
   });
   const moveBlockM = trpc.teacher.moveBlock.useMutation({
     onError: (e) => {
-      setErr(`Failed to move block: ${e.message}`);
+      setErr(t("errMoveBlock", { msg: e.message }));
       setUnits(course.units);
     },
   });
   const setCourseStatus = trpc.teacher.setCourseStatus.useMutation({
     onSuccess: () => router.refresh(),
-    onError: (e) => setErr(`Failed to update course status: ${e.message}`),
+    onError: (e) => setErr(t("errCourseStatus", { msg: e.message })),
   });
 
   const markSaved = useCallback(() => setSavedLabel(t("savedNow")), [t]);
@@ -334,7 +334,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       selectBlock(newBlock.id);
       markSaved();
     } catch (e) {
-      setErr(`Failed to add block: ${e instanceof Error ? e.message : ""}`);
+      setErr(t("errAddBlock", { msg: e instanceof Error ? e.message : "" }));
     }
   };
 
@@ -374,7 +374,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       selectBlock(created.id);
       markSaved();
     } catch (e) {
-      setErr(`Failed to duplicate: ${e instanceof Error ? e.message : ""}`);
+      setErr(t("errDuplicate", { msg: e instanceof Error ? e.message : "" }));
     }
   };
 
@@ -407,7 +407,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       selectBlock(created.id);
       markSaved();
     } catch (e) {
-      setErr(`Failed to switch type: ${e instanceof Error ? e.message : ""}`);
+      setErr(t("errSwitchType", { msg: e instanceof Error ? e.message : "" }));
     }
   };
 
@@ -501,7 +501,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       setOpenUnits((prev) => new Set(prev).add(unit.id));
       markSaved();
     } catch (e) {
-      setErr(`Failed to add unit: ${e instanceof Error ? e.message : ""}`);
+      setErr(t("errAddUnit", { msg: e instanceof Error ? e.message : "" }));
     }
   };
 
@@ -525,7 +525,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
       selectLesson(lesson.id);
       markSaved();
     } catch (e) {
-      setErr(`Failed to add lesson: ${e instanceof Error ? e.message : ""}`);
+      setErr(t("errAddLesson", { msg: e instanceof Error ? e.message : "" }));
     }
   };
 
@@ -2609,6 +2609,7 @@ function Empty({ children }: { children: ReactNode }) {
 }
 
 function BlockBody({ block }: { block: LessonBlock }) {
+  const t = useTranslations("CourseBuilder");
   const s = block.settings;
   const ap = (s.appearance ?? {}) as NonNullable<BlockSettings["appearance"]>;
 
@@ -2643,7 +2644,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
               {body.length > 600 ? body.slice(0, 600) + "…" : body}
             </p>
           ) : (
-            <Empty>Empty reading — add content in the inspector.</Empty>
+            <Empty>{t("emptyReading")}</Empty>
           )}
         </>
       );
@@ -2654,11 +2655,11 @@ function BlockBody({ block }: { block: LessonBlock }) {
       const opts = arr<{ text?: string; correct?: boolean }>(s.options);
       return (
         <>
-          <Stem>{stem || "Untitled question"}</Stem>
+          <Stem>{stem || t("untitledQuestion")}</Stem>
           {opts.length ? (
             <OptionCards options={opts} appearance={ap} />
           ) : (
-            <Empty>No answer options yet.</Empty>
+            <Empty>{t("noOptions")}</Empty>
           )}
         </>
       );
@@ -2669,11 +2670,11 @@ function BlockBody({ block }: { block: LessonBlock }) {
         stem?: string;
         answers?: { key?: string; text?: string; correct?: boolean }[];
       }>(s.questions);
-      if (!qs.length) return <Empty>No questions yet.</Empty>;
+      if (!qs.length) return <Empty>{t("noQuestions")}</Empty>;
       const q0 = qs[0];
       return (
         <>
-          <Stem>{str(q0.stem) || "Question 1"}</Stem>
+          <Stem>{str(q0.stem) || t("questionN", { n: 1 })}</Stem>
           <OptionCards
             options={arr<{ text?: string; correct?: boolean }>(q0.answers).map(
               (a) => ({ text: str(a.text), correct: !!a.correct })
@@ -2682,7 +2683,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
           />
           {qs.length > 1 && (
             <div style={{ fontSize: 11, color: tone.mute, marginTop: 10 }}>
-              + {qs.length - 1} more question{qs.length - 1 === 1 ? "" : "s"}
+              {t("moreQuestions", { count: qs.length - 1 })}
             </div>
           )}
         </>
@@ -2707,12 +2708,12 @@ function BlockBody({ block }: { block: LessonBlock }) {
           <Icon name="sparkles" size={16} color={tone.ai} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: tone.ai }}>
-              Adaptive quiz · generated from this lesson
+              {t("aiQuizTitle")}
             </div>
             <div style={{ fontSize: 11.5, color: tone.body, marginTop: 2 }}>
               {n
-                ? `${n} question${n === 1 ? "" : "s"} ready · difficulty adapts per student`
-                : "Not generated yet — open the inspector to generate."}
+                ? t("aiQuizReady", { count: n })
+                : t("aiQuizEmpty")}
             </div>
           </div>
         </div>
@@ -2738,10 +2739,8 @@ function BlockBody({ block }: { block: LessonBlock }) {
     case "SIMULATION": {
       const url = str(s.url);
       const caption = str(s.caption);
-      const labels: Record<string, string> = {
-        SLIDES: "Slides",
-        SIMULATION: "Interactive simulation",
-      };
+      const sourceLabel =
+        block.type === "SLIDES" ? t("sourceSlides") : t("sourceSimulation");
       return (
         <>
           <div
@@ -2763,7 +2762,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
             <div style={{ textAlign: "center" }}>
               <Icon name="grid" size={22} color={tone.mute} />
               <div style={{ marginTop: 6 }}>
-                {url ? hostOf(url) : labels[block.type]}
+                {url ? hostOf(url) : sourceLabel}
               </div>
             </div>
           </div>
@@ -2772,7 +2771,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
               {caption}
             </div>
           )}
-          {!url && <Empty>No source URL yet.</Empty>}
+          {!url && <Empty>{t("noSourceUrl")}</Empty>}
         </>
       );
     }
@@ -2795,7 +2794,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
           >
             <Icon name="download" size={16} color={tone.body} />
             <span style={{ fontSize: 13, color: tone.ink, flex: 1 }}>
-              {url ? hostOf(url) : "PDF / file"}
+              {url ? hostOf(url) : t("pdfFile")}
             </span>
             <span
               style={{
@@ -2807,7 +2806,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
                 padding: "4px 10px",
               }}
             >
-              Download
+              {t("download")}
             </span>
           </div>
           {caption && (
@@ -2822,7 +2821,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
     case "DRAG_MATCH": {
       const pairs = arr<{ left?: string; right?: string }>(s.pairs);
       const prompt = str(s.prompt);
-      if (!pairs.length) return <Empty>No matching pairs yet.</Empty>;
+      if (!pairs.length) return <Empty>{t("noPairs")}</Empty>;
       return (
         <>
           {prompt && <Stem>{prompt}</Stem>}
@@ -2846,7 +2845,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
       const opts = arr<string>(s.options).filter((o) => typeof o === "string");
       return (
         <>
-          <Stem>{prompt || "Poll"}</Stem>
+          <Stem>{prompt || t("pollFallback")}</Stem>
           {opts.length ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {opts.map((o, i) => (
@@ -2876,7 +2875,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
               ))}
             </div>
           ) : (
-            <Empty>No poll options yet.</Empty>
+            <Empty>{t("noPollOptions")}</Empty>
           )}
         </>
       );
@@ -2895,7 +2894,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
               color: tone.ink,
             }}
           >
-            {title || "Section"}
+            {title || t("sectionFallback")}
           </div>
           {subtitle && (
             <div style={{ fontSize: 13, color: tone.body, marginTop: 4 }}>
@@ -2910,7 +2909,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
       const prompt = str(s.prompt);
       return (
         <>
-          <Stem>{prompt || "Class discussion"}</Stem>
+          <Stem>{prompt || t("discussionFallback")}</Stem>
           <div
             style={{
               padding: "10px 14px",
@@ -2921,7 +2920,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
               fontSize: 13,
             }}
           >
-            Write a reply…
+            {t("writeReply")}
           </div>
         </>
       );
@@ -2937,7 +2936,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
             hour: "numeric",
             minute: "2-digit",
           })
-        : "Not scheduled";
+        : t("notScheduled");
       return (
         <div
           style={{
@@ -2953,7 +2952,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
           <Icon name="user" size={16} color={tone.body} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: tone.ink }}>
-              {str(s.title) || str(s.label) || "Live session"}
+              {str(s.title) || str(s.label) || t("liveFallback")}
             </div>
             <div
               style={{ fontSize: 11.5, color: tone.body, marginTop: 2 }}
@@ -2972,7 +2971,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
               padding: "4px 10px",
             }}
           >
-            Join
+            {t("join")}
           </span>
         </div>
       );
@@ -2983,7 +2982,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
       const expected = str(s.expected);
       return (
         <>
-          <Stem>{prompt || "Read aloud"}</Stem>
+          <Stem>{prompt || t("speakFallback")}</Stem>
           <div
             style={{
               display: "flex",
@@ -3010,7 +3009,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
               <Icon name="mic" size={16} color={tone.body} />
             </span>
             <span style={{ fontSize: 12.5, color: tone.mute }}>
-              {expected ? `Expected: “${expected}”` : "Tap to record your answer"}
+              {expected ? t("speakExpected", { text: expected }) : t("speakRecord")}
             </span>
           </div>
         </>
@@ -3023,11 +3022,11 @@ function BlockBody({ block }: { block: LessonBlock }) {
         body?: string;
         choices?: { label?: string }[];
       }>(s.nodes);
-      if (!nodes.length) return <Empty>No scenario nodes yet.</Empty>;
+      if (!nodes.length) return <Empty>{t("noNodes")}</Empty>;
       const start = nodes[0];
       return (
         <>
-          <Stem>{str(start.title) || "Scenario"}</Stem>
+          <Stem>{str(start.title) || t("scenarioFallback")}</Stem>
           {str(start.body) && (
             <p
               style={{
@@ -3053,7 +3052,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
                   color: tone.ink,
                 }}
               >
-                {str(c.label) || `Choice ${i + 1}`}
+                {str(c.label) || t("choiceN", { n: i + 1 })}
               </div>
             ))}
           </div>
@@ -3062,7 +3061,7 @@ function BlockBody({ block }: { block: LessonBlock }) {
     }
 
     default:
-      return <Empty>Block preview not available.</Empty>;
+      return <Empty>{t("previewUnavailable")}</Empty>;
   }
 }
 
@@ -3088,6 +3087,7 @@ function OptionCards({
   options: { text?: string; correct?: boolean }[];
   appearance: NonNullable<BlockSettings["appearance"]>;
 }) {
+  const t = useTranslations("CourseBuilder");
   const layout = appearance.optionLayout ?? "list";
   const showLetters = appearance.showLetters ?? true;
   const showCorrect = appearance.showCorrect ?? true;
@@ -3146,7 +3146,7 @@ function OptionCards({
                 fontWeight: correct ? 600 : 400,
               }}
             >
-              {o.text || `Option ${i + 1}`}
+              {o.text || t("optionN", { n: i + 1 })}
             </span>
             {correct && (
               <span
@@ -3161,7 +3161,7 @@ function OptionCards({
                 }}
               >
                 <Icon name="check" size={12} color={GOOD} />
-                CORRECT
+                {t("correct")}
               </span>
             )}
           </div>
