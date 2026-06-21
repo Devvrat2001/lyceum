@@ -3690,12 +3690,13 @@ function CoursePanel({
   totalLessons: number;
   totalDuration: number;
 }) {
+  const t = useTranslations("CourseBuilder");
   return (
     <>
-      <PanelLabel>COURSE</PanelLabel>
+      <PanelLabel>{t("panelCourse")}</PanelLabel>
       <CourseDetailsEditor course={course} />
 
-      <Field label="STATS">
+      <Field label={t("fieldStats")}>
         <div
           style={{
             display: "grid",
@@ -3703,14 +3704,16 @@ function CoursePanel({
             gap: 10,
           }}
         >
-          <Stat label="UNITS" value={String(units.length)} />
-          <Stat label="LESSONS" value={String(totalLessons)} />
-          <Stat label="PRICE" value={fmtPrice(course.priceCents)} />
+          <Stat label={t("statUnits")} value={String(units.length)} />
+          <Stat label={t("statLessons")} value={String(totalLessons)} />
+          <Stat label={t("statPrice")} value={fmtPrice(course.priceCents)} />
           <Stat
-            label="EST. TIME"
+            label={t("statEstTime")}
             value={
               totalDuration > 0
-                ? `${Math.max(1, Math.round(totalDuration / 60))} hr`
+                ? t("hrPlain", {
+                    count: Math.max(1, Math.round(totalDuration / 60)),
+                  })
                 : "—"
             }
           />
@@ -3752,6 +3755,8 @@ function localInputToIso(local: string): string {
 
 function CourseDetailsEditor({ course }: { course: CourseProps }) {
   const router = useRouter();
+  const t = useTranslations("CourseBuilder");
+  const tc = useTranslations("MarketplaceCatalog");
   const [title, setTitle] = useState(course.title);
   const [tagline, setTagline] = useState(course.tagline ?? "");
   const [subject, setSubject] = useState(course.subject);
@@ -3774,7 +3779,7 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
 
   const update = trpc.teacher.updateCourse.useMutation({
     onSuccess: () => {
-      setSavedMsg("Saved");
+      setSavedMsg(t("savedShort"));
       router.refresh();
       setTimeout(() => setSavedMsg(null), 3000);
     },
@@ -3797,74 +3802,86 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
     thumbnailUrl !== (course.thumbnailUrl ?? "");
 
   return (
-    <Field label="DETAILS">
+    <Field label={t("fieldDetails")}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <DetailInput label="Title" value={title} onChange={setTitle} />
+        <DetailInput label={t("detailTitle")} value={title} onChange={setTitle} />
         <DetailInput
-          label="Tagline"
+          label={t("detailTagline")}
           value={tagline}
           onChange={setTagline}
-          placeholder="Optional one-liner"
+          placeholder={t("taglinePlaceholder")}
         />
         <div style={{ display: "flex", gap: 8 }}>
-          <DetailInput label="Subject" value={subject} onChange={setSubject} />
-          <DetailInput label="Grade" value={grade} onChange={setGrade} />
+          <DetailInput
+            label={t("detailSubject")}
+            value={subject}
+            onChange={setSubject}
+          />
+          <DetailInput
+            label={t("detailGrade")}
+            value={grade}
+            onChange={setGrade}
+          />
         </div>
         <DetailSelect
-          label="Board"
+          label={t("detailBoard")}
           value={board}
           onChange={setBoard}
           options={[
-            { value: "", label: "None / not board-specific" },
-            ...MARKETPLACE_BOARD_BUCKETS,
+            { value: "", label: t("boardNone") },
+            ...MARKETPLACE_BOARD_BUCKETS.map((b) => ({
+              value: b.value,
+              label: tc(`board.${b.value}`),
+            })),
           ]}
         />
         <DetailSelect
-          label="Delivery format"
+          label={t("detailFormat")}
           value={format}
           onChange={setFormat}
-          options={MARKETPLACE_FORMAT_BUCKETS}
+          options={MARKETPLACE_FORMAT_BUCKETS.map((f) => ({
+            value: f.value,
+            label: tc(`format.${f.value}`),
+          }))}
         />
         {isScheduled && (
           <>
             <DetailInput
-              label={
-                format === "live" ? "Live session start" : "Cohort start"
-              }
+              label={format === "live" ? t("liveStart") : t("cohortStart")}
               value={sessionStartsAt}
               onChange={setSessionStartsAt}
               type="datetime-local"
             />
             <DetailInput
-              label="Meeting link"
+              label={t("meetingLink")}
               value={sessionJoinUrl}
               onChange={setSessionJoinUrl}
-              placeholder="https://meet.… (shown to enrolled students)"
+              placeholder={t("meetingPlaceholder")}
             />
             <DetailSelect
-              label="Repeats"
+              label={t("detailRepeats")}
               value={sessionRecurrence}
               onChange={setSessionRecurrence}
               options={[
-                { value: "", label: "One-off session" },
-                { value: "weekly", label: "Weekly" },
-                { value: "biweekly", label: "Every 2 weeks" },
-                { value: "monthly", label: "Monthly" },
+                { value: "", label: t("recurOneOff") },
+                { value: "weekly", label: t("recurWeekly") },
+                { value: "biweekly", label: t("recurBiweekly") },
+                { value: "monthly", label: t("recurMonthly") },
               ]}
             />
           </>
         )}
         <DetailInput
-          label="Price · USD"
+          label={t("detailPrice")}
           value={price}
           onChange={setPrice}
           type="number"
         />
         <DetailInput
-          label="Thumbnail URL"
+          label={t("detailThumbnail")}
           value={thumbnailUrl}
           onChange={setThumbnailUrl}
-          placeholder="https://… (blank = auto gradient)"
+          placeholder={t("thumbnailPlaceholder")}
         />
         <button
           type="button"
@@ -3903,7 +3920,7 @@ function CourseDetailsEditor({ course }: { course: CourseProps }) {
             fontFamily: tone.sans,
           }}
         >
-          {update.isPending ? "Saving…" : "Save course details"}
+          {update.isPending ? t("publishing") : t("saveCourseDetails")}
         </button>
         {savedMsg && (
           <div
