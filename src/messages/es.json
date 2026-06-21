@@ -1044,5 +1044,42 @@
     "insertInto": "Insertar en →",
     "lessonFallback": "lección {id}",
     "noLessonHint": "Haz clic en cualquier lección del lienzo para fijar el destino de inserción."
+  },
+  "CourseBuilder": {
+    "savedAll": "Todos los cambios guardados",
+    "savedNow": "Guardado ahora mismo",
+    "backHome": "Volver al inicio del profesor",
+    "untitledLesson": "Lección sin título",
+    "viewEdit": "Editar",
+    "viewStudent": "Vista de estudiante",
+    "aiAssist": "Asistente IA",
+    "publishing": "Guardando…",
+    "publish": "Publicar →",
+    "unpublish": "Despublicar",
+    "status": {
+      "DRAFT": "BORRADOR",
+      "PUBLISHED": "PUBLICADO",
+      "ARCHIVED": "ARCHIVADO"
+    },
+    "reorderLesson": "Reordenar lección",
+    "dupLesson": "Duplicar lección",
+    "delLesson": "Eliminar lección",
+    "reorderUnit": "Reordenar unidad",
+    "subtitlePlaceholder": "Subtítulo (opcional)",
+    "unitTitleAria": "Título de la unidad",
+    "unitSubtitleAria": "Subtítulo de la unidad",
+    "unitN": "Unidad {order}",
+    "renameUnit": "Renombrar unidad",
+    "dupUnit": "Duplicar unidad",
+    "delUnit": "Eliminar unidad",
+    "confirmDelUnit": "¿Eliminar «{title}» y todas sus lecciones? Esto no se puede deshacer.",
+    "confirmDelLesson": "¿Eliminar la lección «{title}»? Esto no se puede deshacer.",
+    "addLesson": "Añadir lección",
+    "courseOutline": "ESQUEMA DEL CURSO",
+    "unitsCount": "{count, plural, one {# unidad} other {# unidades}}",
+    "lessonsCount": "{count, plural, one {# lección} other {# lecciones}}",
+    "durationHr": "~{count} h",
+    "noUnits": "Aún no hay unidades. Añade tu primera unidad para empezar a construir.",
+    "addUnit": "Añadir unidad"
   }
 }

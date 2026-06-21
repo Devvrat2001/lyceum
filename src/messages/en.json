@@ -1044,5 +1044,42 @@
     "insertInto": "Insert into →",
     "lessonFallback": "lesson {id}",
     "noLessonHint": "Click any lesson in the canvas to set the insert target."
+  },
+  "CourseBuilder": {
+    "savedAll": "All changes saved",
+    "savedNow": "Saved just now",
+    "backHome": "Back to teacher home",
+    "untitledLesson": "Untitled lesson",
+    "viewEdit": "Edit",
+    "viewStudent": "Student view",
+    "aiAssist": "AI assist",
+    "publishing": "Saving…",
+    "publish": "Publish →",
+    "unpublish": "Unpublish",
+    "status": {
+      "DRAFT": "DRAFT",
+      "PUBLISHED": "PUBLISHED",
+      "ARCHIVED": "ARCHIVED"
+    },
+    "reorderLesson": "Reorder lesson",
+    "dupLesson": "Duplicate lesson",
+    "delLesson": "Delete lesson",
+    "reorderUnit": "Reorder unit",
+    "subtitlePlaceholder": "Subtitle (optional)",
+    "unitTitleAria": "Unit title",
+    "unitSubtitleAria": "Unit subtitle",
+    "unitN": "Unit {order}",
+    "renameUnit": "Rename unit",
+    "dupUnit": "Duplicate unit",
+    "delUnit": "Delete unit",
+    "confirmDelUnit": "Delete \"{title}\" and all its lessons? This can't be undone.",
+    "confirmDelLesson": "Delete lesson \"{title}\"? This can't be undone.",
+    "addLesson": "Add lesson",
+    "courseOutline": "COURSE OUTLINE",
+    "unitsCount": "{count, plural, one {# unit} other {# units}}",
+    "lessonsCount": "{count, plural, one {# lesson} other {# lessons}}",
+    "durationHr": "~{count} hr",
+    "noUnits": "No units yet. Add your first unit to start building.",
+    "addUnit": "Add unit"
   }
 }

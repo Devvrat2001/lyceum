@@ -1044,5 +1044,42 @@
     "insertInto": "इसमें डालें →",
     "lessonFallback": "पाठ {id}",
     "noLessonHint": "इन्सर्ट लक्ष्य सेट करने के लिए कैनवास में किसी भी पाठ पर क्लिक करें।"
+  },
+  "CourseBuilder": {
+    "savedAll": "सभी बदलाव सहेजे गए",
+    "savedNow": "अभी-अभी सहेजा गया",
+    "backHome": "शिक्षक होम पर वापस जाएँ",
+    "untitledLesson": "बिना शीर्षक पाठ",
+    "viewEdit": "संपादित करें",
+    "viewStudent": "छात्र दृश्य",
+    "aiAssist": "AI सहायता",
+    "publishing": "सहेजा जा रहा है…",
+    "publish": "प्रकाशित करें →",
+    "unpublish": "अप्रकाशित करें",
+    "status": {
+      "DRAFT": "ड्राफ़्ट",
+      "PUBLISHED": "प्रकाशित",
+      "ARCHIVED": "संग्रहीत"
+    },
+    "reorderLesson": "पाठ पुनः क्रमित करें",
+    "dupLesson": "पाठ की प्रतिलिपि बनाएँ",
+    "delLesson": "पाठ हटाएँ",
+    "reorderUnit": "इकाई पुनः क्रमित करें",
+    "subtitlePlaceholder": "उपशीर्षक (वैकल्पिक)",
+    "unitTitleAria": "इकाई शीर्षक",
+    "unitSubtitleAria": "इकाई उपशीर्षक",
+    "unitN": "इकाई {order}",
+    "renameUnit": "इकाई का नाम बदलें",
+    "dupUnit": "इकाई की प्रतिलिपि बनाएँ",
+    "delUnit": "इकाई हटाएँ",
+    "confirmDelUnit": "\"{title}\" और इसके सभी पाठ हटाएँ? इसे पूर्ववत नहीं किया जा सकता।",
+    "confirmDelLesson": "पाठ \"{title}\" हटाएँ? इसे पूर्ववत नहीं किया जा सकता।",
+    "addLesson": "पाठ जोड़ें",
+    "courseOutline": "कोर्स रूपरेखा",
+    "unitsCount": "{count, plural, one {# इकाई} other {# इकाइयाँ}}",
+    "lessonsCount": "{count, plural, one {# पाठ} other {# पाठ}}",
+    "durationHr": "~{count} घं",
+    "noUnits": "अभी कोई इकाई नहीं। निर्माण शुरू करने के लिए अपनी पहली इकाई जोड़ें।",
+    "addUnit": "इकाई जोड़ें"
   }
 }

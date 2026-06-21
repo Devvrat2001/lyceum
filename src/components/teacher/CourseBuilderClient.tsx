@@ -27,6 +27,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/wf/primitives";
+import { useTranslations } from "next-intl";
 import { trpc } from "@/lib/trpc/react";
 import {
   BlockInspector,
@@ -158,6 +159,7 @@ function wordCount(s: string): number {
 // ════════════════════════════════════════════════════════════════════
 export function CourseBuilderClient({ course }: { course: CourseProps }) {
   const router = useRouter();
+  const t = useTranslations("CourseBuilder");
   const [units, setUnits] = useState<Unit[]>(course.units);
   const [viewMode, setViewMode] = useState<ViewMode>("edit");
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(
@@ -169,7 +171,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     () => new Set(course.units[0] ? [course.units[0].id] : [])
   );
   const [err, setErr] = useState<string | null>(null);
-  const [savedLabel, setSavedLabel] = useState("All changes saved");
+  const [savedLabel, setSavedLabel] = useState(t("savedAll"));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -228,7 +230,7 @@ export function CourseBuilderClient({ course }: { course: CourseProps }) {
     onError: (e) => setErr(`Failed to update course status: ${e.message}`),
   });
 
-  const markSaved = useCallback(() => setSavedLabel("Saved just now"), []);
+  const markSaved = useCallback(() => setSavedLabel(t("savedNow")), [t]);
 
   // ── derived selection ──
   const selectedLesson = useMemo(() => {
@@ -851,6 +853,7 @@ function BuilderTopBar({
   publishing: boolean;
   onPublishToggle: () => void;
 }) {
+  const t = useTranslations("CourseBuilder");
   return (
     <header
       style={{
@@ -867,7 +870,7 @@ function BuilderTopBar({
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Link
           href="/teacher"
-          aria-label="Back to teacher home"
+          aria-label={t("backHome")}
           style={{
             width: 24,
             height: 24,
@@ -916,7 +919,7 @@ function BuilderTopBar({
             whiteSpace: "nowrap",
           }}
         >
-          {lessonTitle ?? "Untitled lesson"}
+          {lessonTitle ?? t("untitledLesson")}
         </span>
         <span
           style={{
@@ -929,7 +932,9 @@ function BuilderTopBar({
             borderRadius: 4,
           }}
         >
-          {course.status}
+          {["DRAFT", "PUBLISHED", "ARCHIVED"].includes(course.status)
+            ? t(`status.${course.status}`)
+            : course.status}
         </span>
       </div>
       <div style={{ flex: 1 }} />
@@ -945,8 +950,8 @@ function BuilderTopBar({
       >
         {(
           [
-            ["grid", "Edit", "edit"],
-            ["user", "Student view", "student"],
+            ["grid", t("viewEdit"), "edit"],
+            ["user", t("viewStudent"), "student"],
           ] as const
         ).map(([ic, label, mode]) => {
           const on = viewMode === mode;
@@ -999,7 +1004,7 @@ function BuilderTopBar({
         }}
       >
         <Icon name="sparkles" size={13} color={tone.ai} />
-        AI assist
+        {t("aiAssist")}
       </Link>
       <button
         type="button"
@@ -1019,10 +1024,10 @@ function BuilderTopBar({
         }}
       >
         {publishing
-          ? "Saving…"
+          ? t("publishing")
           : course.status === "DRAFT"
-            ? "Publish →"
-            : "Unpublish"}
+            ? t("publish")
+            : t("unpublish")}
       </button>
     </header>
   );
@@ -1089,6 +1094,7 @@ function SortableLessonRow({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations("CourseBuilder");
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: lesson.id });
   const style: React.CSSProperties = {
@@ -1108,7 +1114,7 @@ function SortableLessonRow({
       <span
         {...attributes}
         {...listeners}
-        aria-label="Reorder lesson"
+        aria-label={t("reorderLesson")}
         style={{
           cursor: "grab",
           touchAction: "none",
@@ -1156,8 +1162,8 @@ function SortableLessonRow({
           {lesson.blocks.length}
         </span>
       </button>
-      <RailAction label="Duplicate lesson" glyph="⧉" onClick={onDuplicate} />
-      <RailAction label="Delete lesson" glyph="✕" danger onClick={onDelete} />
+      <RailAction label={t("dupLesson")} glyph="⧉" onClick={onDuplicate} />
+      <RailAction label={t("delLesson")} glyph="✕" danger onClick={onDelete} />
     </div>
   );
 }
@@ -1198,6 +1204,7 @@ function SortableUnitRow({
   onReorderLessons: (unitId: string, orderedIds: string[]) => void;
   adding: boolean;
 }) {
+  const t = useTranslations("CourseBuilder");
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: unit.id });
   const [editing, setEditing] = useState(false);
@@ -1235,7 +1242,7 @@ function SortableUnitRow({
         <span
           {...attributes}
           {...listeners}
-          aria-label="Reorder unit"
+          aria-label={t("reorderUnit")}
           style={{
             cursor: "grab",
             touchAction: "none",
@@ -1265,7 +1272,7 @@ function SortableUnitRow({
                 if (e.key === "Enter") commit();
                 if (e.key === "Escape") setEditing(false);
               }}
-              aria-label="Unit title"
+              aria-label={t("unitTitleAria")}
               style={{
                 fontSize: 12,
                 fontWeight: 600,
@@ -1286,8 +1293,8 @@ function SortableUnitRow({
                 if (e.key === "Escape") setEditing(false);
               }}
               onBlur={commit}
-              placeholder="Subtitle (optional)"
-              aria-label="Unit subtitle"
+              placeholder={t("subtitlePlaceholder")}
+              aria-label={t("unitSubtitleAria")}
               style={{
                 fontSize: 11,
                 color: tone.body,
@@ -1327,7 +1334,7 @@ function SortableUnitRow({
             <span
               style={{ fontFamily: tone.mono, fontSize: 9, color: tone.mute }}
             >
-              Unit {unit.order}
+              {t("unitN", { order: unit.order })}
             </span>
             <span
               style={{
@@ -1372,22 +1379,18 @@ function SortableUnitRow({
         )}
         {!editing && (
           <>
-            <RailAction label="Rename unit" glyph="✎" onClick={startEdit} />
+            <RailAction label={t("renameUnit")} glyph="✎" onClick={startEdit} />
             <RailAction
-              label="Duplicate unit"
+              label={t("dupUnit")}
               glyph="⧉"
               onClick={() => onDuplicateUnit(unit.id)}
             />
             <RailAction
-              label="Delete unit"
+              label={t("delUnit")}
               glyph="✕"
               danger
               onClick={() => {
-                if (
-                  window.confirm(
-                    `Delete "${unit.title}" and all its lessons? This can't be undone.`
-                  )
-                )
+                if (window.confirm(t("confirmDelUnit", { title: unit.title })))
                   onDeleteUnit(unit.id);
               }}
             />
@@ -1422,11 +1425,7 @@ function SortableUnitRow({
                   onSelect={() => onSelectLesson(l.id)}
                   onDuplicate={() => onDuplicateLesson(unit.id, l.id)}
                   onDelete={() => {
-                    if (
-                      window.confirm(
-                        `Delete lesson "${l.title}"? This can't be undone.`
-                      )
-                    )
+                    if (window.confirm(t("confirmDelLesson", { title: l.title })))
                       onDeleteLesson(unit.id, l.id);
                   }}
                 />
@@ -1451,7 +1450,7 @@ function SortableUnitRow({
             }}
           >
             <Icon name="plus" size={11} color={tone.mute} />
-            Add lesson
+            {t("addLesson")}
           </button>
         </div>
       )}
@@ -1503,8 +1502,11 @@ function OutlineRail({
   sensors: ReturnType<typeof useSensors>;
   adding: boolean;
 }) {
+  const t = useTranslations("CourseBuilder");
   const hr =
-    totalDuration > 0 ? ` · ~${Math.max(1, Math.round(totalDuration / 60))} hr` : "";
+    totalDuration > 0
+      ? ` · ${t("durationHr", { count: Math.max(1, Math.round(totalDuration / 60)) })}`
+      : "";
   return (
     <aside
       style={{
@@ -1527,7 +1529,7 @@ function OutlineRail({
             marginBottom: 6,
           }}
         >
-          COURSE OUTLINE
+          {t("courseOutline")}
         </div>
         <div
           style={{
@@ -1540,8 +1542,8 @@ function OutlineRail({
           {course.title}
         </div>
         <div style={{ fontSize: 11, color: tone.mute, marginTop: 4 }}>
-          {units.length} unit{units.length === 1 ? "" : "s"} · {totalLessons}{" "}
-          lesson{totalLessons === 1 ? "" : "s"}
+          {t("unitsCount", { count: units.length })} ·{" "}
+          {t("lessonsCount", { count: totalLessons })}
           {hr}
         </div>
       </div>
@@ -1556,7 +1558,7 @@ function OutlineRail({
               lineHeight: 1.5,
             }}
           >
-            No units yet. Add your first unit to start building.
+            {t("noUnits")}
           </div>
         )}
         <DndContext
@@ -1623,7 +1625,7 @@ function OutlineRail({
           }}
         >
           <Icon name="plus" size={12} color={tone.body} />
-          Add unit
+          {t("addUnit")}
         </button>
       </div>
     </aside>
