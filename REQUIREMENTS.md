@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–71 — entire learner/public surface + the block-type/template catalogs + the two block pickers done; remaining: the rest of the course-builder [CourseBuilderClient / BlockInspector / teacher-courses pages] and admin power tools)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–72 — entire public surface + block catalogs + the CourseBuilderClient FRAME [top bar + outline rail] done; remaining: the rest of CourseBuilderClient [canvas / inspector / panels / details editor] + BlockInspector + teacher-courses pages + admin tools)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -694,10 +694,17 @@ Ordered by learner/public impact:
    by type), `BlockTemplates` ns (12 starters × label+description, keyed by id),
    `BlockPicker` ns (chrome); wired into `AddBlockPopover` + `BlockLibrary` (the
    data modules keep their English labels as the AI-prompt/server fallback;
-   map-var `t`→`tmpl` to free the translator). Remaining: `CourseBuilderClient`
-   (canvas/outline) + `BlockInspector` (per-type editors — big) +
-   `teacher/courses/new` `/new/ai` `/[courseId]/edit` + `teacher/assignments`
-   (`AssignmentsClient`) + `teacher/students/[id]`.
+   map-var `t`→`tmpl` to free the translator). **`CourseBuilderClient` FRAME
+   DONE (cont.72)** — the 4002-line file is multi-part (like BlockReader was);
+   the **top bar + outline rail** (`BuilderTopBar` + `OutlineRail` + the sortable
+   unit/lesson rows) are localized behind a new `CourseBuilder` ns (~33 keys:
+   save/publish, the edit/student view toggle, status badge, unit/lesson CRUD +
+   dnd arias + delete confirms, ICU unit/lesson counts + `~N hr`). Remaining in
+   `CourseBuilderClient`: `BuilderCanvas` (block previews) +
+   `ContextInspector`/`LessonPanel`/`AIPanel`/`CoursePanel` + `CommandMenu` +
+   `CourseDetailsEditor` + the main-component error toasts. Then `BlockInspector`
+   (per-type editors — big) + `teacher/courses/new` `/new/ai` `/[courseId]/edit`
+   + `teacher/assignments` (`AssignmentsClient`) + `teacher/students/[id]`.
 5. **Admin power tools**: `admin/branding` (`BrandingEditor`),
    `admin/integrations`, `admin/analytics` (`AdminInsights`/`AnalyticsCharts`).
 Big but mechanical — chunk a surface or two per cycle (ICU plurals +
