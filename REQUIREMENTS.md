@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–70 — the ENTIRE learner/public surface is now localized [auth, full BlockReader, settings, all public pages, marketplace catalog, CourseCard, course-detail page + its 4 sub-components]; remaining: the teacher course-builder [+ block-type labels] and admin power tools)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–71 — entire learner/public surface + the block-type/template catalogs + the two block pickers done; remaining: the rest of the course-builder [CourseBuilderClient / BlockInspector / teacher-courses pages] and admin power tools)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -689,10 +689,15 @@ Ordered by learner/public impact:
    plural/placeholder), `LiveScheduleCard` (made **`async` + `getTranslations`**;
    the module-level recurrence map became message keys). Then the **block-type
    labels** (`@/lib/blocks` BLOCK_GROUPS) — do those alongside the builder.
-4. **Course builder** (teacher power tool): `CourseBuilderClient`,
-   `BlockInspector`, `BlockLibrary`, `AddBlockPopover` + `teacher/courses/new`
-   `/new/ai` `/[courseId]/edit`, `teacher/assignments` (`AssignmentsClient`),
-   `teacher/students/[id]`.
+4. **Course builder** (teacher power tool): **block catalogs + the 2 pickers
+   DONE (cont.71)** — `BlockCatalog` ns (4 groups + 16 block-type labels, keyed
+   by type), `BlockTemplates` ns (12 starters × label+description, keyed by id),
+   `BlockPicker` ns (chrome); wired into `AddBlockPopover` + `BlockLibrary` (the
+   data modules keep their English labels as the AI-prompt/server fallback;
+   map-var `t`→`tmpl` to free the translator). Remaining: `CourseBuilderClient`
+   (canvas/outline) + `BlockInspector` (per-type editors — big) +
+   `teacher/courses/new` `/new/ai` `/[courseId]/edit` + `teacher/assignments`
+   (`AssignmentsClient`) + `teacher/students/[id]`.
 5. **Admin power tools**: `admin/branding` (`BrandingEditor`),
    `admin/integrations`, `admin/analytics` (`AdminInsights`/`AnalyticsCharts`).
 Big but mechanical — chunk a surface or two per cycle (ICU plurals +
