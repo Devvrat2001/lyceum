@@ -1666,6 +1666,7 @@ function BuilderCanvas({
   onAddFirstLesson?: () => void;
   err: string | null;
 }) {
+  const t = useTranslations("CourseBuilder");
   // command-menu open position: an index into the block list, or null
   const [cmdIndex, setCmdIndex] = useState<number | null>(null);
   const [cmdQuery, setCmdQuery] = useState("");
@@ -1685,7 +1686,7 @@ function BuilderCanvas({
   if (!lesson) {
     return (
       <section
-        aria-label="Lesson canvas"
+        aria-label={t("lessonCanvas")}
         style={{
           flex: 1,
           overflow: "auto",
@@ -1705,12 +1706,10 @@ function BuilderCanvas({
               marginBottom: 8,
             }}
           >
-            NO LESSON SELECTED
+            {t("noLessonSelected")}
           </div>
           <div style={{ fontSize: 15, color: tone.body, marginBottom: 14 }}>
-            {unit
-              ? "This unit has no lessons yet."
-              : "Pick a lesson from the outline, or add one to begin."}
+            {unit ? t("unitNoLessons") : t("pickLesson")}
           </div>
           {onAddFirstLesson && (
             <button
@@ -1732,7 +1731,7 @@ function BuilderCanvas({
               }}
             >
               <Icon name="plus" size={13} color={SEL} />
-              Add a lesson
+              {t("addALesson")}
             </button>
           )}
         </div>
@@ -1742,7 +1741,7 @@ function BuilderCanvas({
 
   return (
     <section
-      aria-label="Lesson canvas"
+      aria-label={t("lessonCanvas")}
       style={{
         flex: 1,
         overflow: "auto",
@@ -1762,9 +1761,9 @@ function BuilderCanvas({
               marginBottom: 8,
             }}
           >
-            {unit ? `UNIT ${unit.order} · ` : ""}
+            {unit ? t("unitPrefix", { order: unit.order }) : ""}
             {lesson.title.toUpperCase()}
-            {isEdit ? " · EDITING" : ""}
+            {isEdit ? t("editingSuffix") : ""}
           </div>
           {isEdit ? (
             <LessonTitleEditor
@@ -1787,8 +1786,10 @@ function BuilderCanvas({
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
             {[
-              lesson.durationMin ? `~${lesson.durationMin} min` : null,
-              `${lesson.blocks.length} block${lesson.blocks.length === 1 ? "" : "s"}`,
+              lesson.durationMin
+                ? t("minutesShort", { count: lesson.durationMin })
+                : null,
+              t("blocksCount", { count: lesson.blocks.length }),
             ]
               .filter(Boolean)
               .map((c, i) => (
@@ -1834,7 +1835,7 @@ function BuilderCanvas({
                     textAlign: "center",
                   }}
                 >
-                  Empty lesson — add your first block below.
+                  {t("emptyLesson")}
                 </div>
               )}
               {lesson.blocks.map((block, i) => (
@@ -1896,7 +1897,7 @@ function BuilderCanvas({
                     }}
                   >
                     <Icon name="plus" size={13} color={tone.body} />
-                    Add block
+                    {t("addBlock")}
                     <span
                       style={{
                         fontFamily: tone.mono,
@@ -1905,7 +1906,7 @@ function BuilderCanvas({
                         marginLeft: 2,
                       }}
                     >
-                      or type /
+                      {t("orTypeSlash")}
                     </span>
                   </button>
                 )}
@@ -1917,7 +1918,7 @@ function BuilderCanvas({
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {lesson.blocks.length === 0 && (
               <div style={{ color: tone.mute, fontSize: 13 }}>
-                This lesson has no content yet.
+                {t("noContent")}
               </div>
             )}
             {lesson.blocks.map((block) => (
@@ -1964,14 +1965,15 @@ function LessonTitleEditor({
   value: string;
   onCommit: (t: string) => void;
 }) {
+  const t = useTranslations("CourseBuilder");
   const [draft, setDraft] = useState(value);
   return (
     <input
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
-        const t = draft.trim();
-        if (t && t !== value) onCommit(t);
+        const trimmed = draft.trim();
+        if (trimmed && trimmed !== value) onCommit(trimmed);
         else setDraft(value);
       }}
       onKeyDown={(e) => {
@@ -1981,7 +1983,7 @@ function LessonTitleEditor({
           (e.target as HTMLInputElement).blur();
         }
       }}
-      aria-label="Lesson title"
+      aria-label={t("lessonTitleAria")}
       style={{
         width: "100%",
         fontSize: 30,
@@ -1999,6 +2001,7 @@ function LessonTitleEditor({
 }
 
 function InsertLine({ onClick }: { onClick: () => void }) {
+  const t = useTranslations("CourseBuilder");
   const [hover, setHover] = useState(false);
   return (
     <div
@@ -2048,9 +2051,9 @@ function InsertLine({ onClick }: { onClick: () => void }) {
             }}
           >
             <Icon name="plus" size={12} color={SEL} />
-            Add block ·{" "}
+            {t("addBlock")} ·{" "}
             <span style={{ fontFamily: tone.mono, fontSize: 10, opacity: 0.7 }}>
-              type /
+              {t("typeSlash")}
             </span>
           </button>
         </>
@@ -2071,6 +2074,8 @@ function CommandMenu({
   onPick: (t: BlockType) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("CourseBuilder");
+  const tc = useTranslations("BlockCatalog");
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -2086,7 +2091,9 @@ function CommandMenu({
   const q = query.trim().toLowerCase();
   const groups = BLOCK_GROUPS.map((g) => ({
     group: g.group,
-    items: g.items.filter((it) => !q || it.label.toLowerCase().includes(q)),
+    items: g.items.filter(
+      (it) => !q || tc(`labels.${it.type}`).toLowerCase().includes(q)
+    ),
   })).filter((g) => g.items.length > 0);
 
   const first = groups[0]?.items[0]?.type ?? null;
@@ -2119,14 +2126,14 @@ function CommandMenu({
         <Icon name="search" size={13} color={tone.mute} />
         <input
           ref={inputRef}
-          aria-label="Search blocks"
+          aria-label={t("searchBlocksAria")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") onClose();
             if (e.key === "Enter" && first) onPick(first);
           }}
-          placeholder="Search blocks…"
+          placeholder={t("searchBlocksPlaceholder")}
           style={{
             flex: 1,
             border: "none",
@@ -2137,12 +2144,12 @@ function CommandMenu({
             background: "transparent",
           }}
         />
-        <span style={{ fontSize: 10, color: tone.mute }}>Insert block</span>
+        <span style={{ fontSize: 10, color: tone.mute }}>{t("insertBlock")}</span>
       </div>
       <div style={{ maxHeight: 280, overflow: "auto", padding: 6 }}>
         {groups.length === 0 && (
           <div style={{ padding: 12, fontSize: 12, color: tone.mute }}>
-            No blocks match “{query}”.
+            {t("noBlocksMatch", { query })}
           </div>
         )}
         {groups.map((g) => (
@@ -2156,7 +2163,7 @@ function CommandMenu({
                 padding: "6px 8px 3px",
               }}
             >
-              {g.group.toUpperCase()}
+              {tc(`groups.${g.group.toLowerCase()}`).toUpperCase()}
             </div>
             {g.items.map((it) => (
               <button
@@ -2204,7 +2211,7 @@ function CommandMenu({
                     flex: 1,
                   }}
                 >
-                  {it.label}
+                  {tc(`labels.${it.type}`)}
                 </span>
                 {it.ai && (
                   <span
@@ -2257,6 +2264,8 @@ function SortableBlock({
     transition,
     isDragging,
   } = useSortable({ id: block.id });
+  const t = useTranslations("CourseBuilder");
+  const tc = useTranslations("BlockCatalog");
   const meta = findBlockMeta(block.type);
 
   const style: React.CSSProperties = {
@@ -2287,7 +2296,7 @@ function SortableBlock({
         <span
           {...attributes}
           {...listeners}
-          aria-label={`Reorder ${meta.label} block`}
+          aria-label={t("reorderBlock", { label: tc(`labels.${block.type}`) })}
           style={{ cursor: "grab", touchAction: "none", display: "inline-flex" }}
         >
           <Icon name="drag" size={13} color={tone.mute} />
@@ -2319,7 +2328,7 @@ function SortableBlock({
       >
         {selected && (
           <BlockToolbar
-            label={meta.label}
+            label={tc(`labels.${block.type}`)}
             onDuplicate={onDuplicate}
             onSwitchType={onSwitchType}
             onDelete={onDelete}
@@ -2347,7 +2356,7 @@ function SortableBlock({
               textTransform: "uppercase",
             }}
           >
-            {meta.label}
+            {tc(`labels.${block.type}`)}
           </span>
           <span
             style={{
@@ -2357,7 +2366,7 @@ function SortableBlock({
               marginLeft: "auto",
             }}
           >
-            {metaLine(block) ?? `block ${index + 1} of ${total}`}
+            {metaLine(block, t) ?? t("blockNofM", { index: index + 1, total })}
           </span>
         </div>
         <BlockBody block={block} />
@@ -2378,6 +2387,8 @@ function BlockToolbar({
   onSwitchType: (t: BlockType) => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations("CourseBuilder");
+  const tc = useTranslations("BlockCatalog");
   const [menu, setMenu] = useState(false);
   return (
     <div
@@ -2445,7 +2456,7 @@ function BlockToolbar({
                 padding: "4px 8px",
               }}
             >
-              TURN INTO
+              {t("turnInto")}
             </div>
             {BLOCK_GROUPS.flatMap((g) => g.items).map((it) => (
               <button
@@ -2476,7 +2487,7 @@ function BlockToolbar({
                   size={12}
                   color={it.ai ? tone.ai : tone.body}
                 />
-                {it.label}
+                {tc(`labels.${it.type}`)}
               </button>
             ))}
           </div>
@@ -2490,8 +2501,8 @@ function BlockToolbar({
           margin: "0 3px",
         }}
       />
-      <ToolbarIcon name="plus" title="Duplicate" onClick={onDuplicate} />
-      <ToolbarIcon name="check" title="Delete" onClick={onDelete} />
+      <ToolbarIcon name="plus" title={t("duplicate")} onClick={onDuplicate} />
+      <ToolbarIcon name="check" title={t("delete")} danger onClick={onDelete} />
     </div>
   );
 }
@@ -2499,14 +2510,17 @@ function BlockToolbar({
 function ToolbarIcon({
   name,
   title,
+  danger,
   onClick,
 }: {
   name: "plus" | "check";
   title: string;
+  danger?: boolean;
   onClick: () => void;
 }) {
-  // "check" stands in for an "x"/delete glyph in this icon set; we rotate
-  // semantics via the title + a reddish tint when danger.
+  // "check" stands in for an "x"/delete glyph in this icon set; the `danger`
+  // flag swaps in a reddish × so the semantics don't depend on the (now
+  // localized) title text.
   return (
     <button
       type="button"
@@ -2523,7 +2537,7 @@ function ToolbarIcon({
         cursor: "pointer",
       }}
     >
-      {title === "Delete" ? (
+      {danger ? (
         <span style={{ color: "#ff9a7a", fontSize: 14, lineHeight: 1 }}>×</span>
       ) : (
         <Icon name={name} size={13} color="rgba(255,255,255,0.85)" />
@@ -2535,26 +2549,34 @@ function ToolbarIcon({
 // ════════════════════════════════════════════════════════════════════
 // WYSIWYG BLOCK RENDERERS (student-facing inner content)
 // ════════════════════════════════════════════════════════════════════
-function metaLine(block: LessonBlock): string | null {
+function metaLine(
+  block: LessonBlock,
+  t: (key: string, values?: Record<string, string | number>) => string
+): string | null {
   const s = block.settings;
   switch (block.type) {
     case "READING": {
       const w = wordCount(str(s.body));
-      return w ? `${w} words · ~${Math.max(1, Math.ceil(w / 200))} min` : null;
+      return w
+        ? t("metaReading", { words: w, min: Math.max(1, Math.ceil(w / 200)) })
+        : null;
     }
     case "MCQ": {
       const opts = arr<{ correct?: boolean }>(s.options);
       if (!opts.length) return null;
-      return `${opts.length} options · ${opts.filter((o) => o?.correct).length} correct`;
+      return t("metaMcq", {
+        count: opts.length,
+        correct: opts.filter((o) => o?.correct).length,
+      });
     }
     case "QUIZ": {
       const n = arr(s.questions).length;
-      return n ? `${n} question${n === 1 ? "" : "s"}` : null;
+      return n ? t("metaQuiz", { count: n }) : null;
     }
     case "AI_QUIZ": {
       const g = s.generated as { questions?: unknown[] } | undefined;
       const n = arr(g?.questions).length;
-      return n ? `auto · ${n} Qs` : "auto-generated";
+      return n ? t("metaAiQuiz", { count: n }) : t("metaAiQuizAuto");
     }
     case "VIDEO":
     case "SLIDES":
@@ -2563,15 +2585,15 @@ function metaLine(block: LessonBlock): string | null {
       return str(s.url) ? hostOf(str(s.url)) : null;
     case "DRAG_MATCH": {
       const n = arr(s.pairs).length;
-      return n ? `${n} pairs` : null;
+      return n ? t("metaPairs", { count: n }) : null;
     }
     case "POLL": {
       const n = arr(s.options).length;
-      return n ? `${n} options` : null;
+      return n ? t("metaPollOptions", { count: n }) : null;
     }
     case "BRANCHING": {
       const n = arr(s.nodes).length;
-      return n ? `${n} nodes` : null;
+      return n ? t("metaNodes", { count: n }) : null;
     }
     default:
       return null;
