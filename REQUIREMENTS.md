@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–72 — entire public surface + block catalogs + the CourseBuilderClient FRAME [top bar + outline rail] done; remaining: the rest of CourseBuilderClient [canvas / inspector / panels / details editor] + BlockInspector + teacher-courses pages + admin tools)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–73 — entire public surface + block catalogs + the CourseBuilderClient frame + the inspector Block/Lesson/AI tabs done; remaining in CourseBuilderClient: the Course tab + the canvas; then BlockInspector + teacher-courses pages + admin tools)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -699,10 +699,14 @@ Ordered by learner/public impact:
    the **top bar + outline rail** (`BuilderTopBar` + `OutlineRail` + the sortable
    unit/lesson rows) are localized behind a new `CourseBuilder` ns (~33 keys:
    save/publish, the edit/student view toggle, status badge, unit/lesson CRUD +
-   dnd arias + delete confirms, ICU unit/lesson counts + `~N hr`). Remaining in
-   `CourseBuilderClient`: `BuilderCanvas` (block previews) +
-   `ContextInspector`/`LessonPanel`/`AIPanel`/`CoursePanel` + `CommandMenu` +
-   `CourseDetailsEditor` + the main-component error toasts. Then `BlockInspector`
+   dnd arias + delete confirms, ICU unit/lesson counts + `~N hr`). **Inspector
+   Block/Lesson/AI tabs DONE (cont.73)** — `ContextInspector` (tab bar + block
+   header, reusing `BlockCatalog` for the block-type label), `LessonPanel`,
+   `AIPanel` (the quiz generator + tips); +25 keys on the `CourseBuilder` ns.
+   Remaining in `CourseBuilderClient`: the **Course tab** (`CoursePanel` +
+   `CourseDetailsEditor` — the latter maps board/format options through the
+   `MarketplaceCatalog` ns) + `BuilderCanvas` (block previews) + `CommandMenu` +
+   the main-component error toasts. Then `BlockInspector`
    (per-type editors — big) + `teacher/courses/new` `/new/ai` `/[courseId]/edit`
    + `teacher/assignments` (`AssignmentsClient`) + `teacher/students/[id]`.
 5. **Admin power tools**: `admin/branding` (`BrandingEditor`),
