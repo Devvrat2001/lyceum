@@ -3237,6 +3237,8 @@ function ContextInspector({
   onRenameLesson: (lessonId: string, title: string) => void;
   onSetDuration: (lessonId: string, durationMin: number | null) => void;
 }) {
+  const t = useTranslations("CourseBuilder");
+  const tcb = useTranslations("BlockCatalog");
   const meta = selectedBlock ? findBlockMeta(selectedBlock.type) : null;
   return (
     <aside
@@ -3259,23 +3261,23 @@ function ContextInspector({
           borderBottom: `1px solid ${tone.line}`,
         }}
       >
-        {(["block", "lesson", "course", "ai"] as const).map((t) => {
-          const on = tab === t;
+        {(["block", "lesson", "course", "ai"] as const).map((tabId) => {
+          const on = tab === tabId;
           const label =
-            t === "block"
-              ? "Block"
-              : t === "lesson"
-                ? "Lesson"
-                : t === "course"
-                  ? "Course"
-                  : "AI";
-          const disabled = t === "block" && !selectedBlock;
+            tabId === "block"
+              ? t("tabBlock")
+              : tabId === "lesson"
+                ? t("tabLesson")
+                : tabId === "course"
+                  ? t("tabCourse")
+                  : t("tabAi");
+          const disabled = tabId === "block" && !selectedBlock;
           return (
             <button
-              key={t}
+              key={tabId}
               type="button"
               disabled={disabled}
-              onClick={() => setTab(t)}
+              onClick={() => setTab(tabId)}
               style={{
                 padding: "7px 12px",
                 fontSize: 12,
@@ -3291,7 +3293,7 @@ function ContextInspector({
                 fontFamily: tone.sans,
               }}
             >
-              {t === "ai" && (
+              {tabId === "ai" && (
                 <Icon name="sparkles" size={12} color={on ? tone.ai : tone.mute} />
               )}
               {label}
@@ -3331,19 +3333,21 @@ function ContextInspector({
               </span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: tone.ink }}>
-                  {meta.label}
+                  {tcb(`labels.${selectedBlock.type}`)}
                 </div>
                 <div
                   style={{ fontSize: 10.5, color: SEL, fontFamily: tone.mono }}
                 >
-                  SELECTED · BLOCK {blockIndex + 1} OF{" "}
-                  {lesson?.blocks.length ?? blockIndex + 1}
+                  {t("selectedBlockOf", {
+                    index: blockIndex + 1,
+                    total: lesson?.blocks.length ?? blockIndex + 1,
+                  })}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onDeselect}
-                aria-label="Deselect block"
+                aria-label={t("deselectBlock")}
                 style={{
                   border: "none",
                   background: "transparent",
@@ -3451,6 +3455,7 @@ function LessonPanel({
   onRename: (lessonId: string, title: string) => void;
   onSetDuration: (lessonId: string, durationMin: number | null) => void;
 }) {
+  const t = useTranslations("CourseBuilder");
   const [title, setTitle] = useState(lesson?.title ?? "");
   const [duration, setDuration] = useState(
     lesson?.durationMin != null ? String(lesson.durationMin) : ""
@@ -3460,25 +3465,26 @@ function LessonPanel({
   // without a sync effect.
 
   if (!lesson) {
-    return <Empty>Select a lesson from the outline to edit it.</Empty>;
+    return <Empty>{t("lessonEmpty")}</Empty>;
   }
 
   return (
     <>
-      <PanelLabel>LESSON</PanelLabel>
-      <Field label="TITLE">
+      <PanelLabel>{t("panelLesson")}</PanelLabel>
+      <Field label={t("fieldTitle")}>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => {
-            const t = title.trim();
-            if (t && t !== lesson.title) onRename(lesson.id, t);
+            const trimmed = title.trim();
+            if (trimmed && trimmed !== lesson.title)
+              onRename(lesson.id, trimmed);
             else setTitle(lesson.title);
           }}
           style={inputStyle}
         />
       </Field>
-      <Field label="ESTIMATED MINUTES">
+      <Field label={t("fieldEstMinutes")}>
         <input
           type="number"
           min={0}
@@ -3494,9 +3500,9 @@ function LessonPanel({
           style={{ ...inputStyle, width: 100 }}
         />
       </Field>
-      <Field label="BLOCKS">
+      <Field label={t("fieldBlocks")}>
         <div style={{ fontSize: 12.5, color: tone.body }}>
-          {lesson.blocks.length} block{lesson.blocks.length === 1 ? "" : "s"}
+          {t("blocksCount", { count: lesson.blocks.length })}
         </div>
       </Field>
       {lesson.slug && (
@@ -3513,7 +3519,7 @@ function LessonPanel({
             marginTop: 4,
           }}
         >
-          Open in student reader{" "}
+          {t("openReader")}{" "}
           <Icon name="arrow" size={12} color={SEL} />
         </Link>
       )}
@@ -3531,23 +3537,25 @@ function AIPanel({
   totalLessons: number;
   course: CourseProps;
 }) {
+  const t = useTranslations("CourseBuilder");
   const [count, setCount] = useState(5);
   const [msg, setMsg] = useState<string | null>(null);
   const gen = trpc.generator.generateQuestions.useMutation({
     onSuccess: (r) => {
       setMsg(
-        `Added ${r.added} question${r.added === 1 ? "" : "s"} (${(
-          r.elapsedMs / 1000
-        ).toFixed(1)}s). Reopen the lesson to see them.`
+        t("genAdded", {
+          count: r.added,
+          secs: (r.elapsedMs / 1000).toFixed(1),
+        })
       );
       setTimeout(() => setMsg(null), 5000);
     },
-    onError: (e) => setMsg(`Failed: ${e.message}`),
+    onError: (e) => setMsg(t("genFailed", { message: e.message })),
   });
 
   return (
     <>
-      <PanelLabel>AI ASSIST</PanelLabel>
+      <PanelLabel>{t("panelAi")}</PanelLabel>
       <div
         style={{
           padding: 12,
@@ -3565,12 +3573,12 @@ function AIPanel({
             marginBottom: 4,
           }}
         >
-          Generate a quiz for this lesson
+          {t("genQuizTitle")}
         </div>
         <div style={{ fontSize: 11.5, color: tone.body, lineHeight: 1.5 }}>
           {lesson
-            ? `Creates multiple-choice questions for “${lesson.title}”.`
-            : "Pick a lesson first."}
+            ? t("genQuizFor", { title: lesson.title })
+            : t("genPickLesson")}
         </div>
         <div
           style={{
@@ -3581,7 +3589,7 @@ function AIPanel({
           }}
         >
           <span style={{ fontFamily: tone.mono, fontSize: 10, color: tone.mute }}>
-            COUNT
+            {t("count")}
           </span>
           <input
             type="number"
@@ -3619,7 +3627,7 @@ function AIPanel({
           }}
         >
           <Icon name="sparkles" size={12} color={tone.ai} />
-          {gen.isPending ? "Generating…" : `Generate ${count} questions`}
+          {gen.isPending ? t("generating") : t("genButton", { count })}
         </button>
         {msg && (
           <div
@@ -3651,7 +3659,7 @@ function AIPanel({
         }}
       >
         <Icon name="sparkles" size={14} color={tone.ai} />
-        Generate a whole course outline →
+        {t("genCourseOutline")}
       </Link>
 
       <div
@@ -3663,8 +3671,8 @@ function AIPanel({
         }}
       >
         {totalLessons < 5
-          ? `This course has ${totalLessons} lesson${totalLessons === 1 ? "" : "s"}. Most Grade ${course.grade} courses run 20–40 — the AI generator can scaffold more.`
-          : "Tip: keep lessons ~8 minutes for better retention."}
+          ? t("tipScaffold", { count: totalLessons, grade: course.grade })
+          : t("tipRetention")}
       </div>
     </>
   );
