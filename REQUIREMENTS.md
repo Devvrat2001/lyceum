@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–75 — public surface + block catalogs + the CourseBuilderClient frame + inspector rail + the canvas CHROME done; remaining in CourseBuilderClient: the per-type BlockBody previews + error toasts; then BlockInspector + teacher-courses pages + admin tools)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–76 — public surface + block catalogs + the ENTIRE CourseBuilderClient done (frame + inspector rail + canvas chrome + block previews + error toasts; CourseBuilder ns = 161); remaining: BlockInspector + teacher-courses pages + admin tools)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -711,11 +711,16 @@ Ordered by learner/public impact:
    picker) + `SortableBlock`/`BlockToolbar`/`ToolbarIcon` (drag arias, TURN-INTO
    menu, dup/delete — `ToolbarIcon` got a `danger` prop so its glyph no longer
    keys off the literal title) + `metaLine` (block meta summaries via a `t`
-   param), reusing `BlockCatalog` for type labels/groups; +31 keys. Remaining in
-   `CourseBuilderClient`: the per-type **`BlockBody` previews** (the WYSIWYG
-   inner content) + the main-component error toasts. Then `BlockInspector`
-   (per-type editors — big) + `teacher/courses/new` `/new/ai` `/[courseId]/edit`
-   + `teacher/assignments` (`AssignmentsClient`) + `teacher/students/[id]`.
+   param), reusing `BlockCatalog` for type labels/groups; +31 keys. **Block
+   previews + error toasts DONE (cont.76)** — the per-type **`BlockBody`** preview
+   chrome (empty/fallback states, AI-quiz status, source labels, option
+   letters/CORRECT, scenario choices) via `useTranslations("CourseBuilder")` on
+   `BlockBody`/`OptionCards`, plus the **13 main-component error toasts** (in-scope
+   `t` with a `{msg}` param); authored block content untouched. +45 keys → **the
+   whole 4002-line `CourseBuilderClient` is now localized (CourseBuilder ns =
+   161).** Remaining for R55: `BlockInspector` (per-type editors — big) +
+   `teacher/courses/new` `/new/ai` `/[courseId]/edit` + `teacher/assignments`
+   (`AssignmentsClient`) + `teacher/students/[id]`.
 5. **Admin power tools**: `admin/branding` (`BrandingEditor`),
    `admin/integrations`, `admin/analytics` (`AdminInsights`/`AnalyticsCharts`).
 Big but mechanical — chunk a surface or two per cycle (ICU plurals +
