@@ -959,5 +959,90 @@
     "update": "समीक्षा अपडेट करें",
     "submit": "समीक्षा सबमिट करें",
     "thanks": "धन्यवाद — आपकी समीक्षा लाइव है।"
+  },
+  "BlockCatalog": {
+    "groups": {
+      "content": "सामग्री",
+      "practice": "अभ्यास",
+      "interactive": "इंटरैक्टिव",
+      "structure": "संरचना"
+    },
+    "labels": {
+      "VIDEO": "वीडियो",
+      "READING": "पठन",
+      "SLIDES": "स्लाइड",
+      "PDF": "PDF / फ़ाइल",
+      "QUIZ": "क्विज़",
+      "MCQ": "बहुविकल्पीय",
+      "SPEAK": "बोलें / रिकॉर्ड करें",
+      "AI_QUIZ": "AI क्विज़",
+      "FREE_RESPONSE": "मुक्त उत्तर · AI मूल्यांकित",
+      "SIMULATION": "सिमुलेशन",
+      "BRANCHING": "शाखायुक्त परिदृश्य",
+      "DRAG_MATCH": "खींचें और मिलाएँ",
+      "POLL": "लाइव पोल",
+      "SECTION": "अनुभाग विराम",
+      "DISCUSSION": "चर्चा सूत्र",
+      "LIVE": "लाइव सत्र"
+    }
+  },
+  "BlockTemplates": {
+    "mcq-4opt": {
+      "label": "4-विकल्प MCQ",
+      "description": "प्रश्न + चार उत्तर, एक सही"
+    },
+    "mcq-true-false": {
+      "label": "सही / गलत",
+      "description": "कथन और एक सही / गलत जोड़ी"
+    },
+    "quiz-3q": {
+      "label": "क्विज़ · 3 प्रश्न",
+      "description": "क्यूरेटेड बहु-प्रश्न MCQ सेट"
+    },
+    "drag-5pair": {
+      "label": "5-जोड़ी मिलान",
+      "description": "पाँच शब्द उनकी परिभाषाओं के साथ"
+    },
+    "discussion-reflect": {
+      "label": "चिंतन प्रॉम्प्ट",
+      "description": "मुक्त-अंत जर्नलिंग सूत्र"
+    },
+    "poll-3opt": {
+      "label": "3-विकल्प पोल",
+      "description": "तीन विकल्पों के साथ त्वरित जाँच"
+    },
+    "section-divider": {
+      "label": "अनुभाग विराम",
+      "description": "वैकल्पिक उपशीर्षक के साथ दृश्य विभाजक"
+    },
+    "reading-intro": {
+      "label": "परिचय पठन",
+      "description": "स्वागत अनुच्छेद + परिणाम सूची"
+    },
+    "aiquiz-5q": {
+      "label": "AI क्विज़ · 5 प्रश्न",
+      "description": "पाठ विषय पर 5 प्रश्न जेनरेट करें"
+    },
+    "speak-vocab": {
+      "label": "शब्दावली बोल-अभ्यास",
+      "description": "छात्र एक शब्द बोलता है; हम पहचान का आकलन करते हैं"
+    },
+    "live-class": {
+      "label": "लाइव क्लास सत्र",
+      "description": "जॉइन लिंक के साथ निर्धारित बैठक"
+    },
+    "branching-3node": {
+      "label": "ब्रांचिंग · 3 नोड",
+      "description": "एक शाखा वाला अपनी-राह-चुनो परिदृश्य"
+    }
+  },
+  "BlockPicker": {
+    "addBlockTitle": "इस पाठ में एक ब्लॉक जोड़ें",
+    "blockBtn": "ब्लॉक",
+    "starters": "स्टार्टर",
+    "blockLibrary": "ब्लॉक लाइब्रेरी",
+    "insertInto": "इसमें डालें →",
+    "lessonFallback": "पाठ {id}",
+    "noLessonHint": "इन्सर्ट लक्ष्य सेट करने के लिए कैनवास में किसी भी पाठ पर क्लिक करें।"
   }
 }

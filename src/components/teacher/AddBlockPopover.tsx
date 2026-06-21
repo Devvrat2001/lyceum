@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { trpc } from "@/lib/trpc/react";
 import { Icon } from "@/components/wf/primitives";
 import { BLOCK_GROUPS, findBlockMeta, type BlockType } from "@/lib/blocks";
@@ -37,6 +38,9 @@ export function AddBlockPopover({
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const tp = useTranslations("BlockPicker");
+  const tc = useTranslations("BlockCatalog");
+  const tt = useTranslations("BlockTemplates");
 
   const addBlock = trpc.teacher.addBlock.useMutation({
     onSuccess: (r) => {
@@ -67,7 +71,7 @@ export function AddBlockPopover({
         }}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Add a block to this lesson"
+        title={tp("addBlockTitle")}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -82,7 +86,7 @@ export function AddBlockPopover({
           cursor: "pointer",
         }}
       >
-        <Icon name="plus" size={10} color="currentColor" /> block
+        <Icon name="plus" size={10} color="currentColor" /> {tp("blockBtn")}
       </button>
       {open && (
         <>
@@ -131,21 +135,21 @@ export function AddBlockPopover({
                   padding: "4px 6px",
                 }}
               >
-                STARTERS
+                {tp("starters")}
               </div>
-              {BLOCK_TEMPLATES.map((t) => {
-                const meta = findBlockMeta(t.type);
+              {BLOCK_TEMPLATES.map((tmpl) => {
+                const meta = findBlockMeta(tmpl.type);
                 return (
                   <button
-                    key={t.id}
+                    key={tmpl.id}
                     type="button"
                     role="menuitem"
                     disabled={addBlock.isPending}
                     onClick={() =>
                       addBlock.mutate({
                         lessonId,
-                        type: t.type,
-                        templateId: t.id,
+                        type: tmpl.type,
+                        templateId: tmpl.id,
                       })
                     }
                     style={{
@@ -170,7 +174,9 @@ export function AddBlockPopover({
                       style={{ marginTop: 2, flexShrink: 0 }}
                     />
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 500 }}>{t.label}</div>
+                      <div style={{ fontWeight: 500 }}>
+                        {tt(`${tmpl.id}.label`)}
+                      </div>
                       <div
                         style={{
                           fontSize: 10,
@@ -179,7 +185,7 @@ export function AddBlockPopover({
                           lineHeight: 1.3,
                         }}
                       >
-                        {t.description}
+                        {tt(`${tmpl.id}.description`)}
                       </div>
                     </span>
                   </button>
@@ -204,7 +210,7 @@ export function AddBlockPopover({
                     padding: "4px 6px",
                   }}
                 >
-                  {grp.group.toUpperCase()}
+                  {tc(`groups.${grp.group.toLowerCase()}`).toUpperCase()}
                 </div>
                 {grp.items.map((it) => (
                   <button
@@ -233,7 +239,9 @@ export function AddBlockPopover({
                       size={12}
                       color="currentColor"
                     />
-                    <span style={{ flex: 1 }}>{it.label}</span>
+                    <span style={{ flex: 1 }}>
+                      {tc(`labels.${it.type}`)}
+                    </span>
                     {it.ai && (
                       <span
                         className="wf-mono"

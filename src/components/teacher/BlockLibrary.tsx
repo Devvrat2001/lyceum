@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Icon } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
 import { BLOCK_GROUPS, findBlockMeta, type BlockType } from "@/lib/blocks";
@@ -49,6 +50,9 @@ export function BlockLibrary({
   ) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const tp = useTranslations("BlockPicker");
+  const tc = useTranslations("BlockCatalog");
+  const tt = useTranslations("BlockTemplates");
 
   const addBlock = trpc.teacher.addBlock.useMutation({
     onSuccess: (r, vars) => {
@@ -95,7 +99,7 @@ export function BlockLibrary({
           marginBottom: 6,
         }}
       >
-        BLOCK LIBRARY
+        {tp("blockLibrary")}
       </div>
 
       {/* Target-lesson chip — explicit so teachers know where a click
@@ -116,13 +120,14 @@ export function BlockLibrary({
       >
         {selectedLessonId ? (
           <>
-            <span style={{ color: "var(--wf-mute)" }}>Insert into → </span>
+            <span style={{ color: "var(--wf-mute)" }}>{tp("insertInto")} </span>
             <strong style={{ color: "var(--wf-ink)" }}>
-              {selectedLessonLabel ?? `lesson ${selectedLessonId.slice(-6)}`}
+              {selectedLessonLabel ??
+                tp("lessonFallback", { id: selectedLessonId.slice(-6) })}
             </strong>
           </>
         ) : (
-          <em>Click any lesson in the canvas to set the insert target.</em>
+          <em>{tp("noLessonHint")}</em>
         )}
       </div>
 
@@ -137,17 +142,17 @@ export function BlockLibrary({
             marginBottom: 6,
           }}
         >
-          STARTERS
+          {tp("starters")}
         </div>
-        {BLOCK_TEMPLATES.map((t) => {
-          const meta = findBlockMeta(t.type);
+        {BLOCK_TEMPLATES.map((tmpl) => {
+          const meta = findBlockMeta(tmpl.type);
           return (
             <button
-              key={t.id}
+              key={tmpl.id}
               type="button"
               disabled={disabled}
-              onClick={() => insertTemplate(t.id, t.type)}
-              title={t.description}
+              onClick={() => insertTemplate(tmpl.id, tmpl.type)}
+              title={tt(`${tmpl.id}.description`)}
               className="wf-block-card"
               data-ai={Boolean(meta.ai)}
               style={{
@@ -159,7 +164,9 @@ export function BlockLibrary({
             >
               <Icon name="plus" size={11} color="var(--wf-mute)" />
               <Icon name={meta.icon as "play"} size={13} color="currentColor" />
-              <span style={{ flex: 1, minWidth: 0 }}>{t.label}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                {tt(`${tmpl.id}.label`)}
+              </span>
               {meta.ai && (
                 <span
                   className="wf-mono"
@@ -189,7 +196,7 @@ export function BlockLibrary({
               marginBottom: 6,
             }}
           >
-            {grp.group.toUpperCase()}
+            {tc(`groups.${grp.group.toLowerCase()}`).toUpperCase()}
           </div>
           {grp.items.map((it) => (
             <button
@@ -208,7 +215,9 @@ export function BlockLibrary({
             >
               <Icon name="plus" size={11} color="var(--wf-mute)" />
               <Icon name={it.icon as "play"} size={13} color="currentColor" />
-              <span style={{ flex: 1, minWidth: 0 }}>{it.label}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                {tc(`labels.${it.type}`)}
+              </span>
               {it.ai && (
                 <span
                   className="wf-mono"

@@ -959,5 +959,90 @@
     "update": "Update review",
     "submit": "Submit review",
     "thanks": "Thanks — your review is live."
+  },
+  "BlockCatalog": {
+    "groups": {
+      "content": "Content",
+      "practice": "Practice",
+      "interactive": "Interactive",
+      "structure": "Structure"
+    },
+    "labels": {
+      "VIDEO": "Video",
+      "READING": "Reading",
+      "SLIDES": "Slides",
+      "PDF": "PDF / file",
+      "QUIZ": "Quiz",
+      "MCQ": "Multiple choice",
+      "SPEAK": "Speak / record",
+      "AI_QUIZ": "AI quiz",
+      "FREE_RESPONSE": "Free response · AI graded",
+      "SIMULATION": "Simulation",
+      "BRANCHING": "Branching scenario",
+      "DRAG_MATCH": "Drag & match",
+      "POLL": "Live poll",
+      "SECTION": "Section break",
+      "DISCUSSION": "Discussion thread",
+      "LIVE": "Live session"
+    }
+  },
+  "BlockTemplates": {
+    "mcq-4opt": {
+      "label": "4-option MCQ",
+      "description": "Question + four answers, one correct"
+    },
+    "mcq-true-false": {
+      "label": "True / false",
+      "description": "Statement plus a True / False pair"
+    },
+    "quiz-3q": {
+      "label": "Quiz · 3 questions",
+      "description": "Curated multi-question MCQ deck"
+    },
+    "drag-5pair": {
+      "label": "5-pair matching",
+      "description": "Five terms paired with their definitions"
+    },
+    "discussion-reflect": {
+      "label": "Reflection prompt",
+      "description": "Open-ended journaling thread"
+    },
+    "poll-3opt": {
+      "label": "3-option poll",
+      "description": "Quick check-in with three choices"
+    },
+    "section-divider": {
+      "label": "Section break",
+      "description": "Visual divider with optional subtitle"
+    },
+    "reading-intro": {
+      "label": "Intro reading",
+      "description": "Welcome paragraph + outcomes list"
+    },
+    "aiquiz-5q": {
+      "label": "AI quiz · 5 questions",
+      "description": "Generate 5 questions on the lesson topic"
+    },
+    "speak-vocab": {
+      "label": "Vocabulary speak-back",
+      "description": "Student says a word; we score the recognition"
+    },
+    "live-class": {
+      "label": "Live class session",
+      "description": "Scheduled meeting with a join link"
+    },
+    "branching-3node": {
+      "label": "Branching · 3 nodes",
+      "description": "Choose-your-own-adventure with one branch"
+    }
+  },
+  "BlockPicker": {
+    "addBlockTitle": "Add a block to this lesson",
+    "blockBtn": "block",
+    "starters": "STARTERS",
+    "blockLibrary": "BLOCK LIBRARY",
+    "insertInto": "Insert into →",
+    "lessonFallback": "lesson {id}",
+    "noLessonHint": "Click any lesson in the canvas to set the insert target."
   }
 }

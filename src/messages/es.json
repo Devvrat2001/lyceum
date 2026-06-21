@@ -959,5 +959,90 @@
     "update": "Actualizar reseña",
     "submit": "Enviar reseña",
     "thanks": "Gracias — tu reseña ya está publicada."
+  },
+  "BlockCatalog": {
+    "groups": {
+      "content": "Contenido",
+      "practice": "Práctica",
+      "interactive": "Interactivo",
+      "structure": "Estructura"
+    },
+    "labels": {
+      "VIDEO": "Vídeo",
+      "READING": "Lectura",
+      "SLIDES": "Diapositivas",
+      "PDF": "PDF / archivo",
+      "QUIZ": "Cuestionario",
+      "MCQ": "Opción múltiple",
+      "SPEAK": "Hablar / grabar",
+      "AI_QUIZ": "Cuestionario con IA",
+      "FREE_RESPONSE": "Respuesta libre · con IA",
+      "SIMULATION": "Simulación",
+      "BRANCHING": "Escenario ramificado",
+      "DRAG_MATCH": "Arrastrar y emparejar",
+      "POLL": "Encuesta en vivo",
+      "SECTION": "Separador de sección",
+      "DISCUSSION": "Hilo de debate",
+      "LIVE": "Sesión en vivo"
+    }
+  },
+  "BlockTemplates": {
+    "mcq-4opt": {
+      "label": "MCQ de 4 opciones",
+      "description": "Pregunta + cuatro respuestas, una correcta"
+    },
+    "mcq-true-false": {
+      "label": "Verdadero / falso",
+      "description": "Afirmación más un par Verdadero / Falso"
+    },
+    "quiz-3q": {
+      "label": "Cuestionario · 3 preguntas",
+      "description": "Conjunto curado de preguntas de opción múltiple"
+    },
+    "drag-5pair": {
+      "label": "Emparejamiento de 5 pares",
+      "description": "Cinco términos emparejados con sus definiciones"
+    },
+    "discussion-reflect": {
+      "label": "Pregunta de reflexión",
+      "description": "Hilo de diario abierto"
+    },
+    "poll-3opt": {
+      "label": "Encuesta de 3 opciones",
+      "description": "Sondeo rápido con tres opciones"
+    },
+    "section-divider": {
+      "label": "Separador de sección",
+      "description": "Divisor visual con subtítulo opcional"
+    },
+    "reading-intro": {
+      "label": "Lectura de introducción",
+      "description": "Párrafo de bienvenida + lista de objetivos"
+    },
+    "aiquiz-5q": {
+      "label": "Cuestionario IA · 5 preguntas",
+      "description": "Genera 5 preguntas sobre el tema de la lección"
+    },
+    "speak-vocab": {
+      "label": "Práctica de vocabulario hablado",
+      "description": "El estudiante dice una palabra; puntuamos el reconocimiento"
+    },
+    "live-class": {
+      "label": "Sesión de clase en vivo",
+      "description": "Reunión programada con enlace de acceso"
+    },
+    "branching-3node": {
+      "label": "Ramificación · 3 nodos",
+      "description": "Aventura interactiva con una bifurcación"
+    }
+  },
+  "BlockPicker": {
+    "addBlockTitle": "Añadir un bloque a esta lección",
+    "blockBtn": "bloque",
+    "starters": "PLANTILLAS",
+    "blockLibrary": "BIBLIOTECA DE BLOQUES",
+    "insertInto": "Insertar en →",
+    "lessonFallback": "lección {id}",
+    "noLessonHint": "Haz clic en cualquier lección del lienzo para fijar el destino de inserción."
   }
 }
