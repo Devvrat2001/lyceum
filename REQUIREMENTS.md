@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–74 — entire public surface + block catalogs + the CourseBuilderClient frame + the whole inspector rail done; remaining in CourseBuilderClient: the canvas + command menu + error toasts; then BlockInspector + teacher-courses pages + admin tools)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–75 — public surface + block catalogs + the CourseBuilderClient frame + inspector rail + the canvas CHROME done; remaining in CourseBuilderClient: the per-type BlockBody previews + error toasts; then BlockInspector + teacher-courses pages + admin tools)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -706,9 +706,14 @@ Ordered by learner/public impact:
    **Course tab DONE (cont.74)** — `CoursePanel` (stats) + `CourseDetailsEditor`
    (the full course-settings form; board/format select options mapped through
    the `MarketplaceCatalog` ns); +30 keys → **the whole inspector rail is
-   localized.** Remaining in `CourseBuilderClient`: `BuilderCanvas` (block
-   previews) + `CommandMenu` + the main-component error toasts. Then
-   `BlockInspector`
+   localized.** **Canvas chrome DONE (cont.75)** — `BuilderCanvas` (empty
+   states, lesson header, add-block CTAs, chips) + `CommandMenu` (the "/" block
+   picker) + `SortableBlock`/`BlockToolbar`/`ToolbarIcon` (drag arias, TURN-INTO
+   menu, dup/delete — `ToolbarIcon` got a `danger` prop so its glyph no longer
+   keys off the literal title) + `metaLine` (block meta summaries via a `t`
+   param), reusing `BlockCatalog` for type labels/groups; +31 keys. Remaining in
+   `CourseBuilderClient`: the per-type **`BlockBody` previews** (the WYSIWYG
+   inner content) + the main-component error toasts. Then `BlockInspector`
    (per-type editors — big) + `teacher/courses/new` `/new/ai` `/[courseId]/edit`
    + `teacher/assignments` (`AssignmentsClient`) + `teacher/students/[id]`.
 5. **Admin power tools**: `admin/branding` (`BrandingEditor`),
