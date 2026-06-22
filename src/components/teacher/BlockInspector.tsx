@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { Btn, Eyebrow, Icon, Toggle } from "@/components/wf/primitives";
 import { trpc } from "@/lib/trpc/react";
+import { useTranslations } from "next-intl";
 import {
   findBlockMeta,
   type BlockType,
@@ -215,6 +216,9 @@ export function BlockInspector({
   onMove?: (toLessonId: string) => void;
 }) {
   const meta = findBlockMeta(block.type);
+  const t = useTranslations("BlockInspector");
+  const tcb = useTranslations("BlockCatalog");
+  const blockLabel = tcb(`labels.${block.type}`);
   const [draft, setDraft] = useState<BlockSettingsShape>(block.settings);
   const [feedback, setFeedback] = useState<
     { kind: "ok" | "error"; msg: string } | null
@@ -239,7 +243,7 @@ export function BlockInspector({
     onSuccess: ({ block: saved }) => {
       const settings = (saved.settings ?? {}) as BlockSettingsShape;
       onSaved(settings);
-      setFeedback({ kind: "ok", msg: "Saved." });
+      setFeedback({ kind: "ok", msg: t("savedToast") });
       setTimeout(() => setFeedback(null), 1800);
     },
     onError: (e) => setFeedback({ kind: "error", msg: e.message }),
@@ -280,13 +284,13 @@ export function BlockInspector({
               marginBottom: 10,
             }}
           >
-            <Eyebrow>Inspector · Block</Eyebrow>
+            <Eyebrow>{t("eyebrow")}</Eyebrow>
             <div style={{ flex: 1 }} />
             <button
               type="button"
               onClick={onDeselect}
-              aria-label="Close inspector"
-              title="Deselect block"
+              aria-label={t("closeAria")}
+              title={t("deselectTitle")}
               style={{
                 border: "none",
                 background: "transparent",
@@ -326,7 +330,7 @@ export function BlockInspector({
                   color: meta.ai ? "var(--wf-ai)" : "var(--wf-ink)",
                 }}
               >
-                {meta.label}
+                {blockLabel}
               </div>
               <div
                 className="wf-mono"
@@ -339,23 +343,23 @@ export function BlockInspector({
         </>
       )}
 
-      <SectionLabel>CONTENT</SectionLabel>
+      <SectionLabel>{t("content")}</SectionLabel>
       <TextField
-        label="LABEL"
+        label={t("labelField")}
         value={draft.label ?? ""}
         onChange={(v) => update("label", v)}
-        placeholder={meta.label}
+        placeholder={blockLabel}
         maxLength={120}
-        hint={`Shown to students. Blank = use the default (${meta.label}).`}
+        hint={t("labelHint", { label: blockLabel })}
       />
 
       {renderTypeFields(block.type, block.id, draft, update, onSaved)}
 
       <TextAreaField
-        label="TEACHER NOTES"
+        label={t("teacherNotes")}
         value={draft.notes ?? ""}
         onChange={(v) => update("notes", v)}
-        placeholder="Reminders for you. Not visible to students."
+        placeholder={t("notesPlaceholder")}
         rows={4}
         maxLength={2000}
       />
@@ -372,10 +376,10 @@ export function BlockInspector({
         onClick={onSave}
       >
         {updateBlock.isPending
-          ? "Saving…"
+          ? t("saving")
           : dirty
-            ? "Save block"
-            : "Saved"}
+            ? t("saveBlock")
+            : t("saved")}
       </Btn>
 
       {moveTargets && moveTargets.length > 0 && onMove && (
@@ -390,7 +394,7 @@ export function BlockInspector({
               marginBottom: 4,
             }}
           >
-            MOVE TO LESSON
+            {t("moveToLesson")}
           </label>
           <select
             value=""
@@ -409,10 +413,10 @@ export function BlockInspector({
               cursor: "pointer",
             }}
           >
-            <option value="">Move this block to…</option>
-            {moveTargets.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
+            <option value="">{t("movePlaceholder")}</option>
+            {moveTargets.map((target) => (
+              <option key={target.id} value={target.id}>
+                {target.label}
               </option>
             ))}
           </select>
@@ -437,7 +441,7 @@ export function BlockInspector({
             fontFamily: "inherit",
           }}
         >
-          Delete block
+          {t("deleteBlock")}
         </button>
       )}
 
@@ -2357,6 +2361,7 @@ function AppearanceSection({
   draft: BlockSettingsShape;
   update: UpdateFn;
 }) {
+  const t = useTranslations("BlockInspector");
   const a = draft.appearance ?? {};
   const setA = (patch: Partial<NonNullable<BlockSettingsShape["appearance"]>>) =>
     update("appearance", { ...a, ...patch });
@@ -2364,17 +2369,21 @@ function AppearanceSection({
   const accent = a.accent ?? ACCENT_SWATCHES[0];
   return (
     <>
-      <SectionLabel>APPEARANCE</SectionLabel>
+      <SectionLabel>{t("appearance")}</SectionLabel>
       <div
         style={{ fontSize: 10.5, color: "var(--wf-mute)", marginBottom: 6 }}
       >
-        Option layout
+        {t("optionLayout")}
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
         {(["list", "grid", "inline"] as const).map((opt) => {
           const on = layout === opt;
           const txt =
-            opt === "list" ? "List" : opt === "grid" ? "Grid 2×2" : "Inline";
+            opt === "list"
+              ? t("layoutList")
+              : opt === "grid"
+                ? t("layoutGrid")
+                : t("layoutInline");
           return (
             <button
               key={opt}
@@ -2401,7 +2410,7 @@ function AppearanceSection({
       <div
         style={{ fontSize: 10.5, color: "var(--wf-mute)", marginBottom: 6 }}
       >
-        Accent
+        {t("accent")}
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
         {ACCENT_SWATCHES.map((c) => {
@@ -2410,7 +2419,7 @@ function AppearanceSection({
             <button
               key={c}
               type="button"
-              aria-label={`Accent ${c}`}
+              aria-label={t("accentAria", { color: c })}
               onClick={() => setA({ accent: c })}
               style={{
                 width: 24,
@@ -2429,17 +2438,17 @@ function AppearanceSection({
         })}
       </div>
       <ToggleRow
-        label="Show option letters (A–D)"
+        label={t("showLetters")}
         on={a.showLetters ?? true}
         onChange={(v) => setA({ showLetters: v })}
       />
       <ToggleRow
-        label="Card style"
+        label={t("cardStyle")}
         on={a.cardStyle ?? true}
         onChange={(v) => setA({ cardStyle: v })}
       />
       <ToggleRow
-        label="Show correct after submit"
+        label={t("showCorrect")}
         on={a.showCorrect ?? true}
         onChange={(v) => setA({ showCorrect: v })}
         divider={false}
@@ -2457,6 +2466,7 @@ function BehaviorSection({
   draft: BlockSettingsShape;
   update: UpdateFn;
 }) {
+  const t = useTranslations("BlockInspector");
   const b = draft.behavior ?? {};
   const setB = (patch: Partial<NonNullable<BlockSettingsShape["behavior"]>>) =>
     update("behavior", { ...b, ...patch });
@@ -2464,28 +2474,28 @@ function BehaviorSection({
   const xp = typeof b.xp === "number" ? b.xp : 20;
   return (
     <>
-      <SectionLabel>BEHAVIOR</SectionLabel>
+      <SectionLabel>{t("behavior")}</SectionLabel>
       {isPractice && (
         <>
           <ToggleRow
-            label="Adaptive difficulty"
+            label={t("adaptive")}
             on={b.adaptive ?? true}
             onChange={(v) => setB({ adaptive: v })}
           />
           <ToggleRow
-            label="Allow AI tutor hints"
+            label={t("aiHints")}
             on={b.aiHints ?? true}
             onChange={(v) => setB({ aiHints: v })}
           />
         </>
       )}
       <ToggleRow
-        label="Required to pass"
+        label={t("requiredToPass")}
         on={b.required ?? isPractice}
         onChange={(v) => setB({ required: v })}
       />
       <ToggleRow
-        label="Allow retake"
+        label={t("allowRetake")}
         on={b.retake ?? true}
         onChange={(v) => setB({ retake: v })}
         divider={false}
@@ -2498,7 +2508,7 @@ function BehaviorSection({
           padding: "10px 0 2px",
         }}
       >
-        <span style={{ fontSize: 12, color: "var(--wf-body)" }}>XP reward</span>
+        <span style={{ fontSize: 12, color: "var(--wf-body)" }}>{t("xpReward")}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <input
             type="number"
@@ -2526,7 +2536,7 @@ function BehaviorSection({
             className="wf-mono"
             style={{ fontSize: 11, color: "var(--wf-mute)" }}
           >
-            XP
+            {t("xpSuffix")}
           </span>
         </div>
       </div>
