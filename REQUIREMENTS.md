@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–76 — public surface + block catalogs + the ENTIRE CourseBuilderClient done (frame + inspector rail + canvas chrome + block previews + error toasts; CourseBuilder ns = 161); remaining: BlockInspector + teacher-courses pages + admin tools)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–77 — public surface + block catalogs + the ENTIRE CourseBuilderClient (CourseBuilder ns = 161) + the BlockInspector shell/appearance/behavior (new BlockInspector ns = 32) done; remaining: BlockInspector per-type field editors + teacher-courses pages + admin tools)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -718,9 +718,16 @@ Ordered by learner/public impact:
    `BlockBody`/`OptionCards`, plus the **13 main-component error toasts** (in-scope
    `t` with a `{msg}` param); authored block content untouched. +45 keys → **the
    whole 4002-line `CourseBuilderClient` is now localized (CourseBuilder ns =
-   161).** Remaining for R55: `BlockInspector` (per-type editors — big) +
-   `teacher/courses/new` `/new/ai` `/[courseId]/edit` + `teacher/assignments`
-   (`AssignmentsClient`) + `teacher/students/[id]`.
+   161).** **`BlockInspector` shell DONE (cont.77)** — the 2647-line file's
+   frame (eyebrow, close/deselect, CONTENT/LABEL/notes fields, save states,
+   move-to-lesson, delete, the Saved toast) + the shared `AppearanceSection`
+   (option layout, accent, option toggles) + `BehaviorSection` (adaptive/AI-hints/
+   required/retake + XP) under a new `BlockInspector` ns (32 keys; block-type
+   label via `BlockCatalog`; map-var `t`→`target` to free the translator).
+   Remaining in `BlockInspector`: the ~19 per-type field **editors**
+   (`ReadingFields`/`McqFields`/`QuizFields`/`PollFields`/`BranchingFields`/…) —
+   the next slices. Then `teacher/courses/new` `/new/ai` `/[courseId]/edit` +
+   `teacher/assignments` (`AssignmentsClient`) + `teacher/students/[id]`.
 5. **Admin power tools**: `admin/branding` (`BrandingEditor`),
    `admin/integrations`, `admin/analytics` (`AdminInsights`/`AnalyticsCharts`).
 Big but mechanical — chunk a surface or two per cycle (ICU plurals +
