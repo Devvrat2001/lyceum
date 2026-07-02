@@ -621,7 +621,7 @@ otherwise feature-complete — the feature board has been exhausted since P7 —
 so the genuine net-new work is: finish i18n for real, plus two small
 hardening tails.
 
-### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–77 — public surface + block catalogs + the ENTIRE CourseBuilderClient (CourseBuilder ns = 161) + the BlockInspector shell/appearance/behavior (new BlockInspector ns = 32) done; remaining: BlockInspector per-type field editors + teacher-courses pages + admin tools)
+### R55 · Finish i18n for real — the surfaces R52 never enumerated · Status: IN PROGRESS (cont.58–78 — public surface + block catalogs + the ENTIRE CourseBuilderClient (CourseBuilder ns = 161) + the BlockInspector shell + batch-1 per-type editors (BlockInspector ns = 83) done; remaining: BlockInspector complex/Video editors + teacher-courses pages + admin tools)
 `<html lang>` is already locale-correct (`getLocale()` in the root layout)
 and the catalogs + parity harness exist, so this is pure breadth, same
 `useTranslations`/`getTranslations` + C:\tmp splice-script pattern as R52.
@@ -724,10 +724,13 @@ Ordered by learner/public impact:
    (option layout, accent, option toggles) + `BehaviorSection` (adaptive/AI-hints/
    required/retake + XP) under a new `BlockInspector` ns (32 keys; block-type
    label via `BlockCatalog`; map-var `t`→`target` to free the translator).
-   Remaining in `BlockInspector`: the ~19 per-type field **editors**
-   (`ReadingFields`/`McqFields`/`QuizFields`/`PollFields`/`BranchingFields`/…) —
-   the next slices. Then `teacher/courses/new` `/new/ai` `/[courseId]/edit` +
-   `teacher/assignments` (`AssignmentsClient`) + `teacher/students/[id]`.
+   **Editors batch 1 DONE (cont.78)** — Reading/Mcq/Slides/Pdf/Poll/Speak/
+   Simulation/FreeResponse/Discussion/Section (+51 keys → BlockInspector ns = 83;
+   shared option-array chrome factored into reused keys). Remaining in
+   `BlockInspector`: the complex array editors (`Quiz`/`AiQuiz`/`Branching`/
+   `DragMatch`/`Live`) + the `Video` editor. Then `teacher/courses/new`
+   `/new/ai` `/[courseId]/edit` + `teacher/assignments` (`AssignmentsClient`) +
+   `teacher/students/[id]`.
 5. **Admin power tools**: `admin/branding` (`BrandingEditor`),
    `admin/integrations`, `admin/analytics` (`AdminInsights`/`AnalyticsCharts`).
 Big but mechanical — chunk a surface or two per cycle (ICU plurals +
