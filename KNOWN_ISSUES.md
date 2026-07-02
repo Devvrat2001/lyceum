@@ -86,6 +86,28 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **Audit finding:** the original suspicion was largely a false alarm. Every bindless `catch {` in `src` is one of: **feature-detection** (`new URL()` validity in BlockReader SLIDES/PDF/SIMULATION + `LessonVideoPlayer` + CourseBuilderClient `hostOf`; the `stripe`/Mux dynamic-import probes), a **defensive no-op** (SpeechRecognition abort/stop, clipboard-blocked, the SSE partial-line skip in `LessonClient`, the offline-queue retry path), or **input validation that returns a meaningful HTTP error** (the `/api/*` route bodies → 400/401/503). None of those should log — it would be noise (e.g. "user pasted an invalid URL").
 - **Fix shipped:** the one genuine "handles the failure but loses the cause" case — `PdfDownloadButton`'s download `catch` (it set the error/retry UI but discarded the fetch/blob error) — now binds the error and `console.debug`s it, so a failed report download is traceable.
 
+### S2-6 · Prisma pg-adapter drops a bind param under a create-heavy sequence — ⚠️ OPEN (found 2026-07-02)
+- **Where:** surfaced while adding the R59 `Order (courseId XOR pathId)` CHECK. A
+  bundle-order `db.order.create({ data: { pathId, … } })` that follows, on the same
+  connection, **parallel** `course.create` (`Promise.all`) + a `path.create` with
+  nested `PathCourse` creates persists the row with **`pathId = NULL`** — the
+  `pathId` bind parameter is silently dropped. A *minimal* `order.create` writes
+  `pathId` correctly; only the multi-insert sequence corrupts it. Reproduced
+  deterministically outside vitest (raw script, same `@/lib/db` client, Prisma 7.8
+  + `@prisma/adapter-pg`).
+- **Risk:** a bundle order with neither `courseId` nor `pathId` is unfulfillable —
+  `fulfillPaidOrder` branches on `order.courseId`/`order.pathId`, so a both-null
+  order enrolls the buyer in **nothing** after payment. The app's real
+  `createPathCheckout` does a path **read** (`findUnique`) before `order.create`,
+  not a create-heavy sequence, so it appears **not** to trigger today — but any
+  path that creates rows right before an `order.create` on the same request could.
+- **Why it matters here:** this is why the R59 Order CHECK is deferred — enforcing
+  it turns the silent corruption into a hard failure in `pathCheckout` /
+  `pathBundle` / `payment.refund` tests.
+- **Next:** minimal repro against a bare `PrismaClient`+adapter to confirm it's the
+  adapter (not app); file upstream / pin a workaround (sequential creates or wrap
+  the fixture in `$transaction`). Once fixed, land the Order CHECK (R59).
+
 ---
 
 ## S3 — Hygiene / low risk

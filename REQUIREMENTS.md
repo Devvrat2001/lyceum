@@ -764,10 +764,13 @@ R62→R63 (soft). R58/R59/R54/R57 are independent.
   from a template clone; delete the fake-`now` hacks; explicit waits + a dedicated
   user for the flaky buy-flow e2e. Resolves KNOWN_ISSUES S3-3. *(Safety net for
   R61/R62 — do first. Needs the dev DB up.)*
-- **R59 · DB CHECK constraints for the "exactly one of" invariants · Status: OPEN**
-  — `Attempt (questionId XOR blockId)`, `Order (courseId XOR pathId)` via a raw-SQL
-  migration tail (audit both = 0 first). `ParentChild` role rule stays app-layer.
-  *(Cheap. Needs the dev DB up.)*
+- **R59 · DB CHECK constraints for the "exactly one of" invariants · Status:
+  PARTIAL (Attempt done 2026-07-02; Order deferred)** — `Attempt (questionId XOR
+  blockId)` shipped (migration `20260702101056`, audited 0/33 clean, regression
+  test `test/checkConstraints.test.ts`). **`Order (courseId XOR pathId)` DEFERRED**
+  — adding it flushed out a Prisma pg-adapter bug that silently drops the `pathId`
+  bind param in a create-heavy insert sequence (**KNOWN_ISSUES S2-6**); the Order
+  CHECK lands once that's root-caused. `ParentChild` role rule stays app-layer.
 - **R60 · `no-literal-string` i18n lint guard · Status: BLOCKED on R55** — enable
   after i18n hits 100%, baseline to 0, gate in CI. Scope to JSX text +
   placeholder/aria-label/title/alt.
