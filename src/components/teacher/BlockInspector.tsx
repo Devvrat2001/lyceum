@@ -816,20 +816,22 @@ function StatusRow({
 }
 
 function ReadingFields({ draft, update }: FieldsProps<"READING">) {
+  const t = useTranslations("BlockInspector");
   return (
     <TextAreaField
-      label="READING (MARKDOWN)"
+      label={t("readingLabel")}
       value={typeof draft.body === "string" ? draft.body : ""}
       onChange={(v) => update("body", v)}
-      placeholder="# Heading\n\nWrite the lesson content in markdown…"
+      placeholder={t("readingPlaceholder")}
       rows={10}
       maxLength={20_000}
-      hint="Markdown rendering ships with the reader UI."
+      hint={t("readingHint")}
     />
   );
 }
 
 function McqFields({ draft, update }: FieldsProps<"MCQ">) {
+  const t = useTranslations("BlockInspector");
   const options: McqOption[] = Array.isArray(draft.options)
     ? (draft.options as McqOption[])
     : [];
@@ -859,10 +861,10 @@ function McqFields({ draft, update }: FieldsProps<"MCQ">) {
   return (
     <>
       <TextAreaField
-        label="QUESTION STEM"
+        label={t("mcqStem")}
         value={typeof draft.stem === "string" ? draft.stem : ""}
         onChange={(v) => update("stem", v)}
-        placeholder="What's 3 × 4?"
+        placeholder={t("mcqStemPlaceholder")}
         rows={3}
         maxLength={500}
       />
@@ -876,7 +878,7 @@ function McqFields({ draft, update }: FieldsProps<"MCQ">) {
             letterSpacing: "0.06em",
           }}
         >
-          ANSWER OPTIONS · 2 – 6 · ONE CORRECT
+          {t("mcqOptionsHdr")}
         </div>
         {options.length === 0 ? (
           <div
@@ -886,7 +888,7 @@ function McqFields({ draft, update }: FieldsProps<"MCQ">) {
               padding: "8px 0",
             }}
           >
-            No options yet — add at least two.
+            {t("optNoneYet")}
           </div>
         ) : (
           options.map((o, i) => (
@@ -904,14 +906,14 @@ function McqFields({ draft, update }: FieldsProps<"MCQ">) {
                 name="mcq-correct"
                 checked={o.correct}
                 onChange={() => setCorrect(i)}
-                aria-label={`Mark option ${i + 1} as correct`}
+                aria-label={t("mcqMarkCorrect", { n: i + 1 })}
                 style={{ accentColor: "var(--wf-good)" }}
               />
               <input
                 type="text"
                 value={o.text}
                 onChange={(e) => setText(i, e.target.value)}
-                placeholder={`Option ${i + 1}`}
+                placeholder={t("optionN", { n: i + 1 })}
                 maxLength={200}
                 style={{
                   flex: 1,
@@ -929,10 +931,10 @@ function McqFields({ draft, update }: FieldsProps<"MCQ">) {
                 disabled={options.length <= 2}
                 title={
                   options.length <= 2
-                    ? "Need at least 2 options"
-                    : "Remove option"
+                    ? t("optNeedTwo")
+                    : t("optRemove")
                 }
-                aria-label={`Remove option ${i + 1}`}
+                aria-label={t("optRemoveAria", { n: i + 1 })}
                 style={{
                   border: "none",
                   background: "transparent",
@@ -969,7 +971,7 @@ function McqFields({ draft, update }: FieldsProps<"MCQ">) {
             cursor: options.length >= 6 ? "not-allowed" : "pointer",
           }}
         >
-          + Add option ({options.length}/6)
+          {t("optAdd", { count: options.length })}
         </button>
       </div>
     </>
@@ -977,21 +979,22 @@ function McqFields({ draft, update }: FieldsProps<"MCQ">) {
 }
 
 function SlidesFields({ draft, update }: FieldsProps<"SLIDES">) {
+  const t = useTranslations("BlockInspector");
   return (
     <>
       <TextField
-        label="SLIDES URL"
+        label={t("slidesUrl")}
         value={typeof draft.url === "string" ? draft.url : ""}
         onChange={(v) => update("url", v)}
-        placeholder="https://docs.google.com/presentation/d/…"
+        placeholder={t("slidesUrlPlaceholder")}
         maxLength={500}
-        hint="Google Slides /edit or /pubembed links work — the reader normalizes them."
+        hint={t("slidesUrlHint")}
       />
       <TextField
-        label="CAPTION (OPTIONAL)"
+        label={t("captionOptional")}
         value={typeof draft.caption === "string" ? draft.caption : ""}
         onChange={(v) => update("caption", v)}
-        placeholder="One-line description shown under the deck"
+        placeholder={t("slidesCaptionPlaceholder")}
         maxLength={200}
       />
     </>
@@ -999,21 +1002,22 @@ function SlidesFields({ draft, update }: FieldsProps<"SLIDES">) {
 }
 
 function PdfFields({ draft, update }: FieldsProps<"PDF">) {
+  const t = useTranslations("BlockInspector");
   return (
     <>
       <TextField
-        label="PDF URL"
+        label={t("pdfUrl")}
         value={typeof draft.url === "string" ? draft.url : ""}
         onChange={(v) => update("url", v)}
-        placeholder="https://… (direct .pdf link)"
+        placeholder={t("pdfUrlPlaceholder")}
         maxLength={500}
-        hint="Some hosts block cross-origin embeds — the reader falls back to a download link."
+        hint={t("pdfUrlHint")}
       />
       <TextField
-        label="CAPTION (OPTIONAL)"
+        label={t("captionOptional")}
         value={typeof draft.caption === "string" ? draft.caption : ""}
         onChange={(v) => update("caption", v)}
-        placeholder="One-line description shown under the PDF"
+        placeholder={t("pdfCaptionPlaceholder")}
         maxLength={200}
       />
     </>
@@ -1021,6 +1025,7 @@ function PdfFields({ draft, update }: FieldsProps<"PDF">) {
 }
 
 function PollFields({ draft, update }: FieldsProps<"POLL">) {
+  const t = useTranslations("BlockInspector");
   // POLL options are plain strings — no correctness flag, no shared
   // shape with MCQ. Stored in the same `options` field; the router
   // discriminates by Block.type and filters to typeof "string".
@@ -1049,10 +1054,10 @@ function PollFields({ draft, update }: FieldsProps<"POLL">) {
   return (
     <>
       <TextAreaField
-        label="POLL QUESTION"
+        label={t("pollQuestion")}
         value={typeof draft.stem === "string" ? draft.stem : ""}
         onChange={(v) => update("stem", v)}
-        placeholder="Which method is easier to remember?"
+        placeholder={t("pollQuestionPlaceholder")}
         rows={3}
         maxLength={500}
       />
@@ -1066,7 +1071,7 @@ function PollFields({ draft, update }: FieldsProps<"POLL">) {
             letterSpacing: "0.06em",
           }}
         >
-          POLL OPTIONS · 2 – 6
+          {t("pollOptionsHdr")}
         </div>
         {options.length === 0 ? (
           <div
@@ -1076,7 +1081,7 @@ function PollFields({ draft, update }: FieldsProps<"POLL">) {
               padding: "8px 0",
             }}
           >
-            No options yet — add at least two.
+            {t("optNoneYet")}
           </div>
         ) : (
           options.map((text, i) => (
@@ -1093,7 +1098,7 @@ function PollFields({ draft, update }: FieldsProps<"POLL">) {
                 type="text"
                 value={text}
                 onChange={(e) => setText(i, e.target.value)}
-                placeholder={`Option ${i + 1}`}
+                placeholder={t("optionN", { n: i + 1 })}
                 maxLength={200}
                 style={{
                   flex: 1,
@@ -1111,10 +1116,10 @@ function PollFields({ draft, update }: FieldsProps<"POLL">) {
                 disabled={options.length <= 2}
                 title={
                   options.length <= 2
-                    ? "Need at least 2 options"
-                    : "Remove option"
+                    ? t("optNeedTwo")
+                    : t("optRemove")
                 }
-                aria-label={`Remove option ${i + 1}`}
+                aria-label={t("optRemoveAria", { n: i + 1 })}
                 style={{
                   border: "none",
                   background: "transparent",
@@ -1151,7 +1156,7 @@ function PollFields({ draft, update }: FieldsProps<"POLL">) {
             cursor: options.length >= 6 ? "not-allowed" : "pointer",
           }}
         >
-          + Add option ({options.length}/6)
+          {t("optAdd", { count: options.length })}
         </button>
       </div>
     </>
@@ -1685,6 +1690,7 @@ function BranchingFields({ draft, update }: FieldsProps<"BRANCHING">) {
 }
 
 function SpeakFields({ draft, update }: FieldsProps<"SPEAK">) {
+  const t = useTranslations("BlockInspector");
   // SPEAK has two parts: the prompt the reader reads aloud, and an
   // optional `expected` target phrase the reader compares the
   // transcript against. Language is BCP-47 (default en-US) so
@@ -1693,50 +1699,51 @@ function SpeakFields({ draft, update }: FieldsProps<"SPEAK">) {
   return (
     <>
       <TextAreaField
-        label="PROMPT (READ ALOUD)"
+        label={t("speakPrompt")}
         value={typeof draft.prompt === "string" ? draft.prompt : ""}
         onChange={(v) => update("prompt", v)}
-        placeholder="Read this sentence aloud, paying attention to the underlined words."
+        placeholder={t("speakPromptPlaceholder")}
         rows={3}
         maxLength={500}
-        hint="The reader speaks this via the browser's text-to-speech."
+        hint={t("speakPromptHint")}
       />
       <TextField
-        label="EXPECTED RESPONSE (OPTIONAL)"
+        label={t("speakExpectedLabel")}
         value={typeof draft.expected === "string" ? draft.expected : ""}
         onChange={(v) => update("expected", v)}
-        placeholder="The phrase the student should say back"
+        placeholder={t("speakExpectedPlaceholder")}
         maxLength={300}
-        hint="When set, the reader compares the student's transcript to this."
+        hint={t("speakExpectedHint")}
       />
       <TextField
-        label="LANGUAGE CODE"
+        label={t("speakLang")}
         value={typeof draft.language === "string" ? draft.language : ""}
         onChange={(v) => update("language", v)}
-        placeholder="en-US"
+        placeholder={t("speakLangPlaceholder")}
         maxLength={16}
-        hint="BCP-47 code. Leave blank for en-US. Examples: es-ES, fr-FR, hi-IN."
+        hint={t("speakLangHint")}
       />
     </>
   );
 }
 
 function SimulationFields({ draft, update }: FieldsProps<"SIMULATION">) {
+  const t = useTranslations("BlockInspector");
   return (
     <>
       <TextField
-        label="SIMULATION URL"
+        label={t("simUrl")}
         value={typeof draft.url === "string" ? draft.url : ""}
         onChange={(v) => update("url", v)}
-        placeholder="https://phet.colorado.edu/… · https://www.desmos.com/… · any iframe-able URL"
+        placeholder={t("simUrlPlaceholder")}
         maxLength={500}
-        hint="Most PhET, Desmos, and GeoGebra sims embed cleanly. Reader falls back to a link for hosts that block embedding."
+        hint={t("simUrlHint")}
       />
       <TextField
-        label="CAPTION (OPTIONAL)"
+        label={t("captionOptional")}
         value={typeof draft.caption === "string" ? draft.caption : ""}
         onChange={(v) => update("caption", v)}
-        placeholder="One-line description shown under the sim"
+        placeholder={t("simCaptionPlaceholder")}
         maxLength={200}
       />
     </>
@@ -2234,70 +2241,71 @@ function DragMatchFields({ draft, update }: FieldsProps<"DRAG_MATCH">) {
 }
 
 function FreeResponseFields({ draft, update }: FieldsProps<"FREE_RESPONSE">) {
+  const t = useTranslations("BlockInspector");
   // Two parts: the prompt students answer, and the rubric the AI grades
   // against. The rubric never reaches the student client — the grading
   // mutation reads it server-side from Block.settings.
   return (
     <>
       <TextAreaField
-        label="WRITING PROMPT"
+        label={t("freePrompt")}
         value={typeof draft.prompt === "string" ? draft.prompt : ""}
         onChange={(v) => update("prompt", v)}
-        placeholder="In your own words, explain why the moon has phases."
+        placeholder={t("freePromptPlaceholder")}
         rows={3}
         maxLength={1000}
-        hint="The question students answer in a few sentences."
+        hint={t("freePromptHint")}
       />
       <TextAreaField
-        label="RUBRIC · WHAT A STRONG ANSWER COVERS"
+        label={t("freeRubric")}
         value={typeof draft.rubric === "string" ? draft.rubric : ""}
         onChange={(v) => update("rubric", v)}
-        placeholder={
-          "- The moon orbits Earth\n- We see the sunlit half from different angles\n- A full cycle takes about a month"
-        }
+        placeholder={t("freeRubricPlaceholder")}
         rows={5}
         maxLength={2000}
-        hint="The AI grades against this. Students never see it. Blank = grade against the prompt's plain intent."
+        hint={t("freeRubricHint")}
       />
     </>
   );
 }
 
 function DiscussionFields({ draft, update }: FieldsProps<"DISCUSSION">) {
+  const t = useTranslations("BlockInspector");
   // DISCUSSION is mostly student-driven — the only authoring control
   // is an optional prompt question that opens the thread. Stored in
   // the `prompt` field; falls back to a generic placeholder if unset.
   return (
     <TextAreaField
-      label="DISCUSSION PROMPT (OPTIONAL)"
+      label={t("discussionLabel")}
       value={typeof draft.prompt === "string" ? draft.prompt : ""}
       onChange={(v) => update("prompt", v)}
-      placeholder="What's one moment in this lesson that confused you, and how did you work past it?"
+      placeholder={t("discussionPlaceholder")}
       rows={3}
       maxLength={500}
-      hint="Shown above the thread to anchor the conversation."
+      hint={t("discussionHint")}
     />
   );
 }
 
 function SectionFields({ draft, update }: FieldsProps<"SECTION">) {
+  const t = useTranslations("BlockInspector");
   // SECTION is a pure presentational divider — title is the visible
   // heading, subtitle is an optional intro line. Useful for grouping a
   // long lesson into thematic sections without nesting structure.
   return (
     <>
       <TextField
-        label="SECTION TITLE"
+        label={t("sectionTitle")}
         value={typeof draft.title === "string" ? draft.title : ""}
         onChange={(v) => update("title", v)}
-        placeholder="Part 1 — Setting up"
+        placeholder={t("sectionTitlePlaceholder")}
         maxLength={120}
       />
       <TextField
-        label="SUBTITLE (OPTIONAL)"
+        label={t("sectionSubtitle")}
         value={typeof draft.subtitle === "string" ? draft.subtitle : ""}
         onChange={(v) => update("subtitle", v)}
-        placeholder="One-line description of what this section covers"
+        placeholder={t("sectionSubtitlePlaceholder")}
         maxLength={200}
       />
     </>
