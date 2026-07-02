@@ -86,27 +86,39 @@ So this is a short, targeted list — not a tar pit. But every item here is a re
 - **Audit finding:** the original suspicion was largely a false alarm. Every bindless `catch {` in `src` is one of: **feature-detection** (`new URL()` validity in BlockReader SLIDES/PDF/SIMULATION + `LessonVideoPlayer` + CourseBuilderClient `hostOf`; the `stripe`/Mux dynamic-import probes), a **defensive no-op** (SpeechRecognition abort/stop, clipboard-blocked, the SSE partial-line skip in `LessonClient`, the offline-queue retry path), or **input validation that returns a meaningful HTTP error** (the `/api/*` route bodies → 400/401/503). None of those should log — it would be noise (e.g. "user pasted an invalid URL").
 - **Fix shipped:** the one genuine "handles the failure but loses the cause" case — `PdfDownloadButton`'s download `catch` (it set the error/retry UI but discarded the fetch/blob error) — now binds the error and `console.debug`s it, so a failed report download is traceable.
 
-### S2-6 · Prisma pg-adapter drops a bind param under a create-heavy sequence — ⚠️ OPEN (found 2026-07-02)
-- **Where:** surfaced while adding the R59 `Order (courseId XOR pathId)` CHECK. A
-  bundle-order `db.order.create({ data: { pathId, … } })` that follows, on the same
-  connection, **parallel** `course.create` (`Promise.all`) + a `path.create` with
-  nested `PathCourse` creates persists the row with **`pathId = NULL`** — the
-  `pathId` bind parameter is silently dropped. A *minimal* `order.create` writes
-  `pathId` correctly; only the multi-insert sequence corrupts it. Reproduced
-  deterministically outside vitest (raw script, same `@/lib/db` client, Prisma 7.8
-  + `@prisma/adapter-pg`).
-- **Risk:** a bundle order with neither `courseId` nor `pathId` is unfulfillable —
-  `fulfillPaidOrder` branches on `order.courseId`/`order.pathId`, so a both-null
-  order enrolls the buyer in **nothing** after payment. The app's real
-  `createPathCheckout` does a path **read** (`findUnique`) before `order.create`,
-  not a create-heavy sequence, so it appears **not** to trigger today — but any
-  path that creates rows right before an `order.create` on the same request could.
-- **Why it matters here:** this is why the R59 Order CHECK is deferred — enforcing
-  it turns the silent corruption into a hard failure in `pathCheckout` /
-  `pathBundle` / `payment.refund` tests.
-- **Next:** minimal repro against a bare `PrismaClient`+adapter to confirm it's the
-  adapter (not app); file upstream / pin a workaround (sequential creates or wrap
-  the fixture in `$transaction`). Once fixed, land the Order CHECK (R59).
+### S2-6 · `@prisma/adapter-pg@7.8.0` drops the last-column bind param under connection saturation — ⚠️ ROOT-CAUSED + MITIGATED (2026-07-02)
+- **Symptom:** a bundle `db.order.create({ data: { pathId, … } })` persists the row
+  with **`pathId = NULL`** — the `pathId` bind parameter is silently dropped.
+- **Root cause (confirmed by bisecting):** `@prisma/adapter-pg` defaults to
+  **unnamed** prepared statements — `PrismaPgOptions.statementNameGenerator` is
+  unset, and its own docs say "if not provided, prepared statements are not
+  cached." That unnamed path **drops the last *physical* column's bind parameter**
+  once enough same-connection INSERTs accumulate on a pooled `pg` connection.
+  `pathId` is `Order`'s **last-added physical column** (Postgres reports the
+  failing row with `pathId` last), and it's the **only** field a *bundle* order
+  needs non-null — which is exactly why **only bundle orders corrupt** (a
+  single-course order leaves `pathId` NULL anyway, so the drop is invisible).
+- **Reproduction:** deterministic in the vitest process (hundreds of prior
+  inserts) and in a standalone `warm×N → bundle` saturation loop on one `@/lib/db`
+  client; **NOT** reproducible in a short script (few queries) or a fresh bare
+  client — it's a *stateful* saturation bug, not a per-query one. Independent of
+  the CHECK constraint (which only converts the silent NULL into a visible
+  `23514`).
+- **Prod exposure:** `payment.createPathCheckout` → `order.create({ pathId })` on a
+  **warm pooled connection** (a serverless container that has served many prior
+  order inserts) can persist `pathId = NULL` → `fulfillPaidOrder` enrolls the buyer
+  in **nothing** → **paid-but-unenrolled**. Low frequency (bundles are rare +
+  needs a saturated connection), high severity (money in, no access).
+- **Mitigation SHIPPED (2026-07-02):** `fulfillPaidOrder` now **throws on a
+  both-null order** *before* flipping it to PAID (test: `test/fulfillOrderGuard.test.ts`),
+  so a dropped-`pathId` order fails loudly (webhook non-200 → provider retries;
+  demoConfirm surfaces the error) instead of silently taking money.
+- **Real fix (pending):** **upgrade `prisma` + `@prisma/adapter-pg` past 7.8** and
+  re-run the saturation repro to confirm the drop is gone. Do **NOT** set
+  `statementNameGenerator` as a blanket workaround — named prepared statements
+  break **pgbouncer** transaction-pooling (common on managed Postgres). Once the
+  drop can't recur, land the deferred **Order (courseId XOR pathId) CHECK** (R59)
+  and extend `test/checkConstraints.test.ts` with the Order cases.
 
 ---
 
