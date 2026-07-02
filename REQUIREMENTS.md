@@ -747,7 +747,42 @@ R50 shipped HSTS/X-Frame/etc. but no CSP, because the app styles via pervasive
 inline `style={{}}` and emits JSON-LD via `dangerouslySetInnerHTML` — a real
 CSP needs a nonce strategy or a refactor away from inline styles. Start
 **report-only** to measure violations before enforcing. Genuine hardening, a
-real chunk of work, not urgent.
+real chunk of work, not urgent. **P10 note:** the real CSP win is a strict
+`script-src` with **nonces** (Phase 4 of `REFACTOR_PLAN.md`), *independent* of
+inline styles — `style-src 'self' 'unsafe-inline'` is fine. Removing inline
+styles (R61) buys maintainability/bundle/theming, not CSP.
+
+---
+
+## P10 · Structural refactor initiative (2026-06-22) — see `REFACTOR_PLAN.md`
+
+Full sequenced plan + guardrails live in **`REFACTOR_PLAN.md`** (dependency graph,
+per-phase steps, verification, rollback). Hard order: R55→R60, R61→R62, R55→R62,
+R62→R63 (soft). R58/R59/R54/R57 are independent.
+
+- **R58 · Test isolation + e2e de-flake · Status: OPEN** — per-worker ephemeral DB
+  from a template clone; delete the fake-`now` hacks; explicit waits + a dedicated
+  user for the flaky buy-flow e2e. Resolves KNOWN_ISSUES S3-3. *(Safety net for
+  R61/R62 — do first. Needs the dev DB up.)*
+- **R59 · DB CHECK constraints for the "exactly one of" invariants · Status: OPEN**
+  — `Attempt (questionId XOR blockId)`, `Order (courseId XOR pathId)` via a raw-SQL
+  migration tail (audit both = 0 first). `ParentChild` role rule stays app-layer.
+  *(Cheap. Needs the dev DB up.)*
+- **R60 · `no-literal-string` i18n lint guard · Status: BLOCKED on R55** — enable
+  after i18n hits 100%, baseline to 0, gate in CI. Scope to JSX text +
+  placeholder/aria-label/title/alt.
+- **R61 · Design-system extraction → primitives + Tailwind tokens · Status: OPEN**
+  — 1,946 `style={{}}` sites (454 in the 3 big files). Map `--wf-*` into Tailwind
+  `@theme`; promote inline molecules (TextField/ToggleRow/SectionLabel…) into
+  `components/wf/`. Pilot BlockInspector first; screenshot-diff each surface.
+  **Highest leverage.**
+- **R62 · Decompose the god components · Status: OPEN (needs R61 + R55)** — block
+  registry (`components/blocks/<type>/{Editor,Reader,Preview}`) via a strangler
+  over the 3 parallel `switch(block.type)`; split `teacher.ts` (2,408) into nested
+  routers; `dynamic()` the editors to shrink the reader bundle.
+- **R63 · Retire the legacy `Question` path · Status: OPEN (do last)** — migrate
+  `Question`→`Block`, remap `Attempt.questionId`→`blockId`+`chosenIndex`; delete
+  the dual-attempt fork. Riskiest (grading/XP/analytics) — after R62.
 
 ### Verified clean in the P9 pass (don't re-audit)
 - `<html lang={locale}>` is set from `getLocale()` (root layout) — the lang
