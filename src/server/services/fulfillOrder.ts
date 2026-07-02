@@ -21,6 +21,17 @@ export async function fulfillPaidOrder(
     pathId: string | null;
   }
 ): Promise<void> {
+  // Defense-in-depth against KNOWN_ISSUES S2-6: a Prisma pg-adapter bind-param
+  // drop can persist a bundle order with pathId=NULL, leaving an order with
+  // neither courseId nor pathId. Such an order is unfulfillable — fail loudly
+  // HERE, before flipping to PAID, so we never mark an order paid while
+  // enrolling the buyer in nothing (a webhook then non-200s and the provider
+  // retries; demoConfirm surfaces the error).
+  if (!order.courseId && !order.pathId) {
+    throw new Error(
+      `Order ${order.id} has neither courseId nor pathId — refusing to fulfill (KNOWN_ISSUES S2-6).`
+    );
+  }
   await db.$transaction(async (tx) => {
     await tx.order.update({
       where: { id: order.id },
